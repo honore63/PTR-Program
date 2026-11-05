@@ -1,13 +1,14 @@
 export {};
+
+export interface PtrpConfig {
+  apiBaseUrl?: string;
+  appName?: string;
+  version?: string;
+}
+
 declare global {
   interface Window {
-    __MANUS_CONFIG__?: {
-      projectId: string;
-      oauthPortalUrl: string;
-      apiUrl: string;
-      apiBrowserKey: string;
-      apiBaseUrl?: string;
-      oauthCallbackUrl?: string;
-    };
+    __PTRP_CONFIG__?: PtrpConfig;
+    __MANUS_CONFIG__?: Record<string, any>;
   }
 }

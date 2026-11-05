@@ -6,11 +6,5 @@ return [
     'db_user' => 'root',
     'db_password' => '',
     'base_path' => '/PTRP',
-    'manus_project_id' => '',
-    'manus_oauth_portal_url' => '',
-    'manus_oauth_api_url' => '',
     'manus_jwt_secret' => '',
-    'manus_api_url' => '',
-    'manus_api_key' => '',
-    'owner_open_id' => '',
 ];

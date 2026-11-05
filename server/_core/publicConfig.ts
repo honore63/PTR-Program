@@ -1,14 +1,13 @@
-// Only these public values may reach the browser. Never serialize process.env.
+// Only public values may reach the browser. Never serialize secrets.
 export function publicPlatformConfig(env: NodeJS.ProcessEnv = process.env) {
   return {
-    projectId: env.MANUS_PROJECT_ID ?? "",
-    oauthPortalUrl: env.MANUS_OAUTH_PORTAL_URL ?? "",
-    apiUrl: env.MANUS_API_URL ?? "",
-    apiBrowserKey: env.MANUS_API_BROWSER_KEY ?? "",
+    appName: "PTR Alumni Network",
+    apiBaseUrl: env.VITE_API_BASE_URL ?? "/PTRP/api/",
+    version: "1.0.0",
   };
 }
 
 export function publicPlatformScript(env: NodeJS.ProcessEnv = process.env): string {
   const json = JSON.stringify(publicPlatformConfig(env)).replaceAll("<", "\\u003c");
-  return `window.__MANUS_CONFIG__=${json};`;
+  return `window.__PTRP_CONFIG__=${json}; window.__MANUS_CONFIG__=window.__PTRP_CONFIG__;`;
 }

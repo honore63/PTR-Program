@@ -24,7 +24,10 @@ function config(): array
     if ($config === null) {
         $configPath = dirname(__DIR__) . '/config.php';
         if (!is_file($configPath)) {
-            throw new ApiError(503, 'Copy config.php.example to config.php and configure XAMPP.');
+            $configPath = dirname(__DIR__) . '/config.php.example';
+        }
+        if (!is_file($configPath)) {
+            throw new ApiError(503, 'Configuration file missing. Please create config.php.');
         }
         $config = require $configPath;
     }
@@ -42,8 +45,33 @@ function database(): PDO
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES => false,
         ]);
+        ensureDatabaseSchema($pdo);
     }
     return $pdo;
+}
+
+function ensureDatabaseSchema(PDO $pdo): void
+{
+    static $migrated = false;
+    if ($migrated) return;
+    $migrated = true;
+
+    try {
+        $columns = $pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('passwordHash', $columns, true)) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN passwordHash VARCHAR(255) NULL AFTER email");
+        }
+        if (!in_array('resetToken', $columns, true)) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN resetToken VARCHAR(128) NULL AFTER role");
+        }
+        if (!in_array('resetTokenExpires', $columns, true)) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN resetTokenExpires DATETIME NULL AFTER resetToken");
+        }
+        $pdo->exec("ALTER TABLE users MODIFY COLUMN openId VARCHAR(64) NULL");
+
+    } catch (Throwable $e) {
+        error_log('Database schema migration notice: ' . $e->getMessage());
+    }
 }
 
 function basePath(): string
@@ -57,6 +85,7 @@ function jsonBody(): array
     if ($raw === false || strlen($raw) > 16000000) {
         throw new ApiError(413, 'Request body is too large.');
     }
+    if (trim($raw) === '') return [];
     $data = json_decode($raw, true);
     if (!is_array($data)) {
         throw new ApiError(400, 'A JSON request body is required.');
@@ -82,7 +111,7 @@ function isTrustedOrigin(string $origin): bool
     $requestHost = strtolower(preg_replace('/:\\d+$/', '', (string) ($_SERVER['HTTP_HOST'] ?? 'localhost')));
     return ($parts['scheme'] ?? '') === 'http'
         && strtolower((string) ($parts['host'] ?? '')) === $requestHost
-        && in_array((int) ($parts['port'] ?? 0), [5500, 5173], true)
+        && in_array((int) ($parts['port'] ?? 0), [3000, 5173, 5500, 80, 443], true)
         && in_array($requestHost, ['localhost', '127.0.0.1'], true);
 }
 
@@ -94,7 +123,7 @@ function sendCorsHeaders(): void
     header('Access-Control-Allow-Origin: ' . $origin);
     header('Access-Control-Allow-Credentials: true');
     header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
     header('Vary: Origin');
 }
 
@@ -115,36 +144,52 @@ function base64UrlDecode(string $value): string|false
     return base64_decode(strtr($value, '-_', '+/') . str_repeat('=', (4 - strlen($value) % 4) % 4), true);
 }
 
-function signSession(array $user): string
+function getSessionSecret(): string
 {
     $settings = config();
-    if (empty($settings['manus_jwt_secret']) || empty($settings['manus_project_id'])) {
-        throw new ApiError(503, 'Manus authentication is not configured.');
+    $secret = (string) ($settings['manus_jwt_secret'] ?? '');
+    if (strlen($secret) < 32) {
+        throw new ApiError(503, 'A session signing secret of at least 32 characters must be configured.');
     }
+    return $secret;
+}
+
+function signSession(array $user): string
+{
+    $secret = getSessionSecret();
     $header = base64UrlEncode(json_encode(['alg' => 'HS256', 'typ' => 'JWT']));
     $payload = base64UrlEncode(json_encode([
-        'openId' => $user['openId'],
-        'appId' => $settings['manus_project_id'],
+        'uid' => (int) $user['id'],
+        'email' => $user['email'] ?? '',
+        'role' => $user['role'] ?? 'user',
         'name' => $user['name'] ?? '',
         'iat' => time(),
-        'exp' => time() + 31536000,
+        'exp' => time() + (86400 * 30), // 30-day session
     ]));
-    $signature = base64UrlEncode(hash_hmac('sha256', $header . '.' . $payload, $settings['manus_jwt_secret'], true));
+    $signature = base64UrlEncode(hash_hmac('sha256', $header . '.' . $payload, $secret, true));
     return $header . '.' . $payload . '.' . $signature;
 }
 
 function sessionIdentity(): ?array
 {
-    $token = $_COOKIE['webdev_app_session'] ?? '';
+    $token = $_COOKIE['ptrp_session'] ?? $_COOKIE['webdev_app_session'] ?? '';
+    if ($token === '' && !empty($_SERVER['HTTP_AUTHORIZATION'])) {
+        if (preg_match('/Bearer\s+(\S+)/i', $_SERVER['HTTP_AUTHORIZATION'], $m)) {
+            $token = $m[1];
+        }
+    }
+    if ($token === '') return null;
     $parts = explode('.', $token);
-    if (count($parts) !== 3 || empty(config()['manus_jwt_secret'])) return null;
+    if (count($parts) !== 3) return null;
     [$header, $payload, $signature] = $parts;
-    $expected = base64UrlEncode(hash_hmac('sha256', $header . '.' . $payload, config()['manus_jwt_secret'], true));
-    $decoded = base64UrlDecode($payload);
+    $secret = getSessionSecret();
+    $expected = base64UrlEncode(hash_hmac('sha256', $header . '.' . $payload, $secret, true));
+    if (!hash_equals($expected, $signature)) return null;
+
     $jwtHeader = json_decode((string) base64UrlDecode($header), true);
-    $claims = json_decode((string) $decoded, true);
-    if (!hash_equals($expected, $signature) || ($jwtHeader['alg'] ?? '') !== 'HS256' || !is_array($claims)) return null;
-    if (($claims['appId'] ?? '') !== (config()['manus_project_id'] ?? '') || (int) ($claims['exp'] ?? 0) <= time() || empty($claims['openId'])) return null;
+    $claims = json_decode((string) base64UrlDecode($payload), true);
+    if (($jwtHeader['alg'] ?? '') !== 'HS256' || !is_array($claims)) return null;
+    if ((int) ($claims['exp'] ?? 0) <= time()) return null;
     return $claims;
 }
 
@@ -155,112 +200,37 @@ function currentUser(bool $required = true): ?array
         if ($required) throw new ApiError(401, 'Please login.');
         return null;
     }
-    $statement = database()->prepare('SELECT id, openId, name, email, loginMethod, role, createdAt, updatedAt, lastSignedIn FROM users WHERE openId = ? LIMIT 1');
-    $statement->execute([$identity['openId']]);
+    $uid = $identity['uid'] ?? 0;
+    if ($uid > 0) {
+        $statement = database()->prepare('SELECT id, name, email, loginMethod, role, createdAt, updatedAt, lastSignedIn FROM users WHERE id = ? LIMIT 1');
+        $statement->execute([$uid]);
+    } else {
+        // Fallback for legacy session containing openId
+        $statement = database()->prepare('SELECT id, name, email, loginMethod, role, createdAt, updatedAt, lastSignedIn FROM users WHERE openId = ? OR email = ? LIMIT 1');
+        $statement->execute([$identity['openId'] ?? '', $identity['email'] ?? '']);
+    }
     $user = $statement->fetch();
-    if (!$user && $required) throw new ApiError(401, 'Account is not registered. Please sign in again.');
+    if (!$user && $required) throw new ApiError(401, 'Account not found. Please log in again.');
     return $user ?: null;
 }
 
 function requireAdmin(): array
 {
-    $user = currentUser();
-    if ($user['role'] !== 'admin') throw new ApiError(403, 'Administrator access required.');
+    $user = currentUser(true);
+    if (($user['role'] ?? '') !== 'admin') throw new ApiError(403, 'Administrator access required.');
     return $user;
 }
 
 function cookieOptions(int $expires): array
 {
     $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
-    return ['expires' => $expires, 'path' => basePath() . '/', 'secure' => $secure, 'httponly' => true, 'samesite' => 'Lax'];
-}
-
-function oauthRequest(string $path, array $payload): array
-{
-    $settings = config();
-    $base = rtrim((string) ($settings['manus_oauth_api_url'] ?? ''), '/');
-    if ($base === '') throw new ApiError(503, 'Set manus_oauth_api_url in config.php.');
-    $context = stream_context_create(['http' => [
-        'method' => 'POST',
-        'header' => "Content-Type: application/json\r\nAccept: application/json\r\n",
-        'content' => json_encode($payload),
-        'timeout' => 30,
-        'ignore_errors' => true,
-    ]]);
-    $response = @file_get_contents($base . $path, false, $context);
-    $status = 0;
-    foreach (($http_response_header ?? []) as $line) {
-        if (preg_match('/^HTTP\/\S+\s+(\d+)/', $line, $matches)) $status = (int) $matches[1];
-    }
-    $data = json_decode((string) $response, true);
-    if ($status < 200 || $status >= 300 || !is_array($data)) {
-        error_log('Manus OAuth request failed with HTTP ' . $status);
-        throw new ApiError(502, 'The Manus authentication service could not complete the request.');
-    }
-    return $data;
-}
-
-function redirectManusStorage(string $key): never
-{
-    $settings = config();
-    $base = rtrim((string) ($settings['manus_api_url'] ?? ''), '/');
-    $apiKey = (string) ($settings['manus_api_key'] ?? '');
-    if ($base === '' || $apiKey === '' || $key === '' || str_contains($key, '..')) {
-        throw new ApiError(404, 'Media asset not found.');
-    }
-    $url = $base . '/v1/storage/presign/get?path=' . rawurlencode($key);
-    $context = stream_context_create(['http' => [
-        'method' => 'GET',
-        'header' => "Authorization: Bearer {$apiKey}\r\nAccept: application/json\r\n",
-        'timeout' => 20,
-        'ignore_errors' => true,
-    ]]);
-    $response = @file_get_contents($url, false, $context);
-    $data = json_decode((string) $response, true);
-    if (empty($data['url']) || !filter_var($data['url'], FILTER_VALIDATE_URL) || !str_starts_with($data['url'], 'https://')) {
-        throw new ApiError(502, 'The media storage service could not provide this asset.');
-    }
-    header('Cache-Control: public, max-age=300');
-    header('Location: ' . $data['url'], true, 307);
-    exit;
-}
-
-function handleOAuthCallback(): never
-{
-    requireMethod('GET');
-    $code = $_GET['code'] ?? '';
-    $state = $_GET['state'] ?? '';
-    $stateJson = is_string($state) ? base64_decode($state, true) : false;
-    $stateData = $stateJson ? json_decode($stateJson, true) : null;
-    $nonce = $_COOKIE['ptrp_oauth_state'] ?? '';
-    if (!is_string($code) || $code === '' || !is_array($stateData) || empty($stateData['nonce']) || !is_string($nonce) || !hash_equals($nonce, $stateData['nonce'])) {
-        throw new ApiError(403, 'Invalid OAuth state. Start sign-in again.');
-    }
-    $redirectUri = (($_SERVER['HTTPS'] ?? '') !== 'off' && !empty($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . basePath() . '/api/oauth/callback';
-    if (($stateData['redirectUri'] ?? '') !== $redirectUri) throw new ApiError(403, 'OAuth callback URL did not match.');
-
-    $settings = config();
-    $token = oauthRequest('/webdev.v1.WebDevAuthPublicService/ExchangeToken', [
-        'clientId' => $settings['manus_project_id'],
-        'grantType' => 'authorization_code',
-        'code' => $code,
-        'redirectUri' => $redirectUri,
-    ]);
-    if (empty($token['accessToken'])) throw new ApiError(502, 'Manus did not return an access token.');
-    $info = oauthRequest('/webdev.v1.WebDevAuthPublicService/GetUserInfo', ['accessToken' => $token['accessToken']]);
-    if (empty($info['openId'])) throw new ApiError(502, 'Manus did not return a user identity.');
-
-    $ownerOpenId = (string) ($settings['owner_open_id'] ?? '');
-    $role = $ownerOpenId !== '' && hash_equals($ownerOpenId, (string) $info['openId']) ? 'admin' : 'user';
-    $statement = database()->prepare('INSERT INTO users (openId, name, email, loginMethod, role, lastSignedIn) VALUES (?, ?, ?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE name = VALUES(name), email = VALUES(email), loginMethod = VALUES(loginMethod), lastSignedIn = NOW(), role = IF(VALUES(role) = \'admin\', \'admin\', role)');
-    $statement->execute([(string) $info['openId'], $info['name'] ?? null, $info['email'] ?? null, $info['loginMethod'] ?? $info['platform'] ?? null, $role]);
-    $userStatement = database()->prepare('SELECT id, openId, name, email, loginMethod, role FROM users WHERE openId = ? LIMIT 1');
-    $userStatement->execute([(string) $info['openId']]);
-    $user = $userStatement->fetch();
-    setcookie('ptrp_oauth_state', '', cookieOptions(time() - 3600));
-    setcookie('webdev_app_session', signSession($user), cookieOptions(time() + 31536000));
-    header('Location: ' . basePath() . '/', true, 302);
-    exit;
+    return [
+        'expires' => $expires,
+        'path' => basePath() . '/',
+        'secure' => $secure,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ];
 }
 
 function inputString(array $data, string $key, int $maxLength, bool $required = false): ?string
@@ -270,7 +240,29 @@ function inputString(array $data, string $key, int $maxLength, bool $required = 
     if (!is_string($value) || ($required && trim($value) === '') || mb_strlen($value) > $maxLength) {
         throw new ApiError(400, 'Invalid ' . $key . '.');
     }
-    return $value;
+    return trim($value);
+}
+
+function serveLocalFile(string $filePath): never
+{
+    if (!is_file($filePath)) {
+        throw new ApiError(404, 'Asset not found.');
+    }
+    $mime = mime_content_type($filePath) ?: 'application/octet-stream';
+    $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+    $mimes = [
+        'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
+        'webp' => 'image/webp', 'gif' => 'image/gif', 'svg' => 'image/svg+xml',
+        'pdf' => 'application/pdf', 'mp4' => 'video/mp4', 'webm' => 'video/webm',
+        'txt' => 'text/plain', 'json' => 'application/json'
+    ];
+    if (isset($mimes[$ext])) $mime = $mimes[$ext];
+
+    header('Content-Type: ' . $mime);
+    header('Content-Length: ' . filesize($filePath));
+    header('Cache-Control: public, max-age=86400');
+    readfile($filePath);
+    exit;
 }
 
 function routeRequest(): void
@@ -280,55 +272,232 @@ function routeRequest(): void
         http_response_code(204);
         return;
     }
-    $settings = config();
+
     $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
-    $storagePrefix = basePath() . '/manus-storage/';
-    if (str_starts_with($path, $storagePrefix)) {
-        redirectManusStorage(rawurldecode(substr($path, strlen($storagePrefix))));
-    }
-    $prefix = basePath() . '/api';
-    $route = str_starts_with($path, $prefix) ? substr($path, strlen($prefix)) : '';
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
+    // Support serving local files under /storage/, /manus-storage/ (for backwards compatibility), and /uploads/
+    $storagePrefixes = [
+        basePath() . '/storage/',
+        basePath() . '/manus-storage/',
+        basePath() . '/uploads/'
+    ];
+
+    foreach ($storagePrefixes as $prefix) {
+        if (str_starts_with($path, $prefix)) {
+            $rel = rawurldecode(substr($path, strlen($prefix)));
+            if (str_contains($rel, '..')) throw new ApiError(400, 'Invalid path');
+
+            // Look in client/public/storage, client/public/manus-storage, or uploads/
+            $candidates = [
+                dirname(__DIR__) . '/uploads/' . $rel,
+                dirname(__DIR__) . '/client/public/storage/' . $rel,
+                dirname(__DIR__) . '/client/public/manus-storage/' . $rel,
+                dirname(__DIR__) . '/client/public/' . $rel,
+            ];
+            foreach ($candidates as $cand) {
+                if (is_file($cand)) serveLocalFile($cand);
+            }
+            throw new ApiError(404, 'Media asset not found.');
+        }
+    }
+
+    $prefix = basePath() . '/api';
+    $route = str_starts_with($path, $prefix) ? substr($path, strlen($prefix)) : '';
+
+    // ---------- Platform Config (Frontend API resolution) ----------
     if ($route === '/platform/config.js' && $method === 'GET') {
         header('Content-Type: application/javascript; charset=utf-8');
         header('Cache-Control: no-store');
         $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
         $origin = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
         $public = [
-            'projectId' => $settings['manus_project_id'] ?? '',
-            'oauthPortalUrl' => $settings['manus_oauth_portal_url'] ?? '',
-            'apiUrl' => '',
-            'apiBrowserKey' => '',
             'apiBaseUrl' => $origin . basePath() . '/api/',
-            'oauthCallbackUrl' => $origin . basePath() . '/api/oauth/callback',
+            'appName' => 'PTR Alumni Network',
+            'version' => '1.0.0',
         ];
-        echo 'window.__MANUS_CONFIG__=' . json_encode($public, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) . ';';
+        $json = json_encode($public, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+        echo 'window.__PTRP_CONFIG__=' . $json . '; window.__MANUS_CONFIG__=window.__PTRP_CONFIG__;';
         return;
     }
-    if ($route === '/oauth/callback') { handleOAuthCallback(); }
-    if ($route === '/auth/me') { requireMethod('GET'); respond(currentUser(false)); }
-    if ($route === '/auth/logout') {
-        requireMethod('POST'); requireSameOrigin();
+
+    // =========================================================================
+    // Independent Authentication
+    // =========================================================================
+
+    // Current logged-in user check
+    if ($route === '/auth/me') {
+        requireMethod('GET');
+        respond(currentUser(false));
+    }
+
+    // Login with Email & Password
+    if ($route === '/auth/login' && $method === 'POST') {
+        requireSameOrigin();
+        $data = jsonBody();
+        $email = strtolower((string) inputString($data, 'email', 320, true));
+        $password = (string) ($data['password'] ?? '');
+        if ($password === '') throw new ApiError(400, 'Password is required.');
+
+        $stmt = database()->prepare('SELECT * FROM users WHERE LOWER(email) = ? LIMIT 1');
+        $stmt->execute([$email]);
+        $user = $stmt->fetch();
+
+        if (!$user || empty($user['passwordHash']) || !password_verify($password, $user['passwordHash'])) {
+            throw new ApiError(401, 'Invalid email or password.');
+        }
+
+        // Update lastSignedIn
+        database()->prepare('UPDATE users SET lastSignedIn = NOW() WHERE id = ?')->execute([$user['id']]);
+
+        // Issue secure session cookie
+        $sessionToken = signSession($user);
+        setcookie('ptrp_session', $sessionToken, cookieOptions(time() + (86400 * 30)));
+
+        respond([
+            'id' => (int) $user['id'],
+            'name' => $user['name'],
+            'email' => $user['email'],
+            'role' => $user['role'],
+            'lastSignedIn' => date('c'),
+        ]);
+    }
+
+    // Registration for users / residents
+    if ($route === '/auth/register' && $method === 'POST') {
+        requireSameOrigin();
+        $data = jsonBody();
+        $name = inputString($data, 'name', 255, true);
+        $email = strtolower((string) inputString($data, 'email', 320, true));
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) throw new ApiError(400, 'Please provide a valid email address.');
+        $password = (string) ($data['password'] ?? '');
+        if (strlen($password) < 8) throw new ApiError(400, 'Password must be at least 8 characters long.');
+
+        // Check if email already registered
+        $check = database()->prepare('SELECT id FROM users WHERE LOWER(email) = ? LIMIT 1');
+        $check->execute([$email]);
+        if ($check->fetch()) {
+            throw new ApiError(409, 'An account with this email is already registered. Please log in.');
+        }
+
+        $role = 'user';
+
+        $passwordHash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
+        $stmt = database()->prepare('INSERT INTO users (name, email, passwordHash, role, loginMethod, lastSignedIn) VALUES (?, ?, ?, ?, \'local\', NOW())');
+        $stmt->execute([$name, $email, $passwordHash, $role]);
+        $newId = (int) database()->lastInsertId();
+
+        $fetch = database()->prepare('SELECT id, name, email, role, lastSignedIn FROM users WHERE id = ?');
+        $fetch->execute([$newId]);
+        $newUser = $fetch->fetch();
+
+        $sessionToken = signSession($newUser);
+        setcookie('ptrp_session', $sessionToken, cookieOptions(time() + (86400 * 30)));
+
+        respond($newUser, 201);
+    }
+
+    // Logout
+    if ($route === '/auth/logout' && $method === 'POST') {
+        requireSameOrigin();
+        setcookie('ptrp_session', '', cookieOptions(time() - 3600));
         setcookie('webdev_app_session', '', cookieOptions(time() - 3600));
         respond(['success' => true]);
     }
-    if (preg_match('#^/content/([a-zA-Z0-9_-]{1,120})$#', $route, $matches)) {
-        requireMethod('GET');
+
+    // Email delivery is not configured; do not generate or expose reset tokens.
+    if ($route === '/auth/forgot-password' && $method === 'POST') {
+        requireSameOrigin();
+        throw new ApiError(503, 'Password recovery is not configured. Please contact a network administrator.');
+    }
+
+    // Do not accept reset tokens until a verified email delivery flow is configured.
+    if ($route === '/auth/reset-password' && $method === 'POST') {
+        requireSameOrigin();
+        throw new ApiError(503, 'Password recovery is not configured. Please contact a network administrator.');
+    }
+
+    // Change password (authenticated user)
+    if ($route === '/auth/change-password' && $method === 'POST') {
+        requireSameOrigin();
+        $user = currentUser(true);
+        $data = jsonBody();
+        $currentPassword = (string) ($data['currentPassword'] ?? '');
+        $newPassword = (string) ($data['newPassword'] ?? '');
+        if (strlen($newPassword) < 8) throw new ApiError(400, 'New password must be at least 8 characters.');
+
+        $stmt = database()->prepare('SELECT passwordHash FROM users WHERE id = ? LIMIT 1');
+        $stmt->execute([$user['id']]);
+        $row = $stmt->fetch();
+        if (!$row || !password_verify($currentPassword, $row['passwordHash'] ?? '')) {
+            throw new ApiError(400, 'Current password is incorrect.');
+        }
+
+        $passwordHash = password_hash($newPassword, PASSWORD_BCRYPT, ['cost' => 12]);
+        database()->prepare('UPDATE users SET passwordHash = ? WHERE id = ?')->execute([$passwordHash, $user['id']]);
+        respond(['success' => true, 'message' => 'Password changed successfully.']);
+    }
+
+    // =========================================================================
+    // Public Content Endpoints
+    // =========================================================================
+
+    if (preg_match('#^/content/([a-zA-Z0-9_-]{1,120})$#', $route, $matches) && $method === 'GET') {
         $statement = database()->prepare("SELECT id, slug, title, summary, body, status, updatedBy, createdAt, updatedAt FROM siteContent WHERE slug = ? AND status = 'published' LIMIT 1");
         $statement->execute([$matches[1]]);
         respond($statement->fetch() ?: null);
     }
+    if ($route === '/schools' && $method === 'GET') {
+        respond(database()->query("SELECT * FROM schools WHERE status = 'published' ORDER BY name ASC")->fetchAll());
+    }
+    if ($route === '/teachers' && $method === 'GET') {
+        respond(database()->query("SELECT t.*, s.name AS schoolName FROM teachers t LEFT JOIN schools s ON s.id = t.schoolId WHERE t.status = 'approved' ORDER BY t.fullName ASC")->fetchAll());
+    }
+    if ($route === '/alumni' && $method === 'GET') {
+        respond(database()->query("SELECT a.*, s.name AS schoolName FROM alumni a LEFT JOIN schools s ON s.id = a.schoolId WHERE a.status = 'approved' ORDER BY a.fullName ASC")->fetchAll());
+    }
+    if ($route === '/news' && $method === 'GET') {
+        respond(database()->query("SELECT * FROM newsArticles WHERE status = 'published' ORDER BY COALESCE(publishedAt, createdAt) DESC")->fetchAll());
+    }
+    if (preg_match('#^/news/([a-zA-Z0-9_-]{1,120})$#', $route, $matches) && $method === 'GET') {
+        $statement = database()->prepare("SELECT * FROM newsArticles WHERE slug = ? AND status = 'published' LIMIT 1");
+        $statement->execute([$matches[1]]);
+        respond($statement->fetch() ?: null);
+    }
+    if ($route === '/gallery' && $method === 'GET') {
+        respond(database()->query("SELECT * FROM galleryItems WHERE status = 'approved' ORDER BY createdAt DESC")->fetchAll());
+    }
+    if ($route === '/best-practices' && $method === 'GET') {
+        respond(database()->query("SELECT * FROM bestPractices WHERE status = 'published' ORDER BY updatedAt DESC")->fetchAll());
+    }
 
+    // =========================================================================
+    // Administrator-Protected Endpoints
+    // =========================================================================
     requireAdmin();
-    if ($route === '/admin/overview') {
-        requireMethod('GET');
-        $row = database()->query("SELECT (SELECT COUNT(*) FROM siteContent) AS contentCount, (SELECT COUNT(*) FROM siteContent WHERE status = 'published') AS publishedCount, (SELECT COUNT(*) FROM mediaAssets) AS mediaCount, (SELECT COUNT(*) FROM users) AS userCount, (SELECT COUNT(*) FROM users WHERE role = 'admin') AS adminCount")->fetch();
+
+    if ($route === '/admin/overview' && $method === 'GET') {
+        $row = database()->query("SELECT
+            (SELECT COUNT(*) FROM siteContent) AS contentCount,
+            (SELECT COUNT(*) FROM siteContent WHERE status = 'published') AS publishedCount,
+            (SELECT COUNT(*) FROM mediaAssets) AS mediaCount,
+            (SELECT COUNT(*) FROM users) AS userCount,
+            (SELECT COUNT(*) FROM users WHERE role = 'admin') AS adminCount,
+            (SELECT COUNT(*) FROM schools) AS schoolCount,
+            (SELECT COUNT(*) FROM teachers) AS teacherCount,
+            (SELECT COUNT(*) FROM alumni) AS alumniCount,
+            (SELECT COUNT(*) FROM newsArticles) AS newsCount,
+            (SELECT COUNT(*) FROM galleryItems) AS galleryCount,
+            (SELECT COUNT(*) FROM bestPractices) AS practiceCount,
+            (SELECT COUNT(*) FROM teachers WHERE status = 'pending') AS pendingTeachers,
+            (SELECT COUNT(*) FROM alumni WHERE status = 'pending') AS pendingAlumni
+        ")->fetch();
         respond(array_map('intval', $row));
     }
+
+    // ---------- Content ----------
     if ($route === '/admin/content' && $method === 'GET') {
-        $rows = database()->query('SELECT * FROM siteContent ORDER BY updatedAt DESC')->fetchAll();
-        respond($rows);
+        respond(database()->query('SELECT * FROM siteContent ORDER BY updatedAt DESC')->fetchAll());
     }
     if ($route === '/admin/content' && $method === 'POST') {
         requireSameOrigin();
@@ -349,6 +518,8 @@ function routeRequest(): void
         $statement = database()->prepare('DELETE FROM siteContent WHERE id = ?'); $statement->execute([(int) $matches[1]]);
         respond(['success' => true]);
     }
+
+    // ---------- Media ----------
     if ($route === '/admin/media' && $method === 'GET') {
         respond(database()->query('SELECT * FROM mediaAssets ORDER BY createdAt DESC')->fetchAll());
     }
@@ -388,22 +559,264 @@ function routeRequest(): void
         $fetch = database()->prepare('SELECT * FROM mediaAssets WHERE id = ?'); $fetch->execute([(int) $matches[1]]);
         respond($fetch->fetch() ?: null);
     }
+
+    // ---------- Users & Roles ----------
     if ($route === '/admin/users' && $method === 'GET') {
-        respond(database()->query('SELECT id, name, email, role, lastSignedIn FROM users ORDER BY lastSignedIn DESC')->fetchAll());
+        respond(database()->query('SELECT id, name, email, role, loginMethod, createdAt, lastSignedIn FROM users ORDER BY lastSignedIn DESC')->fetchAll());
+    }
+    if ($route === '/admin/users' && $method === 'POST') {
+        requireSameOrigin();
+        $data = jsonBody();
+        $name = inputString($data, 'name', 255, true);
+        $email = strtolower((string) inputString($data, 'email', 320, true));
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) throw new ApiError(400, 'Valid email required.');
+        $password = (string) ($data['password'] ?? '');
+        if (strlen($password) < 12) throw new ApiError(400, 'Password must be at least 12 characters.');
+        $role = $data['role'] ?? 'user';
+        if (!in_array($role, ['user', 'admin'], true)) throw new ApiError(400, 'Invalid role.');
+
+        $check = database()->prepare('SELECT id FROM users WHERE LOWER(email) = ? LIMIT 1');
+        $check->execute([$email]);
+        if ($check->fetch()) throw new ApiError(409, 'User with this email already exists.');
+
+        $passwordHash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
+        $stmt = database()->prepare('INSERT INTO users (name, email, passwordHash, role, loginMethod) VALUES (?, ?, ?, ?, \'local\')');
+        $stmt->execute([$name, $email, $passwordHash, $role]);
+        $id = (int) database()->lastInsertId();
+        $fetch = database()->prepare('SELECT id, name, email, role, loginMethod, createdAt, lastSignedIn FROM users WHERE id = ?');
+        $fetch->execute([$id]);
+        respond($fetch->fetch(), 201);
     }
     if (preg_match('#^/admin/users/(\d+)/role$#', $route, $matches) && $method === 'PATCH') {
-        requireSameOrigin(); $actor = currentUser(); $data = jsonBody();
-        $owner = (string) ($settings['owner_open_id'] ?? '');
-        if ($owner === '' || !hash_equals($owner, (string) $actor['openId'])) throw new ApiError(403, 'Only the project owner can change administrator access.');
+        requireSameOrigin();
+        $actor = currentUser();
+        $data = jsonBody();
         $role = $data['role'] ?? '';
         $targetId = (int) $matches[1];
         if (!in_array($role, ['user', 'admin'], true)) throw new ApiError(400, 'Invalid role.');
-        if ($targetId === (int) $actor['id'] && $role === 'user') throw new ApiError(400, 'The project owner must retain administrator access.');
-        $statement = database()->prepare('UPDATE users SET role = ? WHERE id = ?'); $statement->execute([$role, $targetId]);
+        if ($targetId === (int) $actor['id'] && $role === 'user') {
+            $adminCount = (int) database()->query("SELECT COUNT(*) FROM users WHERE role = 'admin'")->fetchColumn();
+            if ($adminCount <= 1) {
+                throw new ApiError(400, 'You are the only administrator. Grant another administrator role before demoting yourself.');
+            }
+        }
+        $statement = database()->prepare('UPDATE users SET role = ? WHERE id = ?');
+        $statement->execute([$role, $targetId]);
+        respond(['success' => true]);
+    }
+    if (preg_match('#^/admin/users/(\d+)$#', $route, $matches) && $method === 'DELETE') {
+        requireSameOrigin();
+        $actor = currentUser();
+        $targetId = (int) $matches[1];
+        if ($targetId === (int) $actor['id']) throw new ApiError(400, 'Cannot delete your own account.');
+        database()->prepare('DELETE FROM users WHERE id = ?')->execute([$targetId]);
+        respond(['success' => true]);
+    }
+    if (preg_match('#^/admin/users/(\d+)/reset-password$#', $route, $matches) && $method === 'POST') {
+        requireSameOrigin();
+        $targetId = (int) $matches[1];
+        $data = jsonBody();
+        $password = (string) ($data['password'] ?? '');
+        if (strlen($password) < 8) throw new ApiError(400, 'Password must be at least 8 characters.');
+        $hash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
+        database()->prepare('UPDATE users SET passwordHash = ?, resetToken = NULL, resetTokenExpires = NULL WHERE id = ?')->execute([$hash, $targetId]);
+        respond(['success' => true, 'message' => 'User password updated successfully.']);
+    }
+
+    // ---------- Schools ----------
+    if ($route === '/admin/schools' && $method === 'GET') {
+        respond(database()->query('SELECT * FROM schools ORDER BY name ASC')->fetchAll());
+    }
+    if ($route === '/admin/schools' && $method === 'POST') {
+        requireSameOrigin(); $data = jsonBody();
+        $name = inputString($data, 'name', 255, true);
+        $district = inputString($data, 'district', 120, true);
+        $description = inputString($data, 'description', 5000);
+        $imageUrl = inputString($data, 'imageUrl', 700);
+        $latitude = (isset($data['latitude']) && $data['latitude'] !== '') ? (float) $data['latitude'] : null;
+        $longitude = (isset($data['longitude']) && $data['longitude'] !== '') ? (float) $data['longitude'] : null;
+        $status = $data['status'] ?? 'published';
+        if (!in_array($status, ['draft', 'published'], true)) throw new ApiError(400, 'Invalid school status.');
+        $id = isset($data['id']) ? (int) $data['id'] : 0;
+        if ($id > 0) {
+            $statement = database()->prepare('UPDATE schools SET name=?, district=?, description=?, imageUrl=?, latitude=?, longitude=?, status=? WHERE id=?');
+            $statement->execute([$name, $district, $description, $imageUrl, $latitude, $longitude, $status, $id]);
+        } else {
+            $statement = database()->prepare('INSERT INTO schools (name, district, description, imageUrl, latitude, longitude, status) VALUES (?,?,?,?,?,?,?)');
+            $statement->execute([$name, $district, $description, $imageUrl, $latitude, $longitude, $status]);
+            $id = (int) database()->lastInsertId();
+        }
+        $fetch = database()->prepare('SELECT * FROM schools WHERE id = ?'); $fetch->execute([$id]);
+        respond($fetch->fetch());
+    }
+    if (preg_match('#^/admin/schools/(\d+)$#', $route, $matches) && $method === 'DELETE') {
+        requireSameOrigin();
+        $statement = database()->prepare('DELETE FROM schools WHERE id = ?'); $statement->execute([(int) $matches[1]]);
         respond(['success' => true]);
     }
 
-    throw new ApiError(404, 'API endpoint not found.');
+    // ---------- Teachers ----------
+    if ($route === '/admin/teachers' && $method === 'GET') {
+        respond(database()->query('SELECT t.*, s.name AS schoolName FROM teachers t LEFT JOIN schools s ON s.id = t.schoolId ORDER BY t.fullName ASC')->fetchAll());
+    }
+    if ($route === '/admin/teachers' && $method === 'POST') {
+        requireSameOrigin(); $data = jsonBody();
+        $fullName = inputString($data, 'fullName', 255, true);
+        $email = inputString($data, 'email', 320);
+        $phone = inputString($data, 'phone', 64);
+        $schoolId = (isset($data['schoolId']) && $data['schoolId'] !== '') ? (int) $data['schoolId'] : null;
+        $bio = inputString($data, 'bio', 5000);
+        $photoUrl = inputString($data, 'photoUrl', 700);
+        $status = $data['status'] ?? 'pending';
+        if (!in_array($status, ['pending', 'approved', 'inactive'], true)) throw new ApiError(400, 'Invalid teacher status.');
+        $id = isset($data['id']) ? (int) $data['id'] : 0;
+        if ($id > 0) {
+            $statement = database()->prepare('UPDATE teachers SET fullName=?, email=?, phone=?, schoolId=?, bio=?, photoUrl=?, status=? WHERE id=?');
+            $statement->execute([$fullName, $email, $phone, $schoolId, $bio, $photoUrl, $status, $id]);
+        } else {
+            $statement = database()->prepare('INSERT INTO teachers (fullName, email, phone, schoolId, bio, photoUrl, status) VALUES (?,?,?,?,?,?,?)');
+            $statement->execute([$fullName, $email, $phone, $schoolId, $bio, $photoUrl, $status]);
+            $id = (int) database()->lastInsertId();
+        }
+        $fetch = database()->prepare('SELECT t.*, s.name AS schoolName FROM teachers t LEFT JOIN schools s ON s.id = t.schoolId WHERE t.id = ?'); $fetch->execute([$id]);
+        respond($fetch->fetch());
+    }
+    if (preg_match('#^/admin/teachers/(\d+)$#', $route, $matches) && $method === 'DELETE') {
+        requireSameOrigin();
+        $statement = database()->prepare('DELETE FROM teachers WHERE id = ?'); $statement->execute([(int) $matches[1]]);
+        respond(['success' => true]);
+    }
+
+    // ---------- Alumni ----------
+    if ($route === '/admin/alumni' && $method === 'GET') {
+        respond(database()->query('SELECT a.*, s.name AS schoolName FROM alumni a LEFT JOIN schools s ON s.id = a.schoolId ORDER BY a.fullName ASC')->fetchAll());
+    }
+    if ($route === '/admin/alumni' && $method === 'POST') {
+        requireSameOrigin(); $data = jsonBody();
+        $fullName = inputString($data, 'fullName', 255, true);
+        $email = inputString($data, 'email', 320);
+        $phone = inputString($data, 'phone', 64);
+        $graduationYear = (isset($data['graduationYear']) && $data['graduationYear'] !== '') ? (int) $data['graduationYear'] : null;
+        $schoolId = (isset($data['schoolId']) && $data['schoolId'] !== '') ? (int) $data['schoolId'] : null;
+        $bio = inputString($data, 'bio', 5000);
+        $status = $data['status'] ?? 'pending';
+        if (!in_array($status, ['pending', 'approved', 'rejected'], true)) throw new ApiError(400, 'Invalid alumni status.');
+        $id = isset($data['id']) ? (int) $data['id'] : 0;
+        if ($id > 0) {
+            $statement = database()->prepare('UPDATE alumni SET fullName=?, email=?, phone=?, graduationYear=?, schoolId=?, bio=?, status=? WHERE id=?');
+            $statement->execute([$fullName, $email, $phone, $graduationYear, $schoolId, $bio, $status, $id]);
+        } else {
+            $statement = database()->prepare('INSERT INTO alumni (fullName, email, phone, graduationYear, schoolId, bio, status) VALUES (?,?,?,?,?,?,?)');
+            $statement->execute([$fullName, $email, $phone, $graduationYear, $schoolId, $bio, $status]);
+            $id = (int) database()->lastInsertId();
+        }
+        $fetch = database()->prepare('SELECT a.*, s.name AS schoolName FROM alumni a LEFT JOIN schools s ON s.id = a.schoolId WHERE a.id = ?'); $fetch->execute([$id]);
+        respond($fetch->fetch());
+    }
+    if (preg_match('#^/admin/alumni/(\d+)$#', $route, $matches) && $method === 'DELETE') {
+        requireSameOrigin();
+        $statement = database()->prepare('DELETE FROM alumni WHERE id = ?'); $statement->execute([(int) $matches[1]]);
+        respond(['success' => true]);
+    }
+
+    // ---------- News ----------
+    if ($route === '/admin/news' && $method === 'GET') {
+        respond(database()->query('SELECT * FROM newsArticles ORDER BY COALESCE(publishedAt, createdAt) DESC')->fetchAll());
+    }
+    if ($route === '/admin/news' && $method === 'POST') {
+        requireSameOrigin(); $user = currentUser(); $data = jsonBody();
+        $slug = inputString($data, 'slug', 120, true);
+        $title = inputString($data, 'title', 255, true);
+        $category = inputString($data, 'category', 80, true);
+        $excerpt = inputString($data, 'excerpt', 1000);
+        $body = inputString($data, 'body', 100000, true);
+        $imageUrl = inputString($data, 'imageUrl', 700);
+        $status = $data['status'] ?? 'draft';
+        if (!in_array($status, ['draft', 'published'], true)) throw new ApiError(400, 'Invalid news status.');
+        $publishedAt = ($status === 'published') ? date('Y-m-d H:i:s') : null;
+        $id = isset($data['id']) ? (int) $data['id'] : 0;
+        if ($id > 0) {
+            $statement = database()->prepare('UPDATE newsArticles SET slug=?, title=?, category=?, excerpt=?, body=?, imageUrl=?, status=?, publishedAt=COALESCE(publishedAt, ?) WHERE id=?');
+            $statement->execute([$slug, $title, $category, $excerpt, $body, $imageUrl, $status, $publishedAt, $id]);
+        } else {
+            $statement = database()->prepare('INSERT INTO newsArticles (slug, title, category, excerpt, body, imageUrl, status, publishedAt, createdBy) VALUES (?,?,?,?,?,?,?,?,?)');
+            $statement->execute([$slug, $title, $category, $excerpt, $body, $imageUrl, $status, $publishedAt, $user['id']]);
+            $id = (int) database()->lastInsertId();
+        }
+        $fetch = database()->prepare('SELECT * FROM newsArticles WHERE id = ?'); $fetch->execute([$id]);
+        respond($fetch->fetch());
+    }
+    if (preg_match('#^/admin/news/(\d+)$#', $route, $matches) && $method === 'DELETE') {
+        requireSameOrigin();
+        $statement = database()->prepare('DELETE FROM newsArticles WHERE id = ?'); $statement->execute([(int) $matches[1]]);
+        respond(['success' => true]);
+    }
+
+    // ---------- Gallery ----------
+    if ($route === '/admin/gallery' && $method === 'GET') {
+        respond(database()->query('SELECT * FROM galleryItems ORDER BY createdAt DESC')->fetchAll());
+    }
+    if ($route === '/admin/gallery' && $method === 'POST') {
+        requireSameOrigin(); $user = currentUser(); $data = jsonBody();
+        $title = inputString($data, 'title', 255, true);
+        $caption = inputString($data, 'caption', 1000);
+        $url = inputString($data, 'url', 700, true);
+        $mediaType = $data['mediaType'] ?? 'image';
+        if (!in_array($mediaType, ['image', 'video'], true)) throw new ApiError(400, 'Invalid media type.');
+        $category = inputString($data, 'category', 80);
+        $status = $data['status'] ?? 'approved';
+        if (!in_array($status, ['pending', 'approved', 'archived'], true)) throw new ApiError(400, 'Invalid gallery status.');
+        $id = isset($data['id']) ? (int) $data['id'] : 0;
+        if ($id > 0) {
+            $statement = database()->prepare('UPDATE galleryItems SET title=?, caption=?, url=?, mediaType=?, category=?, status=? WHERE id=?');
+            $statement->execute([$title, $caption, $url, $mediaType, $category, $status, $id]);
+        } else {
+            $statement = database()->prepare('INSERT INTO galleryItems (title, caption, url, mediaType, category, status, createdBy) VALUES (?,?,?,?,?,?,?)');
+            $statement->execute([$title, $caption, $url, $mediaType, $category, $status, $user['id']]);
+            $id = (int) database()->lastInsertId();
+        }
+        $fetch = database()->prepare('SELECT * FROM galleryItems WHERE id = ?'); $fetch->execute([$id]);
+        respond($fetch->fetch());
+    }
+    if (preg_match('#^/admin/gallery/(\d+)$#', $route, $matches) && $method === 'DELETE') {
+        requireSameOrigin();
+        $statement = database()->prepare('DELETE FROM galleryItems WHERE id = ?'); $statement->execute([(int) $matches[1]]);
+        respond(['success' => true]);
+    }
+
+    // ---------- Best practices ----------
+    if ($route === '/admin/best-practices' && $method === 'GET') {
+        respond(database()->query('SELECT * FROM bestPractices ORDER BY updatedAt DESC')->fetchAll());
+    }
+    if ($route === '/admin/best-practices' && $method === 'POST') {
+        requireSameOrigin(); $data = jsonBody();
+        $title = inputString($data, 'title', 255, true);
+        $category = inputString($data, 'category', 80, true);
+        $summary = inputString($data, 'summary', 1000);
+        $body = inputString($data, 'body', 100000, true);
+        $documentUrl = inputString($data, 'documentUrl', 700);
+        $imageUrl = inputString($data, 'imageUrl', 700);
+        $status = $data['status'] ?? 'draft';
+        if (!in_array($status, ['draft', 'published'], true)) throw new ApiError(400, 'Invalid practice status.');
+        $id = isset($data['id']) ? (int) $data['id'] : 0;
+        if ($id > 0) {
+            $statement = database()->prepare('UPDATE bestPractices SET title=?, category=?, summary=?, body=?, documentUrl=?, imageUrl=?, status=? WHERE id=?');
+            $statement->execute([$title, $category, $summary, $body, $documentUrl, $imageUrl, $status, $id]);
+        } else {
+            $statement = database()->prepare('INSERT INTO bestPractices (title, category, summary, body, documentUrl, imageUrl, status) VALUES (?,?,?,?,?,?,?)');
+            $statement->execute([$title, $category, $summary, $body, $documentUrl, $imageUrl, $status]);
+            $id = (int) database()->lastInsertId();
+        }
+        $fetch = database()->prepare('SELECT * FROM bestPractices WHERE id = ?'); $fetch->execute([$id]);
+        respond($fetch->fetch());
+    }
+    if (preg_match('#^/admin/best-practices/(\d+)$#', $route, $matches) && $method === 'DELETE') {
+        requireSameOrigin();
+        $statement = database()->prepare('DELETE FROM bestPractices WHERE id = ?'); $statement->execute([(int) $matches[1]]);
+        respond(['success' => true]);
+    }
+
+    throw new ApiError(404, 'API endpoint not found: ' . $route);
 }
 
 try {
@@ -412,5 +825,5 @@ try {
     respond(['error' => $error->getMessage()], $error->status);
 } catch (Throwable $error) {
     error_log('PTRP API error: ' . $error->getMessage());
-    respond(['error' => 'The request could not be completed. Check PHP and MySQL configuration.'], 500);
+    respond(['error' => 'The request could not be completed: ' . $error->getMessage()], 500);
 }

@@ -1,48 +1,34 @@
 import type { Express } from "express";
-import { ENV } from "./env";
+import fs from "node:fs";
+import path from "node:path";
 
 export function registerStorageProxy(app: Express) {
-  app.get("/manus-storage/*", async (req, res) => {
+  const handler = (req: any, res: any) => {
     const key = (req.params as Record<string, string>)[0];
-    if (!key) {
-      res.status(400).send("Missing storage key");
+    if (!key || key.includes("..")) {
+      res.status(400).send("Invalid asset key");
       return;
     }
 
-    if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
-      res.status(500).send("Storage proxy not configured");
-      return;
-    }
+    const projectRoot = path.resolve(import.meta.dirname, "../..");
+    const candidates = [
+      path.join(projectRoot, "uploads", key),
+      path.join(projectRoot, "client", "public", "storage", key),
+      path.join(projectRoot, "client", "public", "manus-storage", key),
+      path.join(projectRoot, "client", "public", key),
+    ];
 
-    try {
-      const forgeUrl = new URL(
-        "v1/storage/presign/get",
-        ENV.forgeApiUrl.replace(/\/+$/, "") + "/",
-      );
-      forgeUrl.searchParams.set("path", key);
-
-      const forgeResp = await fetch(forgeUrl, {
-        headers: { Authorization: `Bearer ${ENV.forgeApiKey}` },
-      });
-
-      if (!forgeResp.ok) {
-        const body = await forgeResp.text().catch(() => "");
-        console.error(`[StorageProxy] forge error: ${forgeResp.status} ${body}`);
-        res.status(502).send("Storage backend error");
+    for (const cand of candidates) {
+      if (fs.existsSync(cand) && fs.statSync(cand).isFile()) {
+        res.sendFile(cand);
         return;
       }
-
-      const { url } = (await forgeResp.json()) as { url: string };
-      if (!url) {
-        res.status(502).send("Empty signed URL from backend");
-        return;
-      }
-
-      res.set("Cache-Control", "no-store");
-      res.redirect(307, url);
-    } catch (err) {
-      console.error("[StorageProxy] failed:", err);
-      res.status(502).send("Storage proxy error");
     }
-  });
+
+    res.status(404).send("Media asset not found");
+  };
+
+  app.get("/storage/*", handler);
+  app.get("/uploads/*", handler);
+  app.get("/manus-storage/*", handler);
 }

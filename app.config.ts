@@ -1,1 +1,1 @@
-export default { logoUrl: "https://files.manuscdn.com/user_upload_by_module/session_file/310519663043814850/iFQWnslWfNHGVlhk.svg" };
+export default { logoUrl: "/ptrp-logo.svg" };

@@ -9,7 +9,6 @@ import {
   Lightbulb,
   MapPinned,
   MessageCircle,
-  Network,
   NotebookTabs,
   School,
   Sparkles,
@@ -25,17 +24,26 @@ export const languages: Array<{ key: Language; label: string }> = [
   { key: "fr", label: "FR" },
 ];
 
+export const brand = {
+  name: "PTR Alumni Network",
+  shortName: "PTR",
+  program: "Primary Teacher Residency Program",
+  programShort: "PTRP",
+  tagline: "Inspire, Educate and Empower.",
+  subtitle: "Connecting Resident Teachers, Inspiring Educational Excellence",
+};
+
 export const navItems = [
   { href: "/", label: "Home" },
   { href: "/about", label: "About" },
-  { href: "/network", label: "Our Network" },
-  { href: "/activities", label: "Activities" },
-  { href: "/practices", label: "Best Practices" },
+  { href: "/network", label: "Model Schools" },
   { href: "/impact", label: "Impact" },
+  { href: "/news", label: "News & Activities" },
   { href: "/gallery", label: "Gallery" },
-  { href: "/news", label: "News" },
+  { href: "/alumni", label: "Alumni" },
   { href: "/resources", label: "Resources" },
-  { href: "/contact", label: "Contact" },
+  { href: "/partners", label: "Partners" },
+  { href: "/contact", label: "Join & Contact" },
 ];
 
 export const socialLinks = [
@@ -53,9 +61,10 @@ export const officialPilot = {
   date: "Kigali · 4 October 2023",
   body: "The official launch introduced a 12-month post-TTC residency for 100 selected graduates. The pilot focused on evidence-based pedagogy, 21st-century skills including English and digital literacy, and teaching practicum through demonstration schools.",
   partners: "Ministry of Education · REB · Rainwater Charitable Foundation · IEE Rwanda · Florida State University · Bridge 2 Rwanda",
-  locations: "TTC Save in Gisagara District and TTC Gicumbi in Gicumbi District, with 50 student teachers hosted at each institution.",
+  locations: "TTC Save in Gisagara District and TTC de la Salle Byumba in Gicumbi District, with 50 student teachers hosted at each institution.",
   sourceUrl: "https://www.mineduc.gov.rw/news-detail/primary-teacher-residency-pilot-program-for-ttcs-launched",
-  image: "/manus-storage/ptrp-pilot-launch_c79bf5cd.jpg",
+  image: "/storage/ptrp-pilot-launch.jpg",
+  imageCredit: "Photo: MINEDUC",
 };
 
 export const officialSocialVideo = {
@@ -64,28 +73,6 @@ export const officialSocialVideo = {
   date: "2 November 2026",
   videoUrl: "https://youtu.be/kDFHWe75e-I",
   embedUrl: "https://www.youtube.com/embed/kDFHWe75e-I?rel=0",
-};
-
-export const fsuResultsSource = {
-  title: "LSI reports encouraging results from the Primary Teaching Residency Program in Rwanda",
-  date: "27 June 2024",
-  sourceLabel: "Florida State University · Learning Systems Institute",
-  sourceUrl: "https://lsi.fsu.edu/article/lsi-reports-encouraging-results-primary-teaching-residency-program-rwanda",
-  findings: [
-    "More than 80 teacher residents received a performance rating of “meets” or “exceeds” expectations in all three observed lessons during term two.",
-    "Residents continued to grow in literacy, mathematics, and science knowledge, skills, and attitudes.",
-    "The article reports increased confidence in teaching, English literacy, and ICT use, with 0% attrition during the term.",
-  ],
-};
-
-export const commissioningPost = {
-  title: "100 Teacher Residents completed the one-year pilot",
-  date: "5 August 2024",
-  body: "The commissioning ceremony celebrated 100 Teacher Residents concluding a successful one-year pilot. The public posts describe a fourth year of extended training in evidence-based pedagogy and school practice at demonstration schools, co-implemented by Florida State University, Bridge2Rwanda, IEE Rwanda, and Rainwater under the coordination of MINEDUC and REB.",
-  sourceLabel: "IEE Rwanda Instagram and Facebook posts",
-  instagramUrl: "https://www.instagram.com/p/C-TAlcPsdex/",
-  facebookUrl: "https://www.facebook.com/Ieerwanda.org/posts/the-primary-teacher-residents-commissioning-ceremony-celebrated-100-teacher-resi/885089093651350/",
-  locationNote: "The commissioning posts name TTC de la Salle Byumba and TTC Save. The 2023 launch sources name TTC Gicumbi and TTC Save; the institution difference is flagged for PTR Alumni Network administrator verification.",
 };
 
 export const socialProfileEvidence = {
@@ -98,156 +85,373 @@ export const socialProfileEvidence = {
   xDate: "2 November 2026",
 };
 
-export const copy = {
-  en: {
-    nav: { login: "Portal login", menu: "Open navigation", close: "Close navigation" },
-    hero: {
-      eyebrow: "Rwanda · PTR Alumni Network",
-      title: "Teachers connected by practice. Schools strengthened by sharing.",
-      body: "PTR Alumni Network is the official digital community for the Primary Teacher Residency Program (PTRP) in Rwanda — connecting resident teachers, alumni, mentors, and model schools to share experiences, showcase best practices, and highlight impact on education.",
-      primary: "Discover PTR Alumni Network",
-      secondary: "Explore our network",
-      note: "Connecting Resident Teachers, Inspiring Educational Excellence",
-    },
-    stats: { title: "A national network with a clear purpose", label: "Program snapshot" },
-    story: { eyebrow: "Why PTR Alumni Network", title: "The classroom is where transformation becomes visible.", body: "From lesson preparation to peer coaching, PTR Alumni Network brings the lived experience of teachers into one connected space — making good practice easier to find, share, and build on.", cta: "Explore the network" },
-    network: { eyebrow: "Connect", title: "100 perspectives. 17 school communities. One shared direction.", body: "A growing network of resident teachers and model schools, designed to make collaboration practical and visible.", cta: "Explore our network" },
-    activities: { eyebrow: "Share", title: "What teachers are trying, learning, and sharing", body: "Discover approved activities from classrooms, professional learning sessions, mentorship circles, and school communities.", cta: "View activities" },
-    practices: { eyebrow: "Learn together", title: "Small shifts in practice can open big possibilities.", body: "A knowledge-sharing space for learner-centred pedagogy, inclusive education, ICT integration, STEM, assessment, and more.", cta: "Browse best practices" },
-    impact: { eyebrow: "Transform", title: "Track the work. Understand the evidence. Keep improving.", body: "Impact reporting should distinguish what happened, what was produced, and what has been demonstrated — with verified data at the centre.", cta: "Discover our impact" },
-    stories: { eyebrow: "From the network", title: "Stories that keep the work human", body: "The most meaningful progress often starts with a teacher noticing what learners need, trying something new, and sharing what happened next.", cta: "Read success stories" },
-    gallery: { eyebrow: "Field notes", title: "A window into the work", body: "A curated gallery of approved classroom moments, professional learning, school events, and network gatherings.", cta: "Visit the gallery" },
-    // About page
-    about: {
-      eyebrow: "About PTR Alumni Network",
-      title: "About PTR Alumni Network",
-      intro: "PTR Alumni Network is the official digital community for the Primary Teacher Residency Program (PTRP) in Rwanda. PTRP is a 12-month post-training residency program that places newly qualified teachers in 17 model schools across Rwanda, where they work alongside experienced mentor teachers to develop evidence-based teaching skills.",
-      mission: {
-        title: "Our Mission",
-        body: "To improve classroom teaching practice and learner outcomes across Rwanda by supporting newly qualified teachers through a structured, mentored residency year in model schools.",
-      },
-      vision: {
-        title: "Our Vision",
-        body: "A Rwanda where every primary school learner is taught by a confident, well-prepared teacher who uses evidence-based practice to help every child succeed.",
-      },
-      values: [
-        { title: "Excellence", body: "We uphold the highest standards of teaching practice and professional conduct." },
-        { title: "Collaboration", body: "We learn better together — teachers, mentors, and school communities working as one." },
-        { title: "Innovation", body: "We embrace evidence-based approaches, ICT integration, and creative problem-solving." },
-        { title: "Impact", body: "We measure what matters — learner engagement, teacher growth, and improved outcomes." },
-      ],
-      roleInRwanda: {
-        title: "PTRP's Role in Improving Education in Rwanda",
-        body: "PTRP supports the Ministry of Education's goal of strengthening foundational learning. By placing resident teachers in model schools and connecting them through PTR Alumni Network, the program helps raise teaching standards, reduce attrition, and build a sustainable pipeline of skilled educators for Rwanda's primary schools.",
-      },
-    },
-    // Contact page
-    contact: {
-      eyebrow: "Contact & Partnerships",
-      title: "Get in Touch with PTR Alumni Network",
-      intro: "Have a question, partnership idea, or want to learn more about PTR Alumni Network and the Primary Teacher Residency Program (PTRP)? We'd love to hear from you.",
-      address: "Ministry of Education, Kigali, Rwanda",
-      email: "info@ptr.rw",
-      phone: "+250 788 123 456",
-      hours: "Monday – Friday, 8:00 AM – 5:00 PM",
-      cta: "Send us a message",
-    },
-    footer: { description: "The official digital community for the Primary Teacher Residency Program (PTRP) in Rwanda — connecting resident teachers, alumni, mentors, and model schools.", privacy: "Privacy policy", terms: "Terms of use", copyright: "PTR Alumni Network · Official digital community for PTRP" },
+export const homeContent = {
+  eyebrow: "PTR Alumni Network · Rwanda",
+  headline: "Celebrating Excellence in Teacher Education",
+  subheadline: "The alumni network of the Primary Teacher Residency Program (PTRP), working together for quality primary education in Rwanda.",
+  intro: "The Primary Teacher Residency Program (PTRP) prepared 100 graduates of Teacher Training Colleges through a 12-month residency of classroom learning and guided practice in model schools. Today, these teachers are part of a growing alumni network that shares experience, supports one another, and shows the impact of investing in teachers.",
+  buttons: {
+    primary: "Join the Network",
+    secondary: "Watch Our Story",
   },
-  rw: {
-    nav: { login: "Kwinjira muri portal", menu: "Fungura menu", close: "Funga menu" },
-    hero: { eyebrow: "Rwanda · Gahunda y’Abarezi bigisha mu mashuri", title: "Abarezi bahuzwa n’imikorere myiza. Amashuri agakomera binyuze mu gusangira.", body: "PTR Alumni Network ni urubuga ruhuza abarezi, amashuri n’abafatanyabikorwa mu kwiga, gukorana no guteza imbere ireme ry’imyigishirize.", primary: "Menya PTR Alumni Network", secondary: "Reba urusobe rwacu", note: "Urubuga rwo gusangira ibimenyetso, ubunararibonye n’iterambere." },
-    stats: { title: "Urusobe rw’igihugu rufite intego isobanutse", label: "Incamake ya gahunda" }, story: { eyebrow: "Impamvu PTR Alumni Network", title: "Mu ishuri ni ho impinduka zigaragarira.", body: "Kuva ku gutegura amasomo kugeza ku gufashanya hagati y’abarezi, PTR Alumni Network ihuza ubunararibonye bw’abarezi mu rubuga rumwe.", cta: "Menya gahunda" }, network: { eyebrow: "Huza", title: "Ibitekerezo 100. Amashuri 17. Icyerekezo kimwe.", body: "Urusobe rw’abarezi n’amashuri rugamije gutuma ubufatanye buba ingirakamaro kandi bugaragara.", cta: "Reba urusobe" }, activities: { eyebrow: "Sangiza", title: "Ibyo abarezi bagerageza, biga kandi basangiza", body: "Menya ibikorwa byemejwe bivuye mu mashuri no mu myigire y’umwuga.", cta: "Reba ibikorwa" }, practices: { eyebrow: "Twige hamwe", title: "Impinduka nto mu myigishirize zishobora gufungura amahirwe menshi.", body: "Urubuga rwo gusangiza uburyo bwiza bwo kwigisha no kwiga.", cta: "Reba imikorere myiza" }, impact: { eyebrow: "Hindura", title: "Kurikirana ibikorwa. Sobanukirwa ibimenyetso. Komeza kunoza.", body: "Raporo y’ingaruka igomba gutandukanya ibyakozwe, ibyavuye mu bikorwa n’ibyagaragajwe n’ibimenyetso.", cta: "Menya ingaruka" }, stories: { eyebrow: "Kuva mu rusobe", title: "Inkuru zituma akazi kagumana ubumuntu", body: "Iterambere rikomeye ritangirira ku murezi ubona icyo abanyeshuri bakeneye, akagerageza ikintu gishya, hanyuma akagisangiza abandi.", cta: "Soma inkuru" }, gallery: { eyebrow: "Ibyabaye mu murima", title: "Idirishya ryerekana ibikorwa", body: "Amafoto n’amashusho byemejwe bigaragaza amasomo, amahugurwa n’ibikorwa by’amashuri.", cta: "Jya ku mafoto" }, footer: { description: "Urubuga ruhuza abarezi n'abafatanyabikorwa mu burezi kugira ngo bamenye, basangire kandi bahindure imikorere.", privacy: "Amabwiriza y'ibanga", terms: "Amategeko yo gukoresha", copyright: "PTR Alumni Network · Urubuga ruhuza gusuzumwa" },
-  },
-  fr: {
-    nav: { login: "Accéder au portail", menu: "Ouvrir la navigation", close: "Fermer la navigation" },
-    hero: { eyebrow: "Rwanda · PTR Alumni Network", title: "Des enseignants reliés par la pratique. Des écoles renforcées par le partage.", body: "PTR Alumni Network est la communauté numérique officielle du Programme de Résidence des Enseignants du Primaire (PTRP) au Rwanda — reliant les enseignants résidents, les anciens élèves, les mentors et les écoles modèles pour partager des expériences, mettre en avant les meilleures pratiques et souligner l'impact sur l'éducation.", primary: "Découvrir PTR Alumni Network", secondary: "Explorer notre réseau", note: "Connecter les enseignants résidents · Inspirer l'excellence éducative" },
-    stats: { title: "Un réseau national avec une mission claire", label: "Aperçu du programme" }, story: { eyebrow: "Pourquoi PTR Alumni Network", title: "C’est dans la classe que la transformation devient visible.", body: "De la préparation des leçons au coaching entre pairs, PTR Alumni Network rassemble l’expérience des enseignants dans un espace connecté.", cta: "Découvrir le programme" }, network: { eyebrow: "Connecter", title: "100 points de vue. 17 communautés scolaires. Une direction commune.", body: "Un réseau d’enseignants résidents et d’écoles modèles qui rend la collaboration concrète et visible.", cta: "Explorer le réseau" }, activities: { eyebrow: "Partager", title: "Ce que les enseignants essaient, apprennent et partagent", body: "Découvrez des activités approuvées issues des classes, du développement professionnel et des communautés scolaires.", cta: "Voir les activités" }, practices: { eyebrow: "Apprendre ensemble", title: "De petits changements de pratique peuvent ouvrir de grandes possibilités.", body: "Un espace de partage autour de la pédagogie centrée sur l’apprenant, l’inclusion, les TIC, les STEM et l’évaluation.", cta: "Parcourir les pratiques" }, impact: { eyebrow: "Transformer", title: "Suivre le travail. Comprendre les preuves. Continuer à améliorer.", body: "Le suivi de l’impact doit distinguer les actions, les productions et les résultats démontrés.", cta: "Découvrir notre impact" }, stories: { eyebrow: "Dans le réseau", title: "Des histoires qui gardent le travail humain", body: "Les progrès les plus importants commencent souvent lorsqu’un enseignant observe un besoin, essaie une nouvelle approche et partage la suite.", cta: "Lire les récits" }, gallery: { eyebrow: "Carnet de terrain", title: "Une fenêtre sur le travail", body: "Une galerie sélectionnée de moments de classe, de formations et de rencontres du réseau.", cta: "Visiter la galerie" }, footer: { description: "La communauté numérique officielle du Programme de Résidence des Enseignants du Primaire (PTRP) au Rwanda — reliant les enseignants résidents, les anciens élèves, les mentors et les écoles modèles.", privacy: "Politique de confidentialité", terms: "Conditions d’utilisation", copyright: "PTR Alumni Network · Communauté numérique officielle pour PTRP" },
-  },
-} as const;
+  quote: "A nation that invests in its teachers invests in the future of its children.",
+};
 
-export const stats = [
-  { value: 100, suffix: "", label: "Resident teachers", detail: "Verified program snapshot", icon: UsersRound, tone: "blue" },
-  { value: 17, suffix: "", label: "Model schools", detail: "Verified program snapshot", icon: School, tone: "green" },
-  { value: 1, suffix: "", label: "National network", detail: "Connected by practice", icon: Globe2, tone: "orange" },
-];
-
-export const featureTiles: Array<{ icon: LucideIcon; title: string; body: string; href: string; accent: string }> = [
-  { icon: Network, title: "Our network", body: "Find the people and school communities shaping the conversation.", href: "/network", accent: "mint" },
-  { icon: Activity, title: "Activities & updates", body: "Follow approved classroom, mentorship, and professional learning activity.", href: "/activities", accent: "blue" },
-  { icon: Lightbulb, title: "Best practices", body: "Make useful teaching ideas easier to discover and build on.", href: "/practices", accent: "gold" },
-];
-
-export const activityCards = [
-  { type: "FIELD NOTE", title: "Learning circles that turn reflection into action", meta: "Professional development · DEMO DATA", icon: MessageCircle, color: "blue" },
-  { type: "CLASSROOM", title: "A lesson planned around every learner’s voice", meta: "Learner-centred pedagogy · DEMO DATA", icon: NotebookTabs, color: "green" },
-  { type: "NETWORK", title: "Peer coaching across school communities", meta: "Mentorship & collaboration · DEMO DATA", icon: Handshake, color: "orange" },
-];
-
-export const practiceCards = [
-  { title: "Make thinking visible", category: "Learner-centred pedagogy", body: "A practical routine for helping pupils explain, compare, and build on one another’s ideas.", icon: Sparkles },
-  { title: "Design for participation", category: "Inclusive education", body: "Simple planning prompts that help more learners enter the lesson with confidence.", icon: HeartHandshake },
-  { title: "Teach with what is around you", category: "STEM & practical learning", body: "Turn everyday materials into invitations to observe, test, and make sense of the world.", icon: BookOpen },
-];
-
-export const galleryItems = [
-  { label: "Classroom practice", caption: "Learning in motion", gradient: "from-[#0d2b55] via-[#1e5aa3] to-[#7bc2a3]" },
-  { label: "Professional learning", caption: "Teachers learning together", gradient: "from-[#122b49] via-[#315f6a] to-[#e0a74e]" },
-  { label: "School community", caption: "A network with purpose", gradient: "from-[#0d2b55] via-[#5c3d75] to-[#e7834c]" },
-  { label: "Evidence & impact", caption: "From activity to insight", gradient: "from-[#183c55] via-[#1f7c70] to-[#8cc7a6]" },
-];
-
-export const impactBars = [
-  { label: "Teacher participation", value: 86, color: "bg-[#1e5aa3]" },
-  { label: "School participation", value: 72, color: "bg-[#16a878]" },
-  { label: "Practice sharing", value: 64, color: "bg-[#e6a24b]" },
+export const keyNumbers = [
+  { value: 100, suffix: "", label: "Teacher Residents graduated", detail: "Cohort commissioned on 5 August 2024", icon: UsersRound, tone: "blue" },
+  { value: 12, suffix: "", label: "Months of residency", detail: "Classroom learning and guided practice", icon: BookOpen, tone: "green" },
+  { value: 17, suffix: "", label: "Model schools", detail: "Primary demonstration schools nationwide", icon: School, tone: "orange" },
+  { value: 2, suffix: "", label: "Host TTCs", detail: "TTC Save and TTC de la Salle Byumba", icon: MapPinned, tone: "blue" },
+  { value: 5, suffix: "", label: "Partner organizations", detail: "Plus the RAINWATER Foundation as supporting partner", icon: Handshake, tone: "green" },
 ];
 
 export const programOverview = {
   title: "Primary Teacher Residency Program",
-  aims: "To improve classroom teaching practice and learner outcomes in Rwanda by providing newly qualified teachers with a structured, supported residency year in model schools.",
-  objectives: [
-    "Bridge the gap between initial teacher training and effective classroom practice",
-    "Embed evidence-based pedagogy and 21st-century skills (English, digital literacy) into daily teaching",
-    "Build a national network of reflective, collaborative, and innovative teachers",
-    "Strengthen model schools as centers of excellence and professional learning",
+  whatIs: "PTRP is a 12-month program for graduates of Teacher Training Colleges (TTCs). It strengthens practical classroom skills and the implementation of Rwanda's Competency-Based Curriculum (CBC). It was launched as a pilot to show the value of investing in teachers and giving them the knowledge, practical skills, and confidence to respond to the diverse learning needs of pupils.",
+  howItWorked: [
+    { title: "40% classroom instruction", body: "Structured learning on teaching methods and professional skills." },
+    { title: "60% guided teaching practice", body: "Hands-on teaching in primary demonstration (model) schools, with support from mentors." },
   ],
-  howItOperates: "Resident teachers are assigned to one of 17 model schools, where they work alongside experienced mentor teachers. The 12-month residency includes guided observation, co-planning, team teaching, and independent practice, with regular feedback cycles and professional learning communities.",
-  teacherTraining: "Residents receive ongoing training in learner-centred pedagogy, formative assessment, inclusive education, STEM teaching, and ICT integration. Training is delivered through a mix of face-to-face workshops, online modules, and peer coaching cycles.",
-  mentorship: "Each resident is paired with a trained mentor teacher who provides weekly guidance, models effective practice, and engages in reflective dialogue. Mentors receive dedicated training and support throughout the residency year.",
-  professionalDevelopment: "Residents participate in regular professional learning communities, cross-school visits, and network-wide events. They document their practice, share findings, and build a portfolio of evidence demonstrating improved learner outcomes.",
-  expectedOutcomes: "Improved learner engagement and achievement in literacy and mathematics, increased teacher confidence and effectiveness, strengthened peer collaboration across schools, and a growing network of innovative teaching practices documented and shared across the program.",
+  learned: [
+    { title: "Evidence-based pedagogy", body: "Student-centred learning, inquiry-based teaching, and differentiation to meet the needs of every pupil." },
+    { title: "21st-century skills", body: "A strong focus on English language proficiency and digital literacy." },
+    { title: "Intensive teaching practicums", body: "Real classroom experience under guidance." },
+  ],
+  received: [
+    "Mentorship from tutors and mentors",
+    "Dedicated laptops",
+    "Guided practice in model schools",
+  ],
+  locations: [
+    { name: "TTC Save", district: "Gisagara District", detail: "One of the two colleges that hosted the 100 residents." },
+    { name: "TTC de la Salle Byumba", district: "Gicumbi District", detail: "The second host college for the residency year." },
+  ],
+  launchedBy: "The pilot was launched by the Ministry of Education together with the Rwanda Basic Education Board (REB), Florida State University's Learning Systems Institute (LSI), Inspire, Educate and Empower Rwanda (IEE), and Bridge2Rwanda, with the RAINWATER Foundation as a supporting partner.",
+  timeline: [
+    { date: "2023", title: "Residents begin the program", body: "The pilot launched in 2023. The exact start date is to be confirmed by program administrators." },
+    { date: "12-month residency", title: "Classroom learning and guided practice", body: "Residents learn at TTC Save, TTC de la Salle Byumba, and the 17 model schools." },
+    { date: "5 August 2024", title: "100 Primary Teacher Residents graduate", body: "The cohort is commissioned and begins teaching in schools across Rwanda." },
+    { date: "Today", title: "Alumni support one another", body: "PTRP graduates teach in schools and continue to grow through the PTR Alumni Network." },
+  ],
 };
 
-export const participatingSchools = [
-  { name: "TTC Save", location: "Gisagara District", image: "/manus-storage/ptrp-pilot-launch_c79bf5cd.jpg", intake: 50, focus: "Early childhood and primary pedagogy" },
-  { name: "TTC Gicumbi", location: "Gicumbi District", image: "/manus-storage/ptrp-pilot-launch_c79bf5cd.jpg", intake: 50, focus: "Subject teaching and curriculum" },
-  { name: "School A", location: "Kigali City", image: "/placeholder-school-a.jpg", intake: 30, focus: "Literacy and inclusive education" },
-  { name: "School B", location: "East Province", image: "/placeholder-school-b.jpg", intake: 25, focus: "Mathematics and STEM" },
-  { name: "School C", location: "West Province", image: "/placeholder-school-c.jpg", intake: 20, focus: "Science and practical learning" },
-  { name: "School D", location: "North Province", image: "/placeholder-school-d.jpg", intake: 15, focus: "Inclusive education and SEN" },
-  { name: "School E", location: "Kigali Rural", image: "/placeholder-school-e.jpg", intake: 10, focus: "Digital literacy and ICT integration" },
-  // Complete list of 17 model schools
-  { name: "School F", location: "Kigali Suburbs", image: "/placeholder-school-f.jpg", intake: 8, focus: "Arts and humanities" },
-  { name: "School G", location: "Rural Area", image: "/placeholder-school-g.jpg", intake: 6, focus: "Vocational integration" },
-  { name: "School H", location: "Urban Center", image: "/placeholder-school-h.jpg", intake: 5, focus: "Gender-responsive pedagogy" },
-  { name: "School I", location: "District X", image: "/placeholder-school-i.jpg", intake: 4, focus: "Environmental education" },
-  { name: "School J", location: "District Y", image: "/placeholder-school-j.jpg", intake: 4, focus: "Skill-based learning" },
-  { name: "School K", location: "District Z", image: "/placeholder-school-k.jpg", intake: 3, focus: "Community engagement" },
-  { name: "School L", location: "Remote Area", image: "/placeholder-school-l.jpg", intake: 3, focus: "Multigrade teaching" },
-  { name: "School M", location: "Gisagara", image: "/placeholder-school-m.jpg", intake: 2, focus: "Teacher well-being" },
-  { name: "School N", location: "Gicumbi", image: "/placeholder-school-n.jpg", intake: 2, focus: "Curriculum innovation" },
-  { name: "School O", location: "Huye", image: "/placeholder-school-o.jpg", intake: 1, focus: "Action research" },
+export const visionMission = {
+  vision: "Quality education for every child in Rwanda, driven by well-prepared, professional, and passionate teachers.",
+  mission: "To unite PTRP alumni so we can share best practices, support one another's professional growth, show the impact of the residency model, and keep improving learning outcomes for pupils.",
+  objectives: [
+    "Connect PTRP alumni across all districts.",
+    "Share teaching practices, lesson ideas, and resources.",
+    "Support continuous professional development.",
+    "Document and share the story and impact of PTRP.",
+    "Work with partners to strengthen teacher education in Rwanda.",
+  ],
+  values: [
+    { title: "Dedication", body: "We commit fully to every learner." },
+    { title: "Resilience", body: "We keep going and keep improving." },
+    { title: "Professionalism", body: "We teach with skill and integrity." },
+    { title: "Passion", body: "We love teaching and what it can change." },
+    { title: "Collaboration", body: "We grow stronger together." },
+  ],
+  motto: "Inspire, Educate and Empower.",
+};
+
+export const impactContent = {
+  headline: "From Residents to Education Leaders",
+  paragraphs: [
+    "On 5 August 2024, 100 Primary Teacher Residents graduated from PTRP. The commissioning ceremony was more than a graduation. It recognized dedication, resilience, professional growth, and a shared commitment to transforming the quality of primary education in Rwanda.",
+    "The pilot showed why investing in teachers matters: when teachers are equipped with strong professional skills and confidence, they can respond better to the diverse needs of the pupils in their classrooms. For the graduates, this was not the end of a one-year program. It was the beginning of a greater journey toward educational excellence.",
+  ],
+  focusAreas: [
+    { title: "Better teaching practice", body: "Student-centred, inquiry-based lessons and differentiation for pupils with different needs." },
+    { title: "Stronger English", body: "Teachers with improved English language proficiency." },
+    { title: "Digital skills", body: "Teachers able to use technology in learning." },
+    { title: "Professional confidence", body: "Teachers ready for the realities of the classroom." },
+  ],
+  whereAlumniWork: {
+    title: "Where our alumni work now",
+    pending: true,
+    body: "Schools and districts will be published here as alumni profiles are verified and approved.",
+  },
+  classroomResults: {
+    title: "Results in classrooms",
+    pending: true,
+    body: "Data, examples, awards, and evidence of pupil progress will be published once verified by program administrators.",
+  },
+  stories: [
+    { label: "Alumni story", title: "A photo and quote will appear here", body: "Each story will include the alumnus's name, school, district, and a short quote or video about how the residency changed their teaching." },
+    { label: "Alumni story", title: "A photo and quote will appear here", body: "Alumni can submit their story through the network. The administrator reviews every submission before it is published." },
+    { label: "Alumni story", title: "A photo and quote will appear here", body: "Stories will show the human impact of the residency model across Rwanda's primary schools." },
+  ],
+};
+
+export const modelSchools = [
+  { id: 1, name: "GS Matimba", district: "Nyagatare" },
+  { id: 2, name: "GS Jean de la Mennais Kirambo", district: "Burera" },
+  { id: 3, name: "GS Byumba Catholique", district: "Gicumbi" },
+  { id: 4, name: "GS Bihinga", district: "Gatsibo" },
+  { id: 5, name: "GS Akanzu", district: "Rwamagana" },
+  { id: 6, name: "Rukara Model School", district: "Kayonza" },
+  { id: 7, name: "GS Zaza A", district: "Ngoma" },
+  { id: 8, name: "GS Mayange A", district: "Bugesera" },
+  { id: 9, name: "GS St Jean Paul II", district: "Gisagara", note: "Recently called ES Save · district to confirm" },
+  { id: 10, name: "GS St Laurent Cyahinda", district: "Nyaruguru" },
+  { id: 11, name: "GS Mururu", district: "Rusizi" },
+  { id: 12, name: "GS Uwinkomo", district: "Nyamagabe" },
+  { id: 13, name: "GS Rubengera I", district: "Karongi" },
+  { id: 14, name: "GS Muramba B", district: "Ngororero" },
+  { id: 15, name: "GS St Etienne", district: "Muhanga" },
+  { id: 16, name: "G.S Umubano I", district: "Rubavu" },
+  { id: 17, name: "GS Nyarusange", district: "District to be confirmed", note: "District to confirm" },
 ];
 
-export const sectionMeta: Record<string, { eyebrow: string; title: string; description: string; icon: LucideIcon; demo: string }> = {
-  "/about": { eyebrow: "About PTR Alumni Network", title: "A connected program for stronger teaching practice.", description: "Program background, vision, mission, objectives, core values, implementation approach, and the role of resident teachers and model schools will live here. Official statements are editable and remain placeholders until verified.", icon: HeartHandshake, demo: "Editable program information · DEMO CONTENT" },
-  "/network": { eyebrow: "Our network", title: "Find the people and communities behind the work.", description: "The resident teacher directory and model school profiles will make approved experience easier to find, with filters for school, subject, location, and teaching area. Location and profile details appear only when verified and approved. See participating schools below.", icon: MapPinned, demo: "Directory and school profiles · DEMO CONTENT" },
-  "/activities": { eyebrow: "Activities & updates", title: "A living record of practice in motion.", description: "Browse approved classroom teaching, lesson planning, mentorship, professional development, ICT, STEM, school events, community engagement, and peer learning updates.", icon: Activity, demo: "Approved activities feed · DEMO CONTENT" },
-  "/practices": { eyebrow: "Best teaching practices", title: "A field guide made by teachers, for teachers.", description: "Discover practices with the context, steps, resources, evidence, and lessons learned needed to make an idea useful beyond one classroom.", icon: Lightbulb, demo: "Knowledge-sharing library · DEMO CONTENT" },
-  "/impact": { eyebrow: "Impact on education", title: "Evidence that helps the network keep learning.", description: "The impact dashboard will distinguish activities, outputs, and demonstrated outcomes using verified indicators entered by authorized users. No fabricated statistics or causal claims.", icon: ChartNoAxesCombined, demo: "Verified reporting dashboard · DEMO CONTENT" },
-  "/gallery": { eyebrow: "Gallery", title: "A window into the work across the network.", description: "Approved photos, videos, albums, captions, and stories will be searchable by school, activity, date, and event, with consent and moderation safeguards.", icon: Camera, demo: "Approved media gallery · DEMO CONTENT" },
-  "/news": { eyebrow: "News & success stories", title: "Keep up with the people and moments moving the program forward.", description: "Program announcements, school updates, resident teacher experiences, interviews, recognition, events, and school stories will gather here.", icon: MessageCircle, demo: "News and story archive · DEMO CONTENT" },
-  "/resources": { eyebrow: "Resources & publications", title: "Useful materials, ready to be shared.", description: "A searchable library for lesson plans, teaching materials, videos, reports, research, training, and best-practice documents — with file type, category, tag, and download support.", icon: BookOpen, demo: "Resource library · DEMO CONTENT" },
-  "/contact": { eyebrow: "Contact & partnerships", title: "Bring a question, an idea, or a collaboration.", description: "Official contact details and partnership channels will be published here once verified. For now, this is a safe, editable placeholder for the contact experience.", icon: Handshake, demo: "Contact details pending verification" },
+export const hostColleges = [
+  { name: "TTC Save", district: "Gisagara District", body: "One of the two colleges that hosted the residents." },
+  { name: "TTC de la Salle Byumba", district: "Gicumbi District", body: "The second host college for the residency year." },
+];
+
+export const partners = [
+  { name: "Ministry of Education", shortName: "MINEDUC", role: "Launched the pilot with partners", body: "Provided national leadership and coordination for the PTRP pilot.", url: "https://www.mineduc.gov.rw", logo: "/partners/mineduc.png" },
+  { name: "Rwanda Basic Education Board", shortName: "REB", role: "National education partner and co-launcher of the pilot", body: "Supported curriculum alignment, school coordination, and quality assurance.", url: "https://www.reb.gov.rw", logo: "/partners/reb.png" },
+  { name: "Florida State University, Learning Systems Institute", shortName: "FSU · LSI", role: "Academic and technical partner", body: "Contributed academic expertise, research, and technical support for the residency model.", url: "https://lsi.fsu.edu", logo: "/partners/fsu.png" },
+  { name: "Inspire, Educate and Empower Rwanda", shortName: "IEE", role: "Implementing partner", body: "Supported implementation, training, and school-level delivery of the program.", url: "https://ieerwanda.org", logo: "/partners/iee.png" },
+  { name: "Bridge2Rwanda", shortName: "B2R", role: "Program partner", body: "Contributed program development and partnership support.", url: "https://bridge2rwanda.org", logo: "/partners/bridge2rwanda.png" },
+  { name: "RAINWATER Foundation", shortName: "RAINWATER", role: "Supporting partner", body: "Provided supporting funding and partnership for the pilot.", url: "https://rainwatercharitablefoundation.org", logo: "/partners/rainwater.png" },
+];
+
+export const newsPosts = [
+  {
+    slug: "celebrating-excellence-in-teacher-education",
+    category: "Success Stories",
+    date: "5 August 2024",
+    title: "Celebrating Excellence in Teacher Education: The Success of the Primary Teacher Residency Program (PTRP)",
+    excerpt: "On 5 August 2024, a remarkable milestone was celebrated in Rwanda's education sector as 100 Primary Teacher Residents graduated from the one-year Primary Teacher Residency Program.",
+    body: [
+      "On 5 August 2024, a remarkable milestone was celebrated in Rwanda's education sector as 100 Primary Teacher Residents graduated from the one-year Primary Teacher Residency Program.",
+      "The commissioning ceremony was more than a celebration of graduation. It was a recognition of dedication, resilience, professional growth, and the collective commitment to transforming the quality of primary education in Rwanda.",
+      "The successful completion of this pilot showed the importance of investing in teachers, strengthening professional competencies, and equipping educators with the knowledge, practical skills, and confidence to respond effectively to the diverse learning needs of pupils.",
+      "Behind this achievement was a strong partnership involving the RAINWATER Foundation, Rwanda Basic Education Board (REB), Inspire, Educate and Empower Rwanda (IEE), Bridge2Rwanda, and Florida State University.",
+      "Special recognition goes to the Teacher Residents, tutors, mentors, implementing partners, and all stakeholders. A nation that invests in its teachers invests in the future of its children. Together, let us continue to Inspire, Educate and Empower!",
+    ],
+    hashtags: ["#PTRP", "#PrimaryTeacherResidencyProgram", "#TeacherEducation", "#QualityEducation", "#TeacherProfessionalDevelopment", "#RwandaEducation", "#InvestInTeachers", "#TeachersMatter"],
+  },
+  {
+    slug: "lsi-encouraging-results",
+    category: "Announcements",
+    date: "27 June 2024",
+    title: "LSI reports encouraging results from the Primary Teacher Residency Program",
+    excerpt: "Florida State University's Learning Systems Institute reported positive outcomes from the PTRP pilot, including strong performance in observed lessons and growth in literacy, mathematics, and science.",
+    body: [
+      "Florida State University's Learning Systems Institute reported encouraging results from the Primary Teacher Residency Program in Rwanda.",
+      "More than 80 teacher residents received a performance rating of meets or exceeds expectations in all three observed lessons during term two.",
+      "Residents continued to grow in literacy, mathematics, and science knowledge, skills, and attitudes, with increased confidence in teaching, English literacy, and ICT use.",
+    ],
+    hashtags: ["#PTRP", "#Research", "#TeacherEducation", "#RwandaEducation"],
+  },
+  {
+    slug: "commissioning-ceremony-in-pictures",
+    category: "Videos",
+    date: "5 August 2024",
+    title: "Commissioning ceremony in pictures and video",
+    excerpt: "Relive the celebration as 100 Teacher Residents mark the end of their residency year and the beginning of their journey as PTRP alumni.",
+    body: [
+      "The commissioning ceremony brought together residents, tutors, mentors, partners, and education leaders to celebrate the first PTRP cohort.",
+      "Photos and video from the day are being prepared for the gallery. Alumni can contribute approved media through the network.",
+    ],
+    hashtags: ["#PTRP", "#Commissioning", "#Alumni", "#TeachersMatter"],
+  },
+];
+
+export const newsCategories = ["All", "Events", "Training", "Success Stories", "Announcements", "Videos"];
+
+export const newsIdeas = [
+  "Alumni meetings and regional meet-ups",
+  "Classroom success stories",
+  "Workshops and professional learning",
+  "School visits and peer learning",
+  "New members joining the network",
+  "Partner news and announcements",
+  "Teaching tips and practical resources",
+];
+
+export const galleryAlbums = [
+  { title: "Graduation and Commissioning", date: "5 August 2024", body: "The first PTRP cohort celebrates the end of the residency year.", image: "/storage/ptrp-pilot-launch.jpg", credit: "Photo: MINEDUC", gradient: "from-[#0d2b55] via-[#1e5aa3] to-[#7bc2a3]" },
+  { title: "Residency at TTC Save", date: "Gisagara District", body: "Classroom learning, mentorship, and guided practice at TTC Save.", image: "/storage/ptrp-residents-1.jpg", credit: "Photo: MINEDUC", gradient: "from-[#122b49] via-[#315f6a] to-[#e0a74e]" },
+  { title: "Residency at TTC de la Salle Byumba", date: "Gicumbi District", body: "Residents learn and teach alongside mentors in Gicumbi.", image: "/storage/ptrp-residents-2.jpg", credit: "Photo: MINEDUC", gradient: "from-[#0d2b55] via-[#5c3d75] to-[#e7834c]" },
+  { title: "Model School Practice", date: "17 model schools", body: "Real classroom experience in primary demonstration schools.", image: "/storage/ptrp-residents-3.jpg", credit: "Photo: MINEDUC", gradient: "from-[#183c55] via-[#1f7c70] to-[#8cc7a6]" },
+  { title: "Training and Workshops", date: "Residency year", body: "Professional learning in pedagogy, English, digital literacy, and CBC implementation.", gradient: "from-[#0d2b55] via-[#1e5aa3] to-[#7bc2a3]" },
+  { title: "Alumni Events", date: "Ongoing", body: "Meet-ups, peer learning, and network gatherings.", gradient: "from-[#122b49] via-[#315f6a] to-[#e0a74e]" },
+  { title: "Video Stories", date: "Ongoing", body: "Alumni voices and classroom stories in their own words.", videoUrl: "https://youtu.be/kDFHWe75e-I", gradient: "from-[#0d2b55] via-[#5c3d75] to-[#e7834c]" },
+];
+
+export const galleryRules = [
+  "Only upload content you have permission to share.",
+  "Get consent before posting photos of pupils.",
+  "Include a title, date, and school with every upload.",
+  "All submissions are reviewed and approved by an administrator.",
+];
+
+export const alumniProfiles = [
+  { name: "Alumni Profile 01", ttc: "TTC Save", school: "GS Matimba", district: "Nyagatare", year: "2024", bio: "Profile details will be published after the member completes and approves their profile.", demo: true },
+  { name: "Alumni Profile 02", ttc: "TTC de la Salle Byumba", school: "GS Byumba Catholique", district: "Gicumbi", year: "2024", bio: "Profile details will be published after the member completes and approves their profile.", demo: true },
+  { name: "Alumni Profile 03", ttc: "TTC Save", school: "GS St Jean Paul II", district: "Gisagara", year: "2024", bio: "Profile details will be published after the member completes and approves their profile.", demo: true },
+  { name: "Alumni Profile 04", ttc: "TTC de la Salle Byumba", school: "GS St Etienne", district: "Muhanga", year: "2024", bio: "Profile details will be published after the member completes and approves their profile.", demo: true },
+  { name: "Alumni Profile 05", ttc: "TTC Save", school: "GS Mururu", district: "Rusizi", year: "2024", bio: "Profile details will be published after the member completes and approves their profile.", demo: true },
+  { name: "Alumni Profile 06", ttc: "TTC de la Salle Byumba", school: "GS Umubano I", district: "Rubavu", year: "2024", bio: "Profile details will be published after the member completes and approves their profile.", demo: true },
+];
+
+export const alumniFields = [
+  "Name",
+  "Photo",
+  "Host TTC",
+  "Model school",
+  "District",
+  "Graduation year",
+  "Short bio",
+  "Optional contact link",
+];
+
+export const resourceCategories = [
+  "Lesson plans and teaching materials",
+  "English language and digital literacy",
+  "Student-centred and inquiry-based teaching",
+  "Program documents and reports",
+  "Alumni newsletters",
+];
+
+export const resources = [
+  { title: "Learner-Centred Lesson Plan Template", type: "Lesson Plan", category: "Lesson plans and teaching materials", file: "TXT · planning template", href: "/resources/lesson-plan-template.txt" },
+  { title: "Competency-Based Curriculum Quick Guide", type: "Guide", category: "Program documents and reports", file: "TXT · quick guide", href: "/resources/cbc-quick-guide.txt" },
+  { title: "English Language in the Primary Classroom", type: "Guide", category: "English language and digital literacy", file: "TXT · classroom guide", href: "/resources/english-in-the-classroom.txt" },
+  { title: "ICT Integration Quick Start Guide", type: "Guide", category: "English language and digital literacy", file: "TXT · quick start", href: "/resources/ict-quick-start.txt" },
+  { title: "Inquiry-Based Teaching Toolkit", type: "Toolkit", category: "Student-centred and inquiry-based teaching", file: "TXT · practical toolkit", href: "/resources/inquiry-based-teaching.txt" },
+  { title: "Inclusive Education Strategies", type: "Guide", category: "Student-centred and inquiry-based teaching", file: "TXT · inclusion guide", href: "/resources/inclusive-education.txt" },
+  { title: "Mentor Teacher Handbook", type: "Handbook", category: "Program documents and reports", file: "TXT · mentor handbook", href: "/resources/mentor-handbook.txt" },
+  { title: "PTR Alumni Network Newsletter · Issue 1", type: "Newsletter", category: "Alumni newsletters", file: "TXT · network newsletter", href: "/resources/alumni-newsletter-1.txt" },
+];
+
+export const joinContent = {
+  headline: "Join the PTR Alumni Network",
+  intro: "Are you a graduate of the Primary Teacher Residency Program? Join your fellow alumni to share ideas, find support, and be part of the story of improving education in Rwanda.",
+  fields: [
+    "Full name",
+    "Phone",
+    "Email",
+    "Host TTC (Save or de la Salle Byumba)",
+    "Model school",
+    "District",
+    "Graduation year",
+    "Short bio",
+    "Photo (optional)",
+    "Consent to appear in the directory",
+  ],
+  contact: {
+    email: "info@ptr.rw",
+    phone: "Phone to be confirmed",
+    address: "Kigali, Rwanda · Office location to be confirmed",
+    note: "Email is the confirmed contact channel. Phone and office details will be published after verification. Social media links are live below.",
+  },
 };
+
+export const copy = {
+  en: {
+    nav: { login: "Portal login", menu: "Open navigation", close: "Close navigation" },
+    hero: {
+      eyebrow: "PTR Alumni Network · Rwanda",
+      title: "Celebrating Excellence in Teacher Education",
+      body: "The alumni network of the Primary Teacher Residency Program (PTRP), working together for quality primary education in Rwanda.",
+      primary: "Join the Network",
+      secondary: "Watch Our Story",
+      note: "Inspire, Educate and Empower.",
+    },
+    footer: {
+      description: "The alumni network of the Primary Teacher Residency Program (PTRP), connecting resident teachers and model schools across Rwanda.",
+      privacy: "Privacy policy",
+      terms: "Terms of use",
+      copyright: "© PTR Alumni Network · Inspire, Educate and Empower.",
+    },
+  },
+  rw: {
+    nav: { login: "Kwinjira muri portal", menu: "Fungura menu", close: "Funga menu" },
+    hero: {
+      eyebrow: "PTR Alumni Network · Rwanda",
+      title: "Kwizihiza Ubuhanga mu Burezi bw'Abarimu",
+      body: "Urusobe rw'abanyeshuri barangije Gahunda y'Abarezi bigisha mu mashuri (PTRP), bakorana mu ntego yo guteza imbere ireme ry'uburezi bw'ibanze mu Rwanda.",
+      primary: "Injira mu rusobe",
+      secondary: "Reba inkuru yacu",
+      note: "Inspire, Educate and Empower.",
+    },
+    footer: {
+      description: "Urusobe rw'abanyeshuri barangije Gahunda y'Abarezi bigisha mu mashuri (PTRP), buhuza abarezi n'amashuri mu Rwanda.",
+      privacy: "Amabwiriza y'ibanga",
+      terms: "Amategeko yo gukoresha",
+      copyright: "© PTR Alumni Network · Inspire, Educate and Empower.",
+    },
+  },
+  fr: {
+    nav: { login: "Accéder au portail", menu: "Ouvrir la navigation", close: "Fermer la navigation" },
+    hero: {
+      eyebrow: "PTR Alumni Network · Rwanda",
+      title: "Célébrer l'excellence dans la formation des enseignants",
+      body: "Le réseau des anciens du Programme de résidence des enseignants du primaire (PTRP), uni pour une éducation primaire de qualité au Rwanda.",
+      primary: "Rejoindre le réseau",
+      secondary: "Voir notre histoire",
+      note: "Inspire, Educate and Empower.",
+    },
+    footer: {
+      description: "Le réseau des anciens du Programme de résidence des enseignants du primaire (PTRP), reliant les enseignants résidents et les écoles modèles au Rwanda.",
+      privacy: "Politique de confidentialité",
+      terms: "Conditions d'utilisation",
+      copyright: "© PTR Alumni Network · Inspire, Educate and Empower.",
+    },
+  },
+} as const;
+
+export const sectionMeta: Record<string, { eyebrow: string; title: string; description: string; icon: LucideIcon; demo: string }> = {
+  "/about": { eyebrow: "About the Program", title: "A 12-month residency that prepared 100 teachers for Rwanda's classrooms.", description: "What PTRP is, how it worked, what residents learned and received, where it took place, who launched it, and the journey from resident to alumnus.", icon: HeartHandshake, demo: "Program facts · Official sources" },
+  "/network": { eyebrow: "Model Schools", title: "Our 17 model schools", description: "Primary demonstration schools where residents put what they learned into practice through guided teaching, with mentors beside them.", icon: MapPinned, demo: "School list · Two districts to confirm" },
+  "/impact": { eyebrow: "Impact in Education Today", title: "From Residents to Education Leaders", description: "The PTRP pilot showed why investing in teachers matters. Meet the focus areas, results, and alumni stories shaping the next chapter.", icon: ChartNoAxesCombined, demo: "Impact data · Awaiting verified figures" },
+  "/news": { eyebrow: "News & Activities", title: "What We Are Doing", description: "Events, training, success stories, announcements, and videos from the PTR Alumni Network.", icon: MessageCircle, demo: "News archive · Updated by administrators" },
+  "/gallery": { eyebrow: "Gallery", title: "Our Journey in Pictures and Videos", description: "Albums from graduation, the residency at both host colleges, model school practice, training, and alumni events.", icon: Camera, demo: "Approved media · Consent required" },
+  "/alumni": { eyebrow: "Alumni Directory", title: "Meet Our Alumni", description: "Find PTRP alumni by name, district, or model school. Members control what contact information is public.", icon: UsersRound, demo: "Directory preview · Profiles awaiting members" },
+  "/resources": { eyebrow: "Resources", title: "Learn, Teach, Share", description: "Lesson plans, teaching materials, English and digital literacy guides, program documents, and alumni newsletters.", icon: BookOpen, demo: "Resource library · Demo files" },
+  "/partners": { eyebrow: "Partners", title: "Together, We Make Teachers Matter", description: "PTRP was made possible by a strong partnership of government, universities, and education organizations that share one belief: investing in teachers improves learning for children.", icon: Handshake, demo: "Partner information · Official sources" },
+  "/contact": { eyebrow: "Join & Contact", title: "Join the PTR Alumni Network", description: "Are you a PTRP graduate? Join your fellow alumni to share ideas, find support, and be part of the story of improving education in Rwanda.", icon: Globe2, demo: "Membership form · Contact details pending" },
+  "/activities": { eyebrow: "Activities & Updates", title: "A living record of practice in motion", description: "Approved classroom teaching, lesson planning, mentorship, professional development, ICT, STEM, and school events.", icon: Activity, demo: "Activities feed · Demo content" },
+  "/practices": { eyebrow: "Best Teaching Practices", title: "A field guide made by teachers, for teachers", description: "Discover practices with the context, steps, resources, evidence, and lessons learned needed to make an idea useful beyond one classroom.", icon: Lightbulb, demo: "Knowledge-sharing library · Demo content" },
+};
+
+export const stats = keyNumbers;
+export const featureTiles = [
+  { icon: UsersRound, title: "Alumni directory", body: "Find PTRP graduates across Rwanda.", href: "/alumni", accent: "mint" },
+  { icon: School, title: "Model schools", body: "Explore the 17 demonstration schools.", href: "/network", accent: "blue" },
+  { icon: BookOpen, title: "Resources", body: "Lesson plans, guides, and reports.", href: "/resources", accent: "gold" },
+];
+
+export const activityCards = [
+  { type: "FIELD NOTE", title: "Learning circles that turn reflection into action", meta: "Professional development · DEMO DATA", icon: MessageCircle, color: "blue" },
+  { type: "CLASSROOM", title: "A lesson planned around every learner's voice", meta: "Learner-centred pedagogy · DEMO DATA", icon: NotebookTabs, color: "green" },
+  { type: "NETWORK", title: "Peer coaching across school communities", meta: "Mentorship & collaboration · DEMO DATA", icon: Handshake, color: "orange" },
+];
+
+export const practiceCards = [
+  { title: "Make thinking visible", category: "Learner-centred pedagogy", body: "A practical routine for helping pupils explain, compare, and build on one another's ideas.", icon: Sparkles },
+  { title: "Design for participation", category: "Inclusive education", body: "Simple planning prompts that help more learners enter the lesson with confidence.", icon: HeartHandshake },
+  { title: "Teach with what is around you", category: "STEM & practical learning", body: "Turn everyday materials into invitations to observe, test, and make sense of the world.", icon: BookOpen },
+];
+
+export const galleryPhotos = [
+  { src: "/gallery/gallery-01.jpg", alt: "PTRP community moment 1" },
+  { src: "/gallery/gallery-02.jpg", alt: "PTRP community moment 2" },
+  { src: "/gallery/gallery-03.jpg", alt: "PTRP community moment 3" },
+  { src: "/gallery/gallery-04.jpg", alt: "PTRP community moment 4" },
+  { src: "/gallery/gallery-05.jpg", alt: "PTRP community moment 5" },
+  { src: "/gallery/gallery-06.jpg", alt: "PTRP community moment 6" },
+  { src: "/gallery/gallery-07.jpg", alt: "PTRP community moment 7" },
+  { src: "/gallery/gallery-08.jpg", alt: "PTRP community moment 8" },
+  { src: "/gallery/gallery-09.jpg", alt: "PTRP community moment 9" },
+  { src: "/gallery/gallery-10.jpg", alt: "PTRP community moment 10" },
+  { src: "/gallery/gallery-11.jpg", alt: "PTRP community moment 11" },
+];
+
+export const galleryItems = galleryAlbums;
+export const participatingSchools = modelSchools;

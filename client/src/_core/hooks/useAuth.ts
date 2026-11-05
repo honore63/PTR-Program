@@ -3,23 +3,45 @@ import { ApiError, apiRequest, queryKeys } from "@/lib/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo } from "react";
 
+export type AuthUser = {
+  id: number;
+  name: string | null;
+  email: string | null;
+  role: "user" | "admin";
+  lastSignedIn?: string;
+  createdAt?: string;
+};
+
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
   redirectPath?: string;
 };
 
 export function useAuth(options?: UseAuthOptions) {
-  // Login is started via startLogin() in the effect below, only when we actually
-  // navigate — never during render. startLogin() mints a one-time nonce + writes
-  // the state cookie, so calling it per render would overwrite the cookie and
-  // desync it from an in-flight login's `state`.
   const { redirectOnUnauthenticated = false, redirectPath } = options ?? {};
   const queryClient = useQueryClient();
+
   const meQuery = useQuery({
     queryKey: queryKeys.authMe,
-    queryFn: () => apiRequest<any>("auth/me"),
+    queryFn: () => apiRequest<AuthUser | null>("auth/me"),
     retry: false,
     refetchOnWindowFocus: false,
+  });
+
+  const loginMutation = useMutation({
+    mutationFn: (credentials: { email: string; password: string }) =>
+      apiRequest<AuthUser>("auth/login", { method: "POST", body: credentials }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKeys.authMe, data);
+    },
+  });
+
+  const registerMutation = useMutation({
+    mutationFn: (payload: { name: string; email: string; password: string }) =>
+      apiRequest<AuthUser>("auth/register", { method: "POST", body: payload }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKeys.authMe, data);
+    },
   });
 
   const logoutMutation = useMutation({
@@ -27,6 +49,22 @@ export function useAuth(options?: UseAuthOptions) {
     onSuccess: () => {
       queryClient.setQueryData(queryKeys.authMe, null);
     },
+  });
+
+  const forgotPasswordMutation = useMutation({
+    mutationFn: (email: string) =>
+      apiRequest<{ success: boolean; message: string; resetToken?: string }>("auth/forgot-password", {
+        method: "POST",
+        body: { email },
+      }),
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: (payload: { token: string; password: string }) =>
+      apiRequest<{ success: boolean; message: string }>("auth/reset-password", {
+        method: "POST",
+        body: payload,
+      }),
   });
 
   const logout = useCallback(async () => {
@@ -38,27 +76,19 @@ export function useAuth(options?: UseAuthOptions) {
       }
       throw error;
     } finally {
-      // Clear the Preview auto-login token mirrored into sessionStorage, so
-      // header-based sessions (Safari ITP / WebView) are logged out too. The
-      // backend cookie is cleared by the logout mutation.
-      try {
-        sessionStorage.removeItem("manus-cookie");
-      } catch {}
       queryClient.setQueryData(queryKeys.authMe, null);
       await queryClient.invalidateQueries({ queryKey: queryKeys.authMe });
     }
   }, [logoutMutation, queryClient]);
 
   const state = useMemo(() => {
-    localStorage.setItem(
-      "manus-runtime-user-info",
-      JSON.stringify(meQuery.data)
-    );
+    const user = meQuery.data ?? null;
     return {
-      user: meQuery.data ?? null,
-      loading: meQuery.isLoading || logoutMutation.isPending,
-      error: meQuery.error ?? logoutMutation.error ?? null,
-      isAuthenticated: Boolean(meQuery.data),
+      user,
+      isAdmin: user?.role === "admin",
+      loading: meQuery.isLoading || logoutMutation.isPending || loginMutation.isPending,
+      error: meQuery.error ?? logoutMutation.error ?? loginMutation.error ?? null,
+      isAuthenticated: Boolean(user),
     };
   }, [
     meQuery.data,
@@ -66,6 +96,8 @@ export function useAuth(options?: UseAuthOptions) {
     meQuery.isLoading,
     logoutMutation.error,
     logoutMutation.isPending,
+    loginMutation.error,
+    loginMutation.isPending,
   ]);
 
   useEffect(() => {
@@ -75,7 +107,6 @@ export function useAuth(options?: UseAuthOptions) {
     if (typeof window === "undefined") return;
     if (redirectPath && window.location.pathname === redirectPath) return;
 
-    // Navigate at this moment only. startLogin() mints the nonce + cookie itself.
     if (redirectPath) {
       window.location.href = redirectPath;
     } else {
@@ -92,6 +123,10 @@ export function useAuth(options?: UseAuthOptions) {
   return {
     ...state,
     refresh: () => meQuery.refetch(),
+    login: (credentials: { email: string; password: string }) => loginMutation.mutateAsync(credentials),
+    register: (payload: { name: string; email: string; password: string }) => registerMutation.mutateAsync(payload),
+    forgotPassword: (email: string) => forgotPasswordMutation.mutateAsync(email),
+    resetPassword: (payload: { token: string; password: string }) => resetPasswordMutation.mutateAsync(payload),
     logout,
   };
 }

@@ -9,6 +9,8 @@ RewriteBase /PTRP/
 RewriteCond %{REQUEST_URI} ^/PTRP/api/
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^api/ api/index.php [QSA,L]
+RewriteRule ^storage/(.+)$ api/index.php [QSA,L]
+RewriteRule ^uploads/(.+)$ api/index.php [QSA,L]
 RewriteRule ^manus-storage/(.+)$ api/index.php [QSA,L]
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d

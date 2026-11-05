@@ -13,6 +13,12 @@ export const queryKeys = {
   adminContent: ["api", "admin", "content"] as const,
   adminMedia: ["api", "admin", "media"] as const,
   adminUsers: ["api", "admin", "users"] as const,
+  adminSchools: ["api", "admin", "schools"] as const,
+  adminTeachers: ["api", "admin", "teachers"] as const,
+  adminAlumni: ["api", "admin", "alumni"] as const,
+  adminNews: ["api", "admin", "news"] as const,
+  adminGallery: ["api", "admin", "gallery"] as const,
+  adminPractices: ["api", "admin", "best-practices"] as const,
 };
 
 export async function apiRequest<T>(
@@ -21,7 +27,10 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const { body, headers, ...requestOptions } = options;
   const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
-  const apiBaseUrl = window.__MANUS_CONFIG__?.apiBaseUrl ?? `${import.meta.env.BASE_URL}api/`;
+  const envApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+  const apiBaseUrl = envApiBaseUrl
+    ? (envApiBaseUrl.endsWith("/") ? envApiBaseUrl : `${envApiBaseUrl}/`)
+    : (window.__PTRP_CONFIG__?.apiBaseUrl ?? window.__MANUS_CONFIG__?.apiBaseUrl ?? `${import.meta.env.BASE_URL}api/`);
   const response = await fetch(`${apiBaseUrl}${path}`, {
     ...requestOptions,
     credentials: "include",

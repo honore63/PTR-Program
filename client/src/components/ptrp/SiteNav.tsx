@@ -15,9 +15,12 @@ export function SiteNav({ language, onLanguageChange }: { language: Language; on
   const moreRef = useRef<HTMLDivElement>(null);
   const t = copy[language];
 
+  const normalizePath = (path: string) => (path === "/" ? "/" : path.replace(/\/$/, ""));
+  const isActive = (href: string) => normalizePath(location) === normalizePath(href);
+
   const primaryItems = navItems.slice(0, PRIMARY_COUNT);
   const moreItems = navItems.slice(PRIMARY_COUNT);
-  const moreActive = moreItems.some((item) => item.href === location);
+  const moreActive = moreItems.some((item) => isActive(item.href));
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -57,7 +60,7 @@ export function SiteNav({ language, onLanguageChange }: { language: Language; on
             <Link
               key={item.href}
               href={item.href}
-              aria-current={location === item.href ? "page" : undefined}
+              aria-current={isActive(item.href) ? "page" : undefined}
               className="nav-link transition-colors"
               onMouseEnter={() => setMoreOpen(false)}
             >
@@ -92,7 +95,7 @@ export function SiteNav({ language, onLanguageChange }: { language: Language; on
                   <Link
                     key={item.href}
                     href={item.href}
-                    aria-current={location === item.href ? "page" : undefined}
+                    aria-current={isActive(item.href) ? "page" : undefined}
                     className="nav-more-item block px-3 py-2.5 text-sm font-bold uppercase tracking-wide text-[#4b5563] hover:bg-[#f0f9fe] hover:text-[#0098d9] transition-colors"
                     onClick={() => setMoreOpen(false)}
                     onMouseEnter={() => setMoreOpen(true)}
@@ -155,7 +158,7 @@ export function SiteNav({ language, onLanguageChange }: { language: Language; on
                   key={item.href}
                   href={item.href}
                   onClick={() => setOpen(false)}
-                  aria-current={location === item.href ? "page" : undefined}
+                  aria-current={isActive(item.href) ? "page" : undefined}
                   className="mobile-nav-link flex items-center justify-between gap-3 border-b border-[#eef2f5] pb-3.5 pt-3.5 transition-colors"
                 >
                   <span>{item.label}</span>

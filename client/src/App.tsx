@@ -20,6 +20,9 @@ const NewsPage = lazy(() => import("./pages/NewsPage"));
 const PartnersPage = lazy(() => import("./pages/PartnersPage"));
 const Portal = lazy(() => import("./pages/Portal"));
 const ProgramTeamPage = lazy(() => import("./pages/ProgramTeamPage"));
+const ResidentTeacherDetail = lazy(() => import("./pages/ResidentTeacherDetail"));
+const ResidentTeacherRegistration = lazy(() => import("./pages/ResidentTeacherRegistration"));
+const ResidentsDirectory = lazy(() => import("./pages/ResidentsDirectory"));
 const ResourcesPage = lazy(() => import("./pages/ResourcesPage"));
 const SchoolsPage = lazy(() => import("./pages/SchoolsPage"));
 
@@ -35,6 +38,8 @@ const pageTitles: Record<string, string> = {
   "/partners": "Partners",
   "/contact": "Join & Contact",
   "/team": "Program Team",
+  "/residents": "Resident Teachers",
+  "/register-resident": "Register Resident Teacher",
   "/portal": "Portal Login",
   "/admin": "Administrator Workspace",
   "/404": "Page Not Found",
@@ -96,6 +101,9 @@ function Router({ language }: { language: Language }) {
       <Route path="/partners"><PartnersPage /></Route>
       <Route path="/contact"><ContactPage /></Route>
       <Route path="/team"><ProgramTeamPage /></Route>
+      <Route path="/residents"><ResidentsDirectory /></Route>
+      <Route path="/register-resident"><ResidentTeacherRegistration /></Route>
+      <Route path="/resident-teacher/:id"><ResidentTeacherDetail /></Route>
       <Route path="/activities"><Redirect to="/news" /></Route>
       <Route path="/practices"><Redirect to="/resources" /></Route>
       <Route path="/portal"><Portal language={language} /></Route>

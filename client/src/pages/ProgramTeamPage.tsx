@@ -57,19 +57,19 @@ export default function ProgramTeamPage() {
     <PageHero
       eyebrow="Program Team"
       title="Meet our program coordinators and mentors."
-      description="PTRP program coordinators and mentors guide resident teachers through classroom practice, mentorship, and professional growth at De La Salle and SAVE."
+      description="PTRP program coordinators and mentors guide resident teachers through classroom practice, mentorship, and professional growth at TTC De La Salle Byumba and SAVE."
       icon={UsersRound}
       meta={`2 coordinators · 4 mentors · 2 organizations`}
     >
       <Link href="/contact" className="button-ghost-light">Contact the program <ArrowUpRight className="size-4" /></Link>
     </PageHero>
 
-    <section className="bg-white py-20 md:py-28">
+    <section className="bg-white py-14 md:py-20">
       <div className="mx-auto max-w-[1400px] px-5 md:px-8 lg:px-12">
-        <div className="grid gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-start lg:gap-20">
+        <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start lg:gap-12">
           <div>
             <SectionHeading eyebrow="Program leadership" title="Who guides the residency." />
-            <p className="mt-6 text-[1.02rem] leading-[1.9] text-[#4b5563]">
+            <p className="mt-4 text-[1.02rem] leading-[1.8] text-[#4b5563]">
               Program coordinators at TTC De La Salle Byumba and SAVE guide the residency. Program mentors work directly with residents during guided classroom practice.
             </p>
             <div className="mt-8 grid gap-3 sm:grid-cols-2">
@@ -117,7 +117,7 @@ export default function ProgramTeamPage() {
       </div>
     </section>
 
-    <section id="team" className="scroll-mt-24 bg-[#f6fafb] py-20 md:py-28">
+    <section id="team" className="scroll-mt-24 bg-[#f6fafb] py-14 md:py-20">
       <div className="mx-auto max-w-[1400px] px-5 md:px-8 lg:px-12">
         <SectionHeading
           eyebrow="Program Team Directory"
@@ -192,7 +192,7 @@ export default function ProgramTeamPage() {
           </div>
         </section>
 
-        <section className="mt-12 border-t border-[#e2eef0] pt-8" aria-labelledby="mentors-heading">
+        <section className="mt-10 border-t border-[#e2eef0] pt-7" aria-labelledby="mentors-heading">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <p className="eyebrow text-[#168d6d]">Separate directory</p>
@@ -213,14 +213,14 @@ export default function ProgramTeamPage() {
       </div>
     </section>
 
-    <section className="bg-white py-20 md:py-28">
+    <section className="bg-white py-14 md:py-20">
       <div className="mx-auto max-w-[1400px] px-5 md:px-8 lg:px-12">
         <div className="grid gap-6 lg:grid-cols-3">
           {[
             {
               icon: Building2,
               title: "Two host organizations",
-              body: "Coordinators and mentors serve at De La Salle and SAVE, the PTRP host Teacher Training Colleges.",
+              body: "Coordinators and mentors serve at TTC De La Salle Byumba and SAVE, the PTRP host Teacher Training Colleges.",
             },
             {
               icon: UsersRound,

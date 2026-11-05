@@ -897,6 +897,297 @@ function routeRequest(): void
     }
 
     // =========================================================================
+    // Resident Teacher Profiles - Public endpoints
+    // =========================================================================
+    if ($route === '/resident-teachers' && $method === 'GET') {
+        $limit = (int) (($_GET['limit'] ?? 20) > 0 ? $_GET['limit'] : 20);
+        $limit = min($limit, 100);
+        $offset = (int) max(0, $_GET['offset'] ?? 0);
+        $search = $_GET['search'] ?? null;
+        $school = $_GET['school'] ?? null;
+        $practice = $_GET['practice'] ?? null;
+        $role = $_GET['role'] ?? null;
+        $sort = $_GET['sort'] ?? 'displayOrder';
+
+        $sql = "SELECT * FROM resident_teachers WHERE status = 'published' AND isVisible = 1";
+        $params = [];
+        if ($search) {
+            $sql .= " AND (fullName LIKE ? OR bio LIKE ? OR contributions LIKE ?)";
+            $like = "%$search%";
+            $params[] = $like; $params[] = $like; $params[] = $like;
+        }
+        if ($school) {
+            $sql .= " AND modelSchool = ?";
+            $params[] = $school;
+        }
+        if ($practice) {
+            $sql .= " AND bestPractice = ?";
+            $params[] = $practice;
+        }
+        if ($role) {
+            $sql .= " AND position = ?";
+            $params[] = $role;
+        }
+        $sql .= " ORDER BY isFeatured DESC, displayOrder ASC, fullName ASC LIMIT ? OFFSET ?";
+        $params[] = $limit;
+        $params[] = $offset;
+
+        $statement = database()->prepare($sql);
+        $statement->execute($params);
+        respond($statement->fetchAll());
+    }
+
+    if (preg_match('#^/resident-teachers/(\d+)$#', $route, $matches) && $method === 'GET') {
+        $statement = database()->prepare("SELECT * FROM resident_teachers WHERE id = ? AND status = 'published' AND isVisible = 1 LIMIT 1");
+        $statement->execute([(int) $matches[1]]);
+        $teacher = $statement->fetch();
+        if (!$teacher) throw new ApiError(404, 'Resident teacher not found.');
+
+        $bpStmt = database()->prepare("SELECT * FROM resident_best_practices WHERE teacherId = ? ORDER BY createdAt DESC");
+        $bpStmt->execute([(int) $matches[1]]);
+        $teacher['bestPractices'] = $bpStmt->fetchAll();
+        respond($teacher);
+    }
+
+    if ($route === '/resident-best-practices' && $method === 'GET') {
+        $limit = (int) (($_GET['limit'] ?? 50) > 0 ? $_GET['limit'] : 50);
+        $limit = min($limit, 200);
+        $category = $_GET['category'] ?? null;
+        $teacherId = $_GET['teacherId'] ?? null;
+
+        $sql = "SELECT rbp.*, rt.fullName AS teacherName, rt.modelSchool FROM resident_best_practices rbp
+                JOIN resident_teachers rt ON rbp.teacherId = rt.id
+                WHERE rt.status = 'published' AND rt.isVisible = 1";
+        $params = [];
+        if ($category) {
+            $sql .= " AND rbp.category = ?";
+            $params[] = $category;
+        }
+        if ($teacherId) {
+            $sql .= " AND rbp.teacherId = ?";
+            $params[] = (int) $teacherId;
+        }
+        $sql .= " ORDER BY rbp.publishedAt DESC LIMIT ?";
+        $params[] = $limit;
+
+        $statement = database()->prepare($sql);
+        $statement->execute($params);
+        respond($statement->fetchAll());
+    }
+
+    // Resident Teacher Registration (public)
+    if ($route === '/resident-teachers/register' && $method === 'POST') {
+        $data = jsonBody();
+        $fullName = inputString($data, 'fullName', 255, true);
+        $email = strtolower((string) inputString($data, 'email', 320, true));
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) throw new ApiError(400, 'Please provide a valid email address.');
+        $phone = inputString($data, 'phone', 64);
+        $gender = $data['gender'] ?? null;
+        if ($gender && !in_array($gender, ['male','female','other','prefer_not_to_say'], true)) throw new ApiError(400, 'Invalid gender.');
+        $modelSchool = inputString($data, 'modelSchool', 255);
+        $position = inputString($data, 'position', 255);
+        $bestPractice = inputString($data, 'bestPractice', 255);
+        $bestPracticeDescription = inputString($data, 'bestPracticeDescription', 5000);
+        $subjects = inputString($data, 'subjects', 5000);
+        $skills = inputString($data, 'skills', 5000);
+        $contributions = inputString($data, 'contributions', 5000);
+        $bio = inputString($data, 'bio', 5000);
+        $photoUrl = inputString($data, 'photoUrl', 700);
+
+        // Prevent duplicate email
+        $check = database()->prepare('SELECT id FROM resident_teachers WHERE LOWER(email) = ? LIMIT 1');
+        $check->execute([$email]);
+        if ($check->fetch()) throw new ApiError(409, 'A registration with this email already exists.');
+
+        $statement = database()->prepare(
+            'INSERT INTO resident_teachers (fullName, email, phone, gender, modelSchool, position, bestPractice, bestPracticeDescription, subjects, skills, contributions, bio, photoUrl, status, isFeatured, displayOrder)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \'pending\', 0, 0)'
+        );
+        $statement->execute([$fullName, $email, $phone, $gender, $modelSchool, $position, $bestPractice, $bestPracticeDescription, $subjects, $skills, $contributions, $bio, $photoUrl]);
+        $id = (int) database()->lastInsertId();
+
+        $fetch = database()->prepare('SELECT * FROM resident_teachers WHERE id = ?');
+        $fetch->execute([$id]);
+        respond($fetch->fetch(), 201);
+    }
+
+    // =========================================================================
+    // Resident Teacher Management - Administrator endpoints
+    // =========================================================================
+    requireAdmin();
+
+    if ($route === '/admin/resident-teachers' && $method === 'GET') {
+        $status = $_GET['status'] ?? null;
+        $search = $_GET['search'] ?? null;
+        $sql = "SELECT rt.*, u.name AS reviewerName FROM resident_teachers rt LEFT JOIN users u ON rt.reviewedBy = u.id";
+        $params = [];
+        $where = [];
+        if ($status) { $where[] = 'rt.status = ?'; $params[] = $status; }
+        if ($search) { $where[] = '(rt.fullName LIKE ? OR rt.email LIKE ? OR rt.modelSchool LIKE ?)'; $like = "%$search%"; $params[] = $like; $params[] = $like; $params[] = $like; }
+        if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
+        $sql .= ' ORDER BY rt.createdAt DESC';
+        $statement = database()->prepare($sql);
+        $statement->execute($params);
+        respond($statement->fetchAll());
+    }
+
+    if ($route === '/admin/resident-teachers' && $method === 'POST') {
+        requireSameOrigin();
+        $user = currentUser();
+        $data = jsonBody();
+        $id = isset($data['id']) ? (int) $data['id'] : 0;
+        $fullName = inputString($data, 'fullName', 255, true);
+        $email = strtolower((string) inputString($data, 'email', 320, true));
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) throw new ApiError(400, 'Please provide a valid email address.');
+        $phone = inputString($data, 'phone', 64);
+        $gender = $data['gender'] ?? null;
+        $modelSchool = inputString($data, 'modelSchool', 255);
+        $position = inputString($data, 'position', 255);
+        $bestPractice = inputString($data, 'bestPractice', 255);
+        $bestPracticeDescription = inputString($data, 'bestPracticeDescription', 5000);
+        $subjects = inputString($data, 'subjects', 5000);
+        $skills = inputString($data, 'skills', 5000);
+        $contributions = inputString($data, 'contributions', 5000);
+        $bio = inputString($data, 'bio', 5000);
+        $photoUrl = inputString($data, 'photoUrl', 700);
+        $status = $data['status'] ?? 'pending';
+        if (!in_array($status, ['pending','approved','published','rejected','unpublished'], true)) throw new ApiError(400, 'Invalid status.');
+        $isFeatured = !empty($data['isFeatured']);
+        $displayOrder = (isset($data['displayOrder']) && is_numeric($data['displayOrder'])) ? (int) $data['displayOrder'] : 0;
+
+        if ($id > 0) {
+            $updates = [];
+            $values = [];
+            $fields = ['fullName','email','phone','gender','modelSchool','position','bestPractice','bestPracticeDescription','subjects','skills','contributions','bio','photoUrl','status','isFeatured','displayOrder'];
+            $fieldValues = [$fullName,$email,$phone,$gender,$modelSchool,$position,$bestPractice,$bestPracticeDescription,$subjects,$skills,$contributions,$bio,$photoUrl,$status,$isFeatured ? 1 : 0,$displayOrder];
+            foreach ($fields as $i => $field) {
+                $updates[] = "$field = ?";
+                $values[] = $fieldValues[$i];
+            }
+            if ($status === 'published' && empty($data['publishedAt'])) { $updates[] = 'publishedAt = NOW()'; }
+            $values[] = $id;
+            $statement = database()->prepare('UPDATE resident_teachers SET ' . implode(', ', $updates) . ' WHERE id = ?');
+            $statement->execute($values);
+        } else {
+            // Check duplicate email
+            $check = database()->prepare('SELECT id FROM resident_teachers WHERE LOWER(email) = ? LIMIT 1');
+            $check->execute([$email]);
+            if ($check->fetch()) throw new ApiError(409, 'A registration with this email already exists.');
+            $publishedAt = ($status === 'published') ? 'NOW()' : 'NULL';
+            $statement = database()->prepare(
+                "INSERT INTO resident_teachers (fullName, email, phone, gender, modelSchool, position, bestPractice, bestPracticeDescription, subjects, skills, contributions, bio, photoUrl, status, isFeatured, displayOrder, publishedAt)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, $publishedAt)"
+            );
+            $statement->execute([$fullName, $email, $phone, $gender, $modelSchool, $position, $bestPractice, $bestPracticeDescription, $subjects, $skills, $contributions, $bio, $photoUrl, $status, $isFeatured ? 1 : 0, $displayOrder]);
+            $id = (int) database()->lastInsertId();
+        }
+
+        // Log activity
+        $action = $id > 0 ? 'updated_resident_teacher' : 'created_resident_teacher';
+        $logStmt = database()->prepare('INSERT INTO admin_activity_logs (adminId, action, entityType, entityId, details) VALUES (?, ?, ?, ?, ?)');
+        $logStmt->execute([$user['id'], $action, 'resident_teacher', $id, json_encode(['fullName' => $fullName, 'email' => $email, 'status' => $status])]);
+
+        $fetch = database()->prepare('SELECT * FROM resident_teachers WHERE id = ?');
+        $fetch->execute([$id]);
+        respond($fetch->fetch());
+    }
+
+    if (preg_match('#^/admin/resident-teachers/(\d+)/status$#', $route, $matches) && $method === 'PATCH') {
+        requireSameOrigin();
+        $user = currentUser();
+        $teacherId = (int) $matches[1];
+        $data = jsonBody();
+        $status = $data['status'] ?? '';
+        if (!in_array($status, ['pending','approved','published','rejected','unpublished'], true)) throw new ApiError(400, 'Invalid status.');
+        $isFeatured = isset($data['isFeatured']) ? (bool) $data['isFeatured'] : null;
+        $displayOrder = isset($data['displayOrder']) && is_numeric($data['displayOrder']) ? (int) $data['displayOrder'] : null;
+
+        $teacherStmt = database()->prepare('SELECT * FROM resident_teachers WHERE id = ? LIMIT 1');
+        $teacherStmt->execute([$teacherId]);
+        $teacher = $teacherStmt->fetch();
+        if (!$teacher) throw new ApiError(404, 'Resident teacher not found.');
+
+        $updates = ['status = ?'];
+        $values = [$status];
+        if ($isFeatured !== null) { $updates[] = 'isFeatured = ?'; $values[] = $isFeatured ? 1 : 0; }
+        if ($displayOrder !== null) { $updates[] = 'displayOrder = ?'; $values[] = $displayOrder; }
+        if ($status === 'published') { $updates[] = 'publishedAt = NOW()'; $values[] = null; } // placeholder
+        if ($status === 'unpublished') { $updates[] = 'publishedAt = NULL'; $values[] = null; }
+
+        $values[] = $teacherId;
+        $statement = database()->prepare('UPDATE resident_teachers SET ' . implode(', ', $updates) . ' WHERE id = ?');
+        $statement->execute($values);
+
+        // Log activity
+        $logStmt = database()->prepare('INSERT INTO admin_activity_logs (adminId, action, entityType, entityId, details) VALUES (?, ?, ?, ?, ?)');
+        $logStmt->execute([$user['id'], 'status_changed_resident_teacher', 'resident_teacher', $teacherId, json_encode(['status' => $status, 'isFeatured' => $isFeatured, 'displayOrder' => $displayOrder])]);
+
+        $fetch = database()->prepare('SELECT * FROM resident_teachers WHERE id = ?');
+        $fetch->execute([$teacherId]);
+        respond($fetch->fetch());
+    }
+
+    if (preg_match('#^/admin/resident-teachers/(\d+)$#', $route, $method === 'DELETE' ? '#^/admin/resident-teachers/(\d+)$#' : '#^$#')) {
+        // placeholder, real handler below
+    }
+    if (preg_match('#^/admin/resident-teachers/(\d+)$#', $route, $matches) && $method === 'DELETE') {
+        requireSameOrigin();
+        $user = currentUser();
+        $teacherId = (int) $matches[1];
+        $teacherStmt = database()->prepare('SELECT fullName FROM resident_teachers WHERE id = ? LIMIT 1');
+        $teacherStmt->execute([$teacherId]);
+        $teacher = $teacherStmt->fetch();
+        if (!$teacher) throw new ApiError(404, 'Resident teacher not found.');
+
+        database()->prepare('DELETE FROM resident_best_practices WHERE teacherId = ?')->execute([$teacherId]);
+        database()->prepare('DELETE FROM resident_teachers WHERE id = ?')->execute([$teacherId]);
+
+        $logStmt = database()->prepare('INSERT INTO admin_activity_logs (adminId, action, entityType, entityId, details) VALUES (?, ?, ?, ?, ?)');
+        $logStmt->execute([$user['id'], 'deleted_resident_teacher', 'resident_teacher', $teacherId, json_encode(['fullName' => $teacher['fullName']])]);
+
+        respond(['success' => true]);
+    }
+
+    // Best Practices - Admin CRUD
+    if ($route === '/admin/resident-best-practices' && $method === 'POST') {
+        requireSameOrigin();
+        $user = currentUser();
+        $data = jsonBody();
+        $id = isset($data['id']) ? (int) $data['id'] : 0;
+        $teacherId = isset($data['teacherId']) ? (int) $data['teacherId'] : 0;
+        if (!$teacherId) throw new ApiError(400, 'Teacher ID is required.');
+        $title = inputString($data, 'title', 255, true);
+        $category = inputString($data, 'category', 120, true);
+        $description = inputString($data, 'description', 5000, true);
+        $mediaUrl = inputString($data, 'mediaUrl', 700);
+        $mediaType = $data['mediaType'] ?? null;
+        if ($mediaType && !in_array($mediaType, ['image','video','document'], true)) throw new ApiError(400, 'Invalid media type.');
+
+        if ($id > 0) {
+            $statement = database()->prepare('UPDATE resident_best_practices SET teacherId=?, title=?, category=?, description=?, mediaUrl=?, mediaType=? WHERE id=?');
+            $statement->execute([$teacherId, $title, $category, $description, $mediaUrl, $mediaType, $id]);
+        } else {
+            $statement = database()->prepare('INSERT INTO resident_best_practices (teacherId, title, category, description, mediaUrl, mediaType) VALUES (?, ?, ?, ?, ?, ?)');
+            $statement->execute([$teacherId, $title, $category, $description, $mediaUrl, $mediaType]);
+            $id = (int) database()->lastInsertId();
+        }
+
+        $logStmt = database()->prepare('INSERT INTO admin_activity_logs (adminId, action, entityType, entityId, details) VALUES (?, ?, ?, ?, ?)');
+        $logStmt->execute([$user['id'], $id > 0 ? 'updated_best_practice' : 'created_best_practice', 'resident_best_practice', $id, json_encode(['title' => $title, 'category' => $category, 'teacherId' => $teacherId])]);
+
+        $fetch = database()->prepare('SELECT * FROM resident_best_practices WHERE id = ?');
+        $fetch->execute([$id]);
+        respond($fetch->fetch());
+    }
+
+    if (preg_match('#^/admin/resident-best-practices/(\d+)$#', $route, $matches) && $method === 'DELETE') {
+        requireSameOrigin();
+        $statement = database()->prepare('DELETE FROM resident_best_practices WHERE id = ?');
+        $statement->execute([(int) $matches[1]]);
+        respond(['success' => true]);
+    }
+
+    // =========================================================================
     // Social Media Integration - Public endpoints
     // =========================================================================
     if ($route === '/social/platforms' && $method === 'GET') {

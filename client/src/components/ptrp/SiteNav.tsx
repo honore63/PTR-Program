@@ -55,7 +55,7 @@ export function SiteNav({ language, onLanguageChange }: { language: Language; on
         </Link>
 
         {/* Primary navigation (desktop) */}
-        <nav className="hidden shrink-0 flex-1 items-center justify-center gap-8 min-[1024px]:flex" aria-label="Primary navigation">
+        <nav className="hidden shrink-0 flex-1 items-center justify-center gap-8 min-[1280px]:flex" aria-label="Primary navigation">
           {primaryItems.map((item) => (
             <Link
               key={item.href}
@@ -110,7 +110,7 @@ export function SiteNav({ language, onLanguageChange }: { language: Language; on
         </nav>
 
         {/* Right actions */}
-        <div className="hidden shrink-0 items-center gap-3 min-[1024px]:flex">
+        <div className="hidden shrink-0 items-center gap-3 min-[1280px]:flex">
           <div className="language-switcher" aria-label="Language selector">
             {languages.map((item) => (
               <button
@@ -132,7 +132,7 @@ export function SiteNav({ language, onLanguageChange }: { language: Language; on
 
         {/* Mobile toggle */}
         <button
-          className="icon-button min-[1024px]:!hidden"
+          className="icon-button min-[1280px]:!hidden"
           onClick={() => setOpen((value) => !value)}
           aria-expanded={open}
           aria-controls="mobile-nav"
@@ -150,7 +150,7 @@ export function SiteNav({ language, onLanguageChange }: { language: Language; on
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="border-t border-[#e5e7eb] bg-white min-[1024px]:hidden"
+            className="border-t border-[#e5e7eb] bg-white min-[1280px]:hidden"
           >
             <nav className="mx-auto flex max-w-[1400px] flex-col gap-0 px-5 py-5" aria-label="Mobile navigation">
               {navItems.map((item) => (

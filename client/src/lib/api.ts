@@ -28,6 +28,11 @@ export const queryKeys = {
   adminSocialAccounts: ["api", "admin", "social", "accounts"] as const,
   adminSocialPosts: ["api", "admin", "social", "posts"] as const,
   adminSocialSyncLogs: ["api", "admin", "social", "sync-logs"] as const,
+  adminResidentTeachers: ["api", "admin", "resident-teachers"] as const,
+  adminResidentBestPractices: ["api", "admin", "resident-best-practices"] as const,
+  publicResidentTeachers: ["api", "resident-teachers"] as const,
+  publicResidentTeacher: ["api", "resident-teacher"] as const,
+  publicResidentBestPractices: ["api", "resident-best-practices"] as const,
 };
 
 export async function apiRequest<T>(

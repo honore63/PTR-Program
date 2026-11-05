@@ -46,6 +46,7 @@ export const navItems = [
   { href: "/news", label: "News & Activities" },
   { href: "/gallery", label: "Gallery" },
   { href: "/alumni", label: "Alumni" },
+  { href: "/residents", label: "Resident Teachers" },
   { href: "/team", label: "Program Team" },
   { href: "/resources", label: "Resources" },
   { href: "/partners", label: "Partners" },
@@ -598,3 +599,77 @@ export const galleryPhotos = [
 
 export const galleryItems = galleryAlbums;
 export const participatingSchools = modelSchools;
+
+// ============================================================
+// Resident Teachers Directory types and constants
+// ============================================================
+export type ResidentTeacherStatus = "pending" | "approved" | "published" | "rejected" | "unpublished";
+
+export type ResidentTeacher = {
+  id: number;
+  fullName: string;
+  email: string;
+  phone: string | null;
+  gender: string | null;
+  modelSchool: string | null;
+  position: string | null;
+  bestPractice: string | null;
+  bestPracticeDescription: string | null;
+  subjects: string | null;
+  skills: string | null;
+  contributions: string | null;
+  bio: string | null;
+  photoUrl: string | null;
+  status: ResidentTeacherStatus;
+  isFeatured: boolean;
+  displayOrder: number;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  reviewedBy: number | null;
+  publishedAt: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  bestPractices?: ResidentBestPractice[];
+};
+
+export type ResidentBestPractice = {
+  id: number;
+  teacherId: number;
+  title: string;
+  category: string;
+  description: string;
+  mediaUrl: string | null;
+  mediaType: string | null;
+  publishedAt: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export const residentTeacherStatusLabels: Record<ResidentTeacherStatus, string> = {
+  pending: "Pending Review",
+  approved: "Approved",
+  published: "Published",
+  rejected: "Rejected",
+  unpublished: "Unpublished",
+};
+
+export const residentTeacherStatusColors: Record<ResidentTeacherStatus, string> = {
+  pending: "bg-[#fef3c7]/10 text-[#92400e]",
+  approved: "bg-[#dbeafe]/10 text-[#1d4ed8]",
+  published: "bg-[#d1fae5]/10 text-[#047857]",
+  rejected: "bg-[#fee2e2]/10 text-[#991b1b]",
+  unpublished: "bg-[#e2e8f0]/10 text-[#475569]",
+};
+
+export const bestPracticeCategories = [
+  "ICT Integration in Education",
+  "Learner-Centred Teaching",
+  "Competency-Based Education",
+  "Project-Based Learning",
+  "Inclusive Education",
+  "Assessment for Learning",
+  "Collaborative Learning",
+  "Classroom Management",
+  "Digital Learning Resources",
+  "Innovative Teaching Strategies",
+];

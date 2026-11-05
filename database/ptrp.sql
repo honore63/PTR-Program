@@ -155,13 +155,8 @@ CREATE TABLE IF NOT EXISTS `bestPractices` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================================
--- Seed default admin user
--- ============================================================
--- Default admin: email = "Residents teachers", password = "Ptrp100"
--- Password hash for "Ptrp100" using PASSWORD_BCRYPT cost 12
-INSERT IGNORE INTO `users` (email, passwordHash, name, role, loginMethod, lastSignedIn)
-VALUES ('Residents teachers', '$2y$12$qzy0UYcQIDtMAKIa0QN0/ezs/U8aJxs3qAPkZfyiiwhVBZUPWrEOa', 'Resident Teachers', 'admin', 'local', NOW());
+-- Do not seed a shared administrator account or password.
+-- See README.md "First administrator setup" after importing the schema.
 
 -- ============================================================
 -- Seed sample data for demonstration
@@ -239,10 +234,10 @@ CREATE TABLE IF NOT EXISTS `mentors` (
 -- ============================================================
 -- Seed program coordinators and mentors
 -- ============================================================
--- Coordinators (verified names, placeholder contact details)
+-- Coordinators (verified names and contact details)
 INSERT IGNORE INTO `coordinators` (fullName, organization, email, phone, photoUrl, bio, responsibilities, displayOrder, isVisible, status) VALUES
-  ('Br. Biziyaremye Ferdinand', 'De La Salle', NULL, NULL, NULL, 'Program Coordinator for PTRP at De La Salle. Coordinates residency activities, mentorship pairing, and school placement for resident teachers.', 'Coordination of resident teachers, mentorship, and school partnerships at De La Salle.', 1, 1, 'published'),
-  ('Br. Elias Nshimiyimana', 'SAVE', NULL, NULL, NULL, 'Program Coordinator for PTRP at SAVE. Coordinates residency activities, mentorship pairing, and school placement for resident teachers.', 'Coordination of resident teachers, mentorship, and school partnerships at SAVE.', 2, 1, 'published');
+  ('Br. BIZIYAREMYE Ferdinand', 'TTC De La Salle Byumba', NULL, '+250 789 139 618', NULL, NULL, 'Coordinator of PTRP', 1, 1, 'published'),
+  ('Br. Elias Nshimiyimana', 'SAVE', 'nshimiyimanaelias52@gmail.com', '+250 781 418 869', NULL, NULL, 'Coordinator of PTRP', 2, 1, 'published');
 
 UPDATE `coordinators`
 SET fullName = 'Br. BIZIYAREMYE Ferdinand',
@@ -274,6 +269,98 @@ INSERT IGNORE INTO `mentors` (fullName, organization, email, phone, photoUrl, bi
   ('[Mentor Name - De La Salle]', 'De La Salle', NULL, NULL, NULL, 'Program mentor for resident teachers at De La Salle. Contact details and biography to be completed by the program administrator.', 'Mentor resident teachers during guided classroom practice.', 2, 1, 'draft'),
   ('[Mentor Name - SAVE]', 'SAVE', NULL, NULL, NULL, 'Program mentor for resident teachers at SAVE. Contact details and biography to be completed by the program administrator.', 'Mentor resident teachers during guided classroom practice.', 1, 1, 'draft'),
   ('[Mentor Name - SAVE]', 'SAVE', NULL, NULL, NULL, 'Program mentor for resident teachers at SAVE. Contact details and biography to be completed by the program administrator.', 'Mentor resident teachers during guided classroom practice.', 2, 1, 'draft');
+
+-- ============================================================
+-- Resident Teacher Profiles tables
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `resident_teachers` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `fullName` varchar(255) NOT NULL,
+  `email` varchar(320) NOT NULL,
+  `phone` varchar(64) DEFAULT NULL,
+  `gender` enum('male','female','other','prefer_not_to_say') DEFAULT NULL,
+  `modelSchool` varchar(255) DEFAULT NULL,
+  `position` varchar(255) DEFAULT NULL,
+  `bestPractice` varchar(255) DEFAULT NULL,
+  `bestPracticeDescription` text DEFAULT NULL,
+  `subjects` text DEFAULT NULL,
+  `skills` text DEFAULT NULL,
+  `contributions` text DEFAULT NULL,
+  `bio` text DEFAULT NULL,
+  `photoUrl` varchar(700) DEFAULT NULL,
+  `status` enum('pending','approved','published','rejected','unpublished') NOT NULL DEFAULT 'pending',
+  `isFeatured` tinyint(1) NOT NULL DEFAULT 0,
+  `displayOrder` int NOT NULL DEFAULT 0,
+  `submittedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `reviewedAt` timestamp NULL DEFAULT NULL,
+  `reviewedBy` int DEFAULT NULL,
+  `publishedAt` timestamp NULL DEFAULT NULL,
+  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `resident_teachers_email_unique` (`email`),
+  KEY `resident_teachers_status_idx` (`status`),
+  KEY `resident_teachers_modelSchool_idx` (`modelSchool`),
+  KEY `resident_teachers_bestPractice_idx` (`bestPractice`),
+  KEY `resident_teachers_isFeatured_idx` (`isFeatured`),
+  KEY `resident_teachers_displayOrder_idx` (`displayOrder`),
+  CONSTRAINT `resident_teachers_reviewedBy_fk` FOREIGN KEY (`reviewedBy`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `resident_best_practices` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `teacherId` int NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `category` varchar(120) NOT NULL,
+  `description` text NOT NULL,
+  `mediaUrl` varchar(700) DEFAULT NULL,
+  `mediaType` enum('image','video','document') DEFAULT NULL,
+  `publishedAt` timestamp NULL DEFAULT NULL,
+  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `resident_best_practices_teacherId_idx` (`teacherId`),
+  KEY `resident_best_practices_category_idx` (`category`),
+  CONSTRAINT `resident_best_practices_teacherId_fk` FOREIGN KEY (`teacherId`) REFERENCES `resident_teachers` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `admin_activity_logs` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `adminId` int NOT NULL,
+  `action` varchar(120) NOT NULL,
+  `entityType` varchar(80) NOT NULL,
+  `entityId` int DEFAULT NULL,
+  `details` text DEFAULT NULL,
+  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `admin_activity_logs_adminId_idx` (`adminId`),
+  KEY `admin_activity_logs_createdAt_idx` (`createdAt`),
+  CONSTRAINT `admin_activity_logs_adminId_fk` FOREIGN KEY (`adminId`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- Seed Honore Tuyishime as the first featured resident teacher
+-- ============================================================
+INSERT IGNORE INTO `resident_teachers` (fullName, email, phone, gender, modelSchool, position, bestPractice, bestPracticeDescription, subjects, skills, contributions, bio, photoUrl, status, isFeatured, displayOrder, publishedAt)
+VALUES (
+  'Honore Tuyishime',
+  'tuyishimehonore63@gmail.com',
+  '0791684429',
+  'male',
+  'Rukara Model School',
+  'Program Designer, ICT Integration in Education Practitioner, and Website Manager',
+  'ICT Integration in Education',
+  'Honore Tuyishime is an educator, program designer, and ICT integration practitioner passionate about transforming education through technology. He designed the 21st Century Lesson Plan Generator, a digital platform that supports teachers in preparing competency-based, learner-centred lessons. His work focuses on educational technology, digital innovation, teacher development, and integrating ICT into teaching and learning.',
+  'ICT, Educational Technology, Digital Innovation, Teacher Development',
+  'ICT Integration, Lesson Planning, Digital Literacy, Web Development',
+  'Designed and developed the 21st Century Lesson Plan Generator. Promotes ICT Integration in Education. Supports teachers in using technology to improve teaching and learning.',
+  'Program Designer, ICT Integration Practitioner, and Website Manager for the PTR Alumni Network.',
+  '/storage/honore-tuyishime-profile.svg',
+  'published',
+  1,
+  1,
+  NOW()
+);
 
 -- ============================================================
 -- Social Media Integration tables

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <rect width="400" height="400" fill="#e2e8f0"/>
+  <circle cx="200" cy="180" r="60" fill="#cbd5e1"/>
+  <path d="M140 260 L140 400 L260 400 L260 260 Z" fill="#cbd5e1"/>
+  <text x="200" y="370" font-family="Arial, sans-serif" font-size="14" fill="#64748b" text-anchor="middle">Profile Photo</text>
+  <text x="200" y="390" font-family="Arial, sans-serif" font-size="12" fill="#94a3b8" text-anchor="middle">Upload via Admin Portal</text>
+</svg>

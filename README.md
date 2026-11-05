@@ -671,6 +671,8 @@ UPDATE users SET role = 'admin' WHERE email = 'your-admin@example.com';
 
 Replace the example address with the exact account you control and verify the affected row before signing in to `/admin`. Email-based password recovery is disabled until a verified email-delivery service is configured; an administrator can reset an account password from the protected user-management screen.
 
+For the inspected XAMPP database's existing administrator, [`database/migrations/20261105_replace_admin_account.sql`](./database/migrations/20261105_replace_admin_account.sql) is a targeted example that preserves the user's ID and related records. Back up the database first, confirm the target row ID, generate a bcrypt hash with PHP `password_hash()`, replace the SQL placeholder, and commit only when exactly one row was updated. Do not reuse the password shared in this conversation on a public deployment.
+
 Password recovery endpoints return an explicit unavailable response until email delivery is implemented; reset tokens are never returned to the browser.
 
 Existing databases may contain accounts created by an earlier schema that seeded a shared administrator credential. Audit existing admin accounts, replace any known or reused passwords, and invalidate old sessions before exposing the deployment publicly; importing the updated SQL does not rewrite existing user records.

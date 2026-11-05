@@ -6,9 +6,7 @@ import {
   Archive, BarChart3, BookOpen, Building2, CheckCircle2, FileText, GraduationCap,
   ImagePlus, LayoutDashboard, Loader2, LogOut, Pencil, Plus, School, ShieldCheck,
   Trash2, UploadCloud, UserCog, UsersRound, X, KeyRound, AlertCircle,
-  RefreshCw,
-  Smartphone,
-  UserRound,
+  RefreshCw, Smartphone, Briefcase,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { SocialManager } from "./SocialManager";
@@ -16,7 +14,7 @@ import { SocialManager } from "./SocialManager";
 type AdminTab =
   | "overview" | "content" | "uploads" | "users"
   | "schools" | "teachers" | "alumni" | "news" | "gallery" | "practices"
-  | "social" | "coordinators" | "mentors";
+  | "social" | "coordinators" | "mentors" | "resident-teachers" | "resident-best-practices";
 
 const starterPages = [
   { slug: "home", title: "PTR Alumni Network home", summary: "Hero, program snapshot, and homepage narrative", body: "Keep this record for the public homepage." },
@@ -36,7 +34,7 @@ function AdminLoginForm() {
     e.preventDefault();
     setError(null);
     if (!username || !password) {
-      setError("Please enter your administrator username and password.");
+      setError("Please enter your administrator email and password.");
       return;
     }
     setLoading(true);
@@ -70,14 +68,15 @@ function AdminLoginForm() {
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.9rem", textAlign: "left" }}>
           <div>
             <label style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#4b5563", display: "block", marginBottom: "0.3rem" }}>
-              Username
+              Email
             </label>
             <input
-              type="text"
+              type="email"
               required
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Residents teachers"
+              placeholder="ptrp@admin.org"
+              autoComplete="username"
               style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.9rem", color: "#111" }}
             />
           </div>
@@ -139,6 +138,8 @@ export default function AdminDashboard() {
   const socialSyncLogs = useApiQuery<any[]>(queryKeys.adminSocialSyncLogs, "admin/social/sync-logs", isAdmin);
   const coordinators = useApiQuery<any[]>(queryKeys.adminCoordinators, "admin/coordinators", isAdmin);
   const mentors = useApiQuery<any[]>(queryKeys.adminMentors, "admin/mentors", isAdmin);
+  const residentTeachers = useApiQuery<any[]>(queryKeys.adminResidentTeachers, "admin/resident-teachers", isAdmin);
+  const residentBestPractices = useApiQuery<any[]>(queryKeys.adminResidentBestPractices, "admin/resident-best-practices", isAdmin);
 
   const saveContent = useMutation({ mutationFn: (input: typeof contentForm) => apiRequest("admin/content", { method: "POST", body: input }), onSuccess: async () => { toast.success("Content saved"); setEditing(null); setContentForm({ slug: "", title: "", summary: "", body: "", status: "draft" }); await queryClient.invalidateQueries({ queryKey: queryKeys.adminContent }); await queryClient.invalidateQueries({ queryKey: queryKeys.adminOverview }); }, onError: (error: Error) => toast.error(error.message) });
 
@@ -202,6 +203,8 @@ export default function AdminDashboard() {
   const socialSyncLogRows = useMemo(() => socialSyncLogs.data ?? [], [socialSyncLogs.data]);
   const coordinatorRows = useMemo(() => coordinators.data ?? [], [coordinators.data]);
   const mentorRows = useMemo(() => mentors.data ?? [], [mentors.data]);
+  const residentTeacherRows = useMemo(() => residentTeachers.data ?? [], [residentTeachers.data]);
+  const residentBestPracticeRows = useMemo(() => residentBestPractices.data ?? [], [residentBestPractices.data]);
 
   const invalidate = (key: readonly unknown[]) => queryClient.invalidateQueries({ queryKey: key });
 
@@ -219,6 +222,27 @@ export default function AdminDashboard() {
   const deletePractice = makeDelete("admin/best-practices", queryKeys.adminPractices);
   const deleteCoordinator = makeDelete("admin/coordinators", queryKeys.adminCoordinators);
   const deleteMentor = makeDelete("admin/mentors", queryKeys.adminMentors);
+  const deleteResidentTeacher = makeDelete("admin/resident-teachers", queryKeys.adminResidentTeachers);
+  const deleteResidentBestPractice = makeDelete("admin/resident-best-practices", queryKeys.adminResidentBestPractices);
+
+  const setResidentTeacherStatus = useMutation({
+    mutationFn: (input: { id: number; status: string; isFeatured?: boolean; displayOrder?: number }) =>
+      apiRequest(`admin/resident-teachers/${input.id}/status`, { method: "PATCH", body: { status: input.status, isFeatured: input.isFeatured, displayOrder: input.displayOrder } }),
+    onSuccess: async () => { toast.success("Teacher status updated"); await invalidate(queryKeys.adminResidentTeachers); await invalidate(queryKeys.adminResidentBestPractices); },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const saveResidentTeacher = useMutation({
+    mutationFn: (input: any) => apiRequest("admin/resident-teachers", { method: "POST", body: input }),
+    onSuccess: async () => { toast.success("Resident teacher saved"); await invalidate(queryKeys.adminResidentTeachers); },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const saveResidentBestPractice = useMutation({
+    mutationFn: (input: any) => apiRequest("admin/resident-best-practices", { method: "POST", body: input }),
+    onSuccess: async () => { toast.success("Best practice saved"); await invalidate(queryKeys.adminResidentBestPractices); await invalidate(queryKeys.adminResidentTeachers); },
+    onError: (error: Error) => toast.error(error.message),
+  });
 
   if (authLoading) return <div className="admin-loading"><Loader2 className="size-6 animate-spin" /> Checking administrator access…</div>;
   if (!user) return <AdminLoginForm />;
@@ -260,7 +284,9 @@ export default function AdminDashboard() {
     { id: "practices", label: "Best practices", icon: Archive },
     { id: "social", label: "Social Media", icon: Smartphone },
     { id: "coordinators", label: "Coordinators", icon: Building2 },
-    { id: "mentors", label: "Mentors", icon: UserRound },
+    { id: "mentors", label: "Mentors", icon: UsersRound },
+    { id: "resident-teachers", label: "Resident Teachers", icon: UsersRound },
+    { id: "resident-best-practices", label: "Best Practices", icon: Briefcase },
     { id: "users", label: "Access and roles", icon: UserCog },
   ];
 
@@ -278,7 +304,7 @@ export default function AdminDashboard() {
         <header className="admin-header">
           <div>
             <p className="eyebrow text-[#168d6d]">Protected administration</p>
-            <h1>{tab === "overview" ? "Keep every public surface trustworthy." : tab === "content" ? "Edit website content" : tab === "uploads" ? "Manage media uploads" : tab === "schools" ? "Manage model schools" : tab === "teachers" ? "Manage resident teachers" : tab === "alumni" ? "Manage alumni" : tab === "news" ? "Manage news and events" : tab === "gallery" ? "Manage gallery" : tab === "practices" ? "Manage best practices" : tab === "social" ? "Social Media Integration" : tab === "coordinators" ? "Program Coordinators" : tab === "mentors" ? "Program Mentors" : "Access and roles"}</h1>
+            <h1>{tab === "overview" ? "Keep every public surface trustworthy." : tab === "content" ? "Edit website content" : tab === "uploads" ? "Manage media uploads" : tab === "schools" ? "Manage model schools" : tab === "teachers" ? "Manage resident teachers" : tab === "alumni" ? "Manage alumni" : tab === "news" ? "Manage news and events" : tab === "gallery" ? "Manage gallery" : tab === "practices" ? "Manage best practices" : tab === "social" ? "Social Media Integration" : tab === "coordinators" ? "Program Coordinators" : tab === "mentors" ? "Program Mentors" : tab === "resident-teachers" ? "Resident Teachers" : tab === "resident-best-practices" ? "Best Practices" : "Access and roles"}</h1>
             <p>Signed in as <strong>{user.name || user.email || "Administrator"}</strong>. Only approved administrators can change public content.</p>
           </div>
           <div className="admin-header-actions"><span className="admin-user-pill"><span className="admin-online-dot" /> Admin</span><button className="admin-icon-button" onClick={() => window.location.href = "/"} aria-label="Close admin workspace"><X className="size-4" /></button></div>
@@ -297,6 +323,8 @@ export default function AdminDashboard() {
         {tab === "social" && <SocialManager accounts={socialAccountRows} posts={socialPostRows} syncLogs={socialSyncLogRows} onConnect={connectAccount.mutate} onDisconnect={disconnectAccount.mutate} onModerate={moderatePost.mutate} onPublish={publishPost.mutate} onSync={syncAccounts.mutate} connecting={connectAccount.isPending} syncing={syncAccounts.isPending} moderating={moderatePost.isPending} publishing={publishPost.isPending} onRefresh={() => { invalidate(queryKeys.adminSocialAccounts); invalidate(queryKeys.adminSocialPosts); invalidate(queryKeys.adminSocialSyncLogs); }} />}
         {tab === "coordinators" && <TeamManager rows={coordinatorRows} role="coordinator" onDelete={(id: number) => deleteCoordinator.mutate(id)} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminCoordinators })} />}
         {tab === "mentors" && <TeamManager rows={mentorRows} role="mentor" onDelete={(id: number) => deleteMentor.mutate(id)} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminMentors })} />}
+        {tab === "resident-teachers" && <ResidentTeachersManager rows={residentTeacherRows} onSave={saveResidentTeacher.mutate} onSetStatus={setResidentTeacherStatus.mutate} onDelete={deleteResidentTeacher.mutate} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminResidentTeachers })} saving={saveResidentTeacher.isPending || setResidentTeacherStatus.isPending} />}
+        {tab === "resident-best-practices" && <ResidentBestPracticesManager rows={residentBestPracticeRows} teachers={residentTeacherRows} onSave={saveResidentBestPractice.mutate} onDelete={deleteResidentBestPractice.mutate} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminResidentBestPractices })} saving={saveResidentBestPractice.isPending} />}
       </section>
     </main>
   );
@@ -514,9 +542,7 @@ function SchoolsManager({ rows, onDelete, onRefresh }: any) {
     try {
       await apiRequest("admin/schools", { method: "POST", body: { ...form, id: form.id || undefined, latitude: form.latitude || null, longitude: form.longitude || null } });
       toast.success("School saved"); setForm({ id: 0, name: "", district: "", description: "", imageUrl: "", latitude: "", longitude: "", status: "published" }); onRefresh();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : `Could not save this ${role} profile.`);
-    } finally { setSaving(false); }
+    } catch (error: any) { toast.error(error.message); } finally { setSaving(false); }
   };
   return (
     <div className="admin-content">
@@ -820,7 +846,9 @@ function TeamManager({ rows, role, onDelete, onRefresh }: { rows: any[]; role: "
         status: role === "coordinator" ? "published" : "draft",
       });
       onRefresh();
-    } catch (error: any) { toast.error(error.message); } finally { setSaving(false); }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : `Could not save this ${role} profile.`);
+    } finally { setSaving(false); }
   };
   return (
     <div className="admin-content">
@@ -859,6 +887,135 @@ function TeamManager({ rows, role, onDelete, onRefresh }: { rows: any[]; role: "
           {rows.length ? rows.map((row: any) => (
             <tr key={row.id}><td><strong>{row.fullName}</strong><span>{row.organization}</span></td><td>{row.organization}</td><td><span className={`admin-status ${row.status === "published" ? "admin-status-published" : "admin-status-draft"}`}>{row.status}</span></td><td><span className={`admin-status ${row.isVisible ? "admin-status-published" : "admin-status-draft"}`}>{row.isVisible ? "Yes" : "No"}</span></td><td className="admin-row-actions"><button className="admin-table-action" onClick={() => setForm({ id: row.id, fullName: row.fullName, organization: row.organization, email: row.email ?? "", phone: row.phone ?? "", photoUrl: row.photoUrl ?? "", bio: row.bio ?? "", responsibilities: row.responsibilities ?? "", displayOrder: row.displayOrder ?? "", isVisible: row.isVisible, status: row.status })}>Edit</button><button className="admin-table-action admin-danger" onClick={() => onDelete(row.id)}><Trash2 className="size-3.5" /></button></td></tr>
           )) : <tr><td colSpan={5} className="admin-empty">No {role} records yet.</td></tr>}
+        </tbody></table></div>
+      </section>
+    </div>
+  );
+}
+
+function ResidentTeachersManager({ rows, onSave, onSetStatus, onDelete, onRefresh, saving }: any) {
+  const [form, setForm] = useState({
+    id: 0, fullName: "", email: "", phone: "", gender: "", modelSchool: "",
+    position: "", bestPractice: "", bestPracticeDescription: "", subjects: "",
+    skills: "", contributions: "", bio: "", photoUrl: "",
+    status: "pending", isFeatured: false, displayOrder: 0,
+  });
+  const [savingLocal, setSavingLocal] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const statuses: { value: string; label: string }[] = [
+    { value: "pending", label: "Pending Review" },
+    { value: "approved", label: "Approved" },
+    { value: "published", label: "Published" },
+    { value: "rejected", label: "Rejected" },
+    { value: "unpublished", label: "Unpublished" },
+  ];
+
+  const submit = async () => {
+    setSavingLocal(true);
+    try {
+      await onSave({ ...form, id: form.id || undefined, isFeatured: form.isFeatured, displayOrder: form.displayOrder ? Number(form.displayOrder) : 0 });
+      setForm({ id: 0, fullName: "", email: "", phone: "", gender: "", modelSchool: "", position: "", bestPractice: "", bestPracticeDescription: "", subjects: "", skills: "", contributions: "", bio: "", photoUrl: "", status: "pending", isFeatured: false, displayOrder: 0 });
+      setEditingId(null);
+      onRefresh();
+    } catch (error: any) { toast.error(error.message); } finally { setSavingLocal(false); }
+  };
+
+  const handleSetStatus = (id: number, status: string) => {
+    onSetStatus({ id, status });
+  };
+
+  const handleFeature = (id: number, featured: boolean) => {
+    onSetStatus({ id, status: rows.find((r: any) => r.id === id)?.status || "published", isFeatured: featured });
+  };
+
+  const handleDisplayOrder = (id: number, order: string) => {
+    const row = rows.find((r: any) => r.id === id);
+    onSetStatus({ id, status: row?.status || "published", isFeatured: row?.isFeatured, displayOrder: Number(order) || 0 });
+  };
+
+  return (
+    <div className="admin-content">
+      {editingId !== null && (
+        <section className="admin-panel admin-editor">
+          <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Resident Teachers</p><h3>Edit Teacher</h3></div><button className="admin-icon-button" onClick={() => setEditingId(null)} aria-label="Close"><X className="size-4" /></button></div>
+          <div className="admin-form-grid">
+            <label>Full name<input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} /></label>
+            <label>Email<input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
+            <label>Phone<input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
+            <label>Model school<input value={form.modelSchool} onChange={(e) => setForm({ ...form, modelSchool: e.target.value })} /></label>
+            <label>Position<input value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} /></label>
+            <label>Best practice<input value={form.bestPractice} onChange={(e) => setForm({ ...form, bestPractice: e.target.value })} /></label>
+            <label className="admin-full">Best practice description<textarea value={form.bestPracticeDescription} onChange={(e) => setForm({ ...form, bestPracticeDescription: e.target.value })} rows={3} /></label>
+            <label className="admin-full">Bio<textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} rows={3} /></label>
+            <label className="admin-full">Contributions<textarea value={form.contributions} onChange={(e) => setForm({ ...form, contributions: e.target.value })} rows={3} /></label>
+            <label>Photo URL<input value={form.photoUrl} onChange={(e) => setForm({ ...form, photoUrl: e.target.value })} /></label>
+            <label>Status<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{statuses.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select></label>
+            <label>Featured<input type="checkbox" checked={form.isFeatured} onChange={(e) => setForm({ ...form, isFeatured: e.target.checked })} /></label>
+            <label>Display order<input type="number" value={form.displayOrder} onChange={(e) => setForm({ ...form, displayOrder: Number(e.target.value) || 0 })} /></label>
+          </div>
+          <div className="admin-form-actions"><button className="button-primary" onClick={submit} disabled={savingLocal || saving}>{savingLocal || saving ? "Saving…" : "Save teacher"}</button></div>
+        </section>
+      )}
+      <section className="admin-panel">
+        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Resident Teachers</p><h3>{rows.length} registered teachers</h3><button className="button-primary" onClick={() => { setEditingId(null); setForm({ id: 0, fullName: "", email: "", phone: "", gender: "", modelSchool: "", position: "", bestPractice: "", bestPracticeDescription: "", subjects: "", skills: "", contributions: "", bio: "", photoUrl: "", status: "pending", isFeatured: false, displayOrder: 0 }); }}><Plus className="size-4" /> Add Teacher</button></div></div>
+        <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Name</th><th>Email</th><th>School</th><th>Status</th><th>Featured</th><th /></tr></thead><tbody>
+          {rows.length ? rows.map((row: any) => (
+            <tr key={row.id}><td><strong>{row.fullName}</strong><span>{row.position || "—"}</span></td><td>{row.email}</td><td>{row.modelSchool || "—"}</td><td><span className={`admin-status ${row.status === "published" ? "admin-status-published" : row.status === "approved" ? "admin-status-published" : "admin-status-draft"}`}>{row.status}</span></td><td><button className="admin-table-action" onClick={() => handleFeature(row.id, !row.isFeatured)}>{row.isFeatured ? "Unfeature" : "Feature"}</button></td><td className="admin-row-actions"><button className="admin-table-action" onClick={() => { setEditingId(row.id); setForm({ id: row.id, fullName: row.fullName, email: row.email, phone: row.phone, gender: row.gender, modelSchool: row.modelSchool, position: row.position, bestPractice: row.bestPractice, bestPracticeDescription: row.bestPracticeDescription, subjects: row.subjects, skills: row.skills, contributions: row.contributions, bio: row.bio, photoUrl: row.photoUrl, status: row.status, isFeatured: row.isFeatured, displayOrder: row.displayOrder }); }}><Pencil className="size-3.5" /></button><button className="admin-table-action admin-danger" onClick={() => { if (confirm(`Delete ${row.fullName}?`)) onDelete(row.id); }}><Trash2 className="size-3.5" /></button></td></tr>
+          )) : <tr><td colSpan={6} className="admin-empty">No resident teachers registered yet.</td></tr>}
+        </tbody></table></div>
+      </section>
+
+      <section className="admin-panel">
+        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Bulk Status Actions</p><h3>Approve / Publish teachers</h3></div></div>
+        <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Name</th><th>Current Status</th><th>New Status</th><th /></tr></thead><tbody>
+          {rows.filter((r: any) => r.status !== "published").length > 0 ? (
+            rows.filter((r: any) => r.status !== "published").map((row: any) => (
+              <tr key={row.id}><td><strong>{row.fullName}</strong></td><td><span className={`admin-status ${row.status}`}>{row.status}</span></td><td><select value={row.status} onChange={(e) => setForm({ ...form, id: row.id, status: e.target.value })} className="admin-mod-select"><option value="pending">Pending</option><option value="approved">Approved</option><option value="published">Publish</option><option value="rejected">Reject</option><option value="unpublished">Unpublish</option></select></td><td className="admin-row-actions"><button className="admin-table-action" onClick={() => handleSetStatus(row.id, form.status)}>Apply</button></td></tr>
+            ))
+          ) : <tr><td colSpan={4} className="admin-empty">All teachers are published.</td></tr>}
+        </tbody></table></div>
+      </section>
+    </div>
+  );
+}
+
+function ResidentBestPracticesManager({ rows, teachers, onSave, onDelete, onRefresh, saving }: any) {
+  const [form, setForm] = useState({ id: 0, teacherId: "", title: "", category: "ICT Integration in Education", description: "", mediaUrl: "", mediaType: "" });
+  const [savingLocal, setSavingLocal] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+
+  const submit = async () => {
+    setSavingLocal(true);
+    try {
+      await onSave({ ...form, id: form.id || undefined, teacherId: Number(form.teacherId) || undefined });
+      setForm({ id: 0, teacherId: "", title: "", category: "ICT Integration in Education", description: "", mediaUrl: "", mediaType: "" });
+      setEditingId(null);
+      onRefresh();
+    } catch (error: any) { toast.error(error.message); } finally { setSavingLocal(false); }
+  };
+
+  return (
+    <div className="admin-content">
+      {editingId !== null && (
+        <section className="admin-panel admin-editor">
+          <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Best Practices</p><h3>Edit Best Practice</h3></div><button className="admin-icon-button" onClick={() => setEditingId(null)} aria-label="Close"><X className="size-4" /></button></div>
+          <div className="admin-form-grid">
+            <label>Teacher<select value={form.teacherId} onChange={(e) => setForm({ ...form, teacherId: e.target.value })}><option value="">Select teacher</option>{teachers.map((t: any) => <option key={t.id} value={t.id}>{t.fullName}</option>)}</select></label>
+            <label>Title<input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
+            <label>Category<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}><option value="ICT Integration in Education">ICT Integration in Education</option><option value="Learner-Centred Teaching">Learner-Centred Teaching</option><option value="Competency-Based Education">Competency-Based Education</option><option value="Project-Based Learning">Project-Based Learning</option><option value="Inclusive Education">Inclusive Education</option><option value="Assessment for Learning">Assessment for Learning</option><option value="Collaborative Learning">Collaborative Learning</option><option value="Classroom Management">Classroom Management</option><option value="Digital Learning Resources">Digital Learning Resources</option><option value="Innovative Teaching Strategies">Innovative Teaching Strategies</option></select></label>
+            <label className="admin-full">Description<textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={4} /></label>
+            <label>Media URL<input value={form.mediaUrl} onChange={(e) => setForm({ ...form, mediaUrl: e.target.value })} placeholder="Image, video, or document URL" /></label>
+            <label>Media Type<select value={form.mediaType} onChange={(e) => setForm({ ...form, mediaType: e.target.value })}><option value="image">Image</option><option value="video">Video</option><option value="document">Document</option></select></label>
+          </div>
+          <div className="admin-form-actions"><button className="button-primary" onClick={submit} disabled={savingLocal || saving}>{savingLocal || saving ? "Saving…" : "Save best practice"}</button></div>
+        </section>
+      )}
+      <section className="admin-panel">
+        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Best Practices</p><h3>{rows.length} practices</h3><button className="button-primary" onClick={() => { setEditingId(null); setForm({ id: 0, teacherId: "", title: "", category: "ICT Integration in Education", description: "", mediaUrl: "", mediaType: "" }); }}><Plus className="size-4" /> Add Practice</button></div></div>
+        <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Title</th><th>Teacher</th><th>Category</th><th /></tr></thead><tbody>
+          {rows.length ? rows.map((row: any) => (
+            <tr key={row.id}><td><strong>{row.title}</strong></td><td>{row.teacherName || "—"}</td><td>{row.category}</td><td className="admin-row-actions"><button className="admin-table-action" onClick={() => { setEditingId(row.id); setForm({ id: row.id, teacherId: row.teacherId, title: row.title, category: row.category, description: row.description, mediaUrl: row.mediaUrl, mediaType: row.mediaType }); }}><Pencil className="size-3.5" /></button><button className="admin-table-action admin-danger" onClick={() => { if (confirm(`Delete "${row.title}"?`)) onDelete(row.id); }}><Trash2 className="size-3.5" /></button></td></tr>
+          )) : <tr><td colSpan={4} className="admin-empty">No best practices yet.</td></tr>}
         </tbody></table></div>
       </section>
     </div>

@@ -41,7 +41,7 @@ function vitePluginXamppAssetPaths(): Plugin {
 }
 
 function vitePluginSpaRouteEntries(): Plugin {
-  const routes = ["about", "portal", "admin", "network", "impact", "news", "gallery", "alumni", "resources", "partners", "contact", "team", "activities", "practices", "404"];
+  const routes = ["about", "portal", "admin", "network", "impact", "news", "gallery", "alumni", "resources", "partners", "contact", "team", "residents", "register-resident", "resident-teacher", "activities", "practices", "404"];
   return {
     name: "spa-route-entry-files",
     writeBundle(options) {

@@ -8,6 +8,7 @@ import {
   Trash2, UploadCloud, UserCog, UsersRound, X, KeyRound, AlertCircle,
   RefreshCw,
   Smartphone,
+  UserRound,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { SocialManager } from "./SocialManager";
@@ -15,7 +16,7 @@ import { SocialManager } from "./SocialManager";
 type AdminTab =
   | "overview" | "content" | "uploads" | "users"
   | "schools" | "teachers" | "alumni" | "news" | "gallery" | "practices"
-  | "social";
+  | "social" | "coordinators" | "mentors";
 
 const starterPages = [
   { slug: "home", title: "PTR Alumni Network home", summary: "Hero, program snapshot, and homepage narrative", body: "Keep this record for the public homepage." },
@@ -136,6 +137,8 @@ export default function AdminDashboard() {
   const socialAccounts = useApiQuery<any[]>(queryKeys.adminSocialAccounts, "admin/social/accounts", isAdmin);
   const socialPosts = useApiQuery<any[]>(queryKeys.adminSocialPosts, "admin/social/posts?status=pending", isAdmin);
   const socialSyncLogs = useApiQuery<any[]>(queryKeys.adminSocialSyncLogs, "admin/social/sync-logs", isAdmin);
+  const coordinators = useApiQuery<any[]>(queryKeys.adminCoordinators, "admin/coordinators", isAdmin);
+  const mentors = useApiQuery<any[]>(queryKeys.adminMentors, "admin/mentors", isAdmin);
 
   const saveContent = useMutation({ mutationFn: (input: typeof contentForm) => apiRequest("admin/content", { method: "POST", body: input }), onSuccess: async () => { toast.success("Content saved"); setEditing(null); setContentForm({ slug: "", title: "", summary: "", body: "", status: "draft" }); await queryClient.invalidateQueries({ queryKey: queryKeys.adminContent }); await queryClient.invalidateQueries({ queryKey: queryKeys.adminOverview }); }, onError: (error: Error) => toast.error(error.message) });
 
@@ -197,6 +200,8 @@ export default function AdminDashboard() {
   const socialAccountRows = useMemo(() => socialAccounts.data ?? [], [socialAccounts.data]);
   const socialPostRows = useMemo(() => socialPosts.data ?? [], [socialPosts.data]);
   const socialSyncLogRows = useMemo(() => socialSyncLogs.data ?? [], [socialSyncLogs.data]);
+  const coordinatorRows = useMemo(() => coordinators.data ?? [], [coordinators.data]);
+  const mentorRows = useMemo(() => mentors.data ?? [], [mentors.data]);
 
   const invalidate = (key: readonly unknown[]) => queryClient.invalidateQueries({ queryKey: key });
 
@@ -212,6 +217,8 @@ export default function AdminDashboard() {
   const deleteNews = makeDelete("admin/news", queryKeys.adminNews);
   const deleteGallery = makeDelete("admin/gallery", queryKeys.adminGallery);
   const deletePractice = makeDelete("admin/best-practices", queryKeys.adminPractices);
+  const deleteCoordinator = makeDelete("admin/coordinators", queryKeys.adminCoordinators);
+  const deleteMentor = makeDelete("admin/mentors", queryKeys.adminMentors);
 
   if (authLoading) return <div className="admin-loading"><Loader2 className="size-6 animate-spin" /> Checking administrator access…</div>;
   if (!user) return <AdminLoginForm />;
@@ -252,6 +259,8 @@ export default function AdminDashboard() {
     { id: "gallery", label: "Gallery", icon: ImagePlus },
     { id: "practices", label: "Best practices", icon: Archive },
     { id: "social", label: "Social Media", icon: Smartphone },
+    { id: "coordinators", label: "Coordinators", icon: Building2 },
+    { id: "mentors", label: "Mentors", icon: UserRound },
     { id: "users", label: "Access and roles", icon: UserCog },
   ];
 
@@ -269,7 +278,7 @@ export default function AdminDashboard() {
         <header className="admin-header">
           <div>
             <p className="eyebrow text-[#168d6d]">Protected administration</p>
-            <h1>{tab === "overview" ? "Keep every public surface trustworthy." : tab === "content" ? "Edit website content" : tab === "uploads" ? "Manage media uploads" : tab === "schools" ? "Manage model schools" : tab === "teachers" ? "Manage resident teachers" : tab === "alumni" ? "Manage alumni" : tab === "news" ? "Manage news and events" : tab === "gallery" ? "Manage gallery" : tab === "practices" ? "Manage best practices" : tab === "social" ? "Social Media Integration" : "Access and roles"}</h1>
+            <h1>{tab === "overview" ? "Keep every public surface trustworthy." : tab === "content" ? "Edit website content" : tab === "uploads" ? "Manage media uploads" : tab === "schools" ? "Manage model schools" : tab === "teachers" ? "Manage resident teachers" : tab === "alumni" ? "Manage alumni" : tab === "news" ? "Manage news and events" : tab === "gallery" ? "Manage gallery" : tab === "practices" ? "Manage best practices" : tab === "social" ? "Social Media Integration" : tab === "coordinators" ? "Program Coordinators" : tab === "mentors" ? "Program Mentors" : "Access and roles"}</h1>
             <p>Signed in as <strong>{user.name || user.email || "Administrator"}</strong>. Only approved administrators can change public content.</p>
           </div>
           <div className="admin-header-actions"><span className="admin-user-pill"><span className="admin-online-dot" /> Admin</span><button className="admin-icon-button" onClick={() => window.location.href = "/"} aria-label="Close admin workspace"><X className="size-4" /></button></div>
@@ -286,6 +295,8 @@ export default function AdminDashboard() {
         {tab === "gallery" && <GalleryManager rows={galleryRows} onDelete={(id: number) => deleteGallery.mutate(id)} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminGallery })} />}
         {tab === "practices" && <PracticesManager rows={practiceRows} onDelete={(id: number) => deletePractice.mutate(id)} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminPractices })} />}
         {tab === "social" && <SocialManager accounts={socialAccountRows} posts={socialPostRows} syncLogs={socialSyncLogRows} onConnect={connectAccount.mutate} onDisconnect={disconnectAccount.mutate} onModerate={moderatePost.mutate} onPublish={publishPost.mutate} onSync={syncAccounts.mutate} connecting={connectAccount.isPending} syncing={syncAccounts.isPending} moderating={moderatePost.isPending} publishing={publishPost.isPending} onRefresh={() => { invalidate(queryKeys.adminSocialAccounts); invalidate(queryKeys.adminSocialPosts); invalidate(queryKeys.adminSocialSyncLogs); }} />}
+        {tab === "coordinators" && <TeamManager rows={coordinatorRows} role="coordinator" onDelete={(id: number) => deleteCoordinator.mutate(id)} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminCoordinators })} />}
+        {tab === "mentors" && <TeamManager rows={mentorRows} role="mentor" onDelete={(id: number) => deleteMentor.mutate(id)} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminMentors })} />}
       </section>
     </main>
   );
@@ -710,6 +721,58 @@ function PracticesManager({ rows, onDelete, onRefresh }: any) {
           {rows.length ? rows.map((row: any) => (
             <tr key={row.id}><td><strong>{row.title}</strong></td><td>{row.category}</td><td><span className={`admin-status ${row.status === "published" ? "admin-status-published" : "admin-status-draft"}`}>{row.status}</span></td><td className="admin-row-actions"><button className="admin-table-action" onClick={() => setForm({ id: row.id, title: row.title, category: row.category, summary: row.summary ?? "", body: row.body, documentUrl: row.documentUrl ?? "", imageUrl: row.imageUrl ?? "", status: row.status })}>Edit</button><button className="admin-table-action admin-danger" onClick={() => onDelete(row.id)}><Trash2 className="size-3.5" /></button></td></tr>
           )) : <tr><td colSpan={4} className="admin-empty">No practices yet.</td></tr>}
+        </tbody></table></div>
+      </section>
+    </div>
+  );
+}
+
+function TeamManager({ rows, role, onDelete, onRefresh }: any) {
+  const [form, setForm] = useState({ id: 0, fullName: "", organization: "", email: "", phone: "", photoUrl: "", bio: "", responsibilities: "", displayOrder: "", isVisible: true, status: role === "coordinator" ? "published" : "draft" });
+  const [saving, setSaving] = useState(false);
+  const organizations = ["De La Salle", "SAVE"];
+  const submit = async () => {
+    setSaving(true);
+    try {
+      await apiRequest(role === "coordinator" ? "admin/coordinators" : "admin/mentors", {
+        method: "POST",
+        body: {
+          ...form,
+          id: form.id || undefined,
+          displayOrder: form.displayOrder ? Number(form.displayOrder) : 0,
+          isVisible: form.isVisible,
+          status: form.status,
+        },
+      });
+      toast.success(`${role.charAt(0).toUpperCase() + role.slice(1)} saved`);
+      setForm({ id: 0, fullName: "", organization: "", email: "", phone: "", photoUrl: "", bio: "", responsibilities: "", displayOrder: "", isVisible: true, status: role === "coordinator" ? "published" : "draft" });
+      onRefresh();
+    } catch (error: any) { toast.error(error.message); } finally { setSaving(false); }
+  };
+  return (
+    <div className="admin-content">
+      <section className="admin-panel admin-editor">
+        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">{role}</p><h3>{form.id ? `Edit ${role}` : `Add ${role}`}</h3></div></div>
+        <div className="admin-form-grid">
+          <label>Full name<input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} placeholder="Full name" /></label>
+          <label>Organization<select value={form.organization} onChange={(e) => setForm({ ...form, organization: e.target.value })}><option value="De La Salle">De La Salle</option><option value="SAVE">SAVE</option></select></label>
+          <label>Email<input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="name@domain.rw" /></label>
+          <label>Phone<input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Phone number" /></label>
+          <label>Photo URL<input value={form.photoUrl} onChange={(e) => setForm({ ...form, photoUrl: e.target.value })} placeholder="Image URL" /></label>
+          <label className="admin-full">Biography<textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} rows={3} placeholder="Short biography" /></label>
+          <label className="admin-full">Responsibilities<textarea value={form.responsibilities} onChange={(e) => setForm({ ...form, responsibilities: e.target.value })} rows={3} placeholder="Role responsibilities" /></label>
+          <label>Display order<input type="number" value={form.displayOrder} onChange={(e) => setForm({ ...form, displayOrder: e.target.value })} /></label>
+          <label>Visible<input type="checkbox" checked={form.isVisible} onChange={(e) => setForm({ ...form, isVisible: e.target.checked })} /></label>
+          <label>Status<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option value="draft">Draft</option><option value="published">Published</option></select></label>
+        </div>
+        <div className="admin-form-actions"><button className="button-primary" onClick={submit} disabled={saving}>{saving ? "Saving…" : `Save ${role}`}</button></div>
+      </section>
+      <section className="admin-panel">
+        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">{role === "coordinator" ? "Program Coordinators" : "Program Mentors"}</p><h3>{rows.length} records</h3></div></div>
+        <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Name</th><th>Organization</th><th>Status</th><th>Visible</th><th /></tr></thead><tbody>
+          {rows.length ? rows.map((row: any) => (
+            <tr key={row.id}><td><strong>{row.fullName}</strong><span>{row.organization}</span></td><td>{row.organization}</td><td><span className={`admin-status ${row.status === "published" ? "admin-status-published" : "admin-status-draft"}`}>{row.status}</span></td><td><span className={`admin-status ${row.isVisible ? "admin-status-published" : "admin-status-draft"}`}>{row.isVisible ? "Yes" : "No"}</span></td><td className="admin-row-actions"><button className="admin-table-action" onClick={() => setForm({ id: row.id, fullName: row.fullName, organization: row.organization, email: row.email ?? "", phone: row.phone ?? "", photoUrl: row.photoUrl ?? "", bio: row.bio ?? "", responsibilities: row.responsibilities ?? "", displayOrder: row.displayOrder ?? "", isVisible: row.isVisible, status: row.status })}>Edit</button><button className="admin-table-action admin-danger" onClick={() => onDelete(row.id)}><Trash2 className="size-3.5" /></button></td></tr>
+          )) : <tr><td colSpan={5} className="admin-empty">No {role} records yet.</td></tr>}
         </tbody></table></div>
       </section>
     </div>

@@ -13,6 +13,11 @@ import {
   School,
   Sparkles,
   UsersRound,
+  UserRound,
+  Mail,
+  Phone,
+  Building2,
+  Target,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -41,6 +46,7 @@ export const navItems = [
   { href: "/news", label: "News & Activities" },
   { href: "/gallery", label: "Gallery" },
   { href: "/alumni", label: "Alumni" },
+  { href: "/team", label: "Program Team" },
   { href: "/resources", label: "Resources" },
   { href: "/partners", label: "Partners" },
   { href: "/contact", label: "Join & Contact" },
@@ -427,11 +433,137 @@ export const sectionMeta: Record<string, { eyebrow: string; title: string; descr
   "/resources": { eyebrow: "Resources", title: "Learn, Teach, Share", description: "Lesson plans, teaching materials, English and digital literacy guides, program documents, and alumni newsletters.", icon: BookOpen, demo: "Resource library · Demo files" },
   "/partners": { eyebrow: "Partners", title: "Together, We Make Teachers Matter", description: "PTRP was made possible by a strong partnership of government, universities, and education organizations that share one belief: investing in teachers improves learning for children.", icon: Handshake, demo: "Partner information · Official sources" },
   "/contact": { eyebrow: "Join & Contact", title: "Join the PTR Alumni Network", description: "Are you a PTRP graduate? Join your fellow alumni to share ideas, find support, and be part of the story of improving education in Rwanda.", icon: Globe2, demo: "Membership form · Contact details pending" },
+  "/team": { eyebrow: "Program Team", title: "PTRP Program Coordinators & Mentors", description: "Meet the program coordinators and mentors who guide resident teachers through the Primary Teacher Residency Program.", icon: Building2, demo: "Coordinator and mentor profiles" },
   "/activities": { eyebrow: "Activities & Updates", title: "A living record of practice in motion", description: "Approved classroom teaching, lesson planning, mentorship, professional development, ICT, STEM, and school events.", icon: Activity, demo: "Activities feed · Demo content" },
   "/practices": { eyebrow: "Best Teaching Practices", title: "A field guide made by teachers, for teachers", description: "Discover practices with the context, steps, resources, evidence, and lessons learned needed to make an idea useful beyond one classroom.", icon: Lightbulb, demo: "Knowledge-sharing library · Demo content" },
 };
 
 export const stats = keyNumbers;
+
+// ============================================================
+// Program Coordinators & Mentors
+// ============================================================
+export type ProgramRole = "coordinator" | "mentor";
+
+export type ProgramTeamMember = {
+  id: number;
+  fullName: string;
+  organization: string;
+  role: ProgramRole;
+  email: string | null;
+  phone: string | null;
+  photoUrl: string | null;
+  bio: string | null;
+  responsibilities: string | null;
+  displayOrder: number;
+  isVisible: boolean;
+  status: "draft" | "published";
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export const programTeamPlaceholders: ProgramTeamMember[] = [
+  {
+    id: 1,
+    fullName: "Br. Biziyaremye Ferdinand",
+    organization: "De La Salle",
+    role: "coordinator",
+    email: null,
+    phone: null,
+    photoUrl: null,
+    bio: "Program Coordinator for PTRP at De La Salle. Coordinates residency activities, mentorship pairing, and school placement for resident teachers.",
+    responsibilities: "Coordination of resident teachers, mentorship, and school partnerships at De La Salle.",
+    displayOrder: 1,
+    isVisible: true,
+    status: "published",
+    createdAt: null,
+    updatedAt: null,
+  },
+  {
+    id: 2,
+    fullName: "Br. Elias Nshimiyimana",
+    organization: "SAVE",
+    role: "coordinator",
+    email: null,
+    phone: null,
+    photoUrl: null,
+    bio: "Program Coordinator for PTRP at SAVE. Coordinates residency activities, mentorship pairing, and school placement for resident teachers.",
+    responsibilities: "Coordination of resident teachers, mentorship, and school partnerships at SAVE.",
+    displayOrder: 2,
+    isVisible: true,
+    status: "published",
+    createdAt: null,
+    updatedAt: null,
+  },
+  {
+    id: 3,
+    fullName: "[Mentor Name - De La Salle]",
+    organization: "De La Salle",
+    role: "mentor",
+    email: null,
+    phone: null,
+    photoUrl: null,
+    bio: "Program mentor for resident teachers at De La Salle. Contact details and biography to be completed by the program administrator.",
+    responsibilities: "Mentor resident teachers during guided classroom practice.",
+    displayOrder: 1,
+    isVisible: true,
+    status: "draft",
+    createdAt: null,
+    updatedAt: null,
+  },
+  {
+    id: 4,
+    fullName: "[Mentor Name - De La Salle]",
+    organization: "De La Salle",
+    role: "mentor",
+    email: null,
+    phone: null,
+    photoUrl: null,
+    bio: "Program mentor for resident teachers at De La Salle. Contact details and biography to be completed by the program administrator.",
+    responsibilities: "Mentor resident teachers during guided classroom practice.",
+    displayOrder: 2,
+    isVisible: true,
+    status: "draft",
+    createdAt: null,
+    updatedAt: null,
+  },
+  {
+    id: 5,
+    fullName: "[Mentor Name - SAVE]",
+    organization: "SAVE",
+    role: "mentor",
+    email: null,
+    phone: null,
+    photoUrl: null,
+    bio: "Program mentor for resident teachers at SAVE. Contact details and biography to be completed by the program administrator.",
+    responsibilities: "Mentor resident teachers during guided classroom practice.",
+    displayOrder: 1,
+    isVisible: true,
+    status: "draft",
+    createdAt: null,
+    updatedAt: null,
+  },
+  {
+    id: 6,
+    fullName: "[Mentor Name - SAVE]",
+    organization: "SAVE",
+    role: "mentor",
+    email: null,
+    phone: null,
+    photoUrl: null,
+    bio: "Program mentor for resident teachers at SAVE. Contact details and biography to be completed by the program administrator.",
+    responsibilities: "Mentor resident teachers during guided classroom practice.",
+    displayOrder: 2,
+    isVisible: true,
+    status: "draft",
+    createdAt: null,
+    updatedAt: null,
+  },
+];
+
+export const coordinatorsPlaceholder = programTeamPlaceholders.filter((m) => m.role === "coordinator");
+export const mentorsPlaceholder = programTeamPlaceholders.filter((m) => m.role === "mentor");
+
 export const featureTiles = [
   { icon: UsersRound, title: "Alumni directory", body: "Find PTRP graduates across Rwanda.", href: "/alumni", accent: "mint" },
   { icon: School, title: "Model schools", body: "Explore the 17 demonstration schools.", href: "/network", accent: "blue" },

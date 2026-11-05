@@ -145,11 +145,11 @@ export default function Portal({ language }: PortalProps) {
       </header>
 
       {/* Login Content */}
-      <div className="mx-auto max-w-[1400px] px-5 md:px-8 lg:px-12 py-12 md:py-20 lg:py-24">
-        <div className="grid gap-12 lg:grid-cols-[1fr_0.65fr] items-start">
+      <div className="portal-workspace-content mx-auto max-w-[1400px] px-5 md:px-8 lg:px-12 py-12 md:py-20 lg:py-24">
+        <div className="grid gap-8 lg:grid-cols-[1fr_0.65fr] items-start">
           
           {/* Left: Info */}
-          <div className="space-y-8">
+          <div className="space-y-6">
             <div>
               <p className="eyebrow text-[#0098d9] mb-4">Secure program workspace</p>
               <h1 className="text-[2.8rem] md:text-[3.8rem] font-extrabold leading-[1.05] tracking-[-0.02em] text-[#111] mb-6">
@@ -168,16 +168,16 @@ export default function Portal({ language }: PortalProps) {
                 { number: "17", label: "Model schools" },
                 { number: "1", label: "Connected network" },
               ].map((stat, index) => (
-                <div key={index} className="bg-[#f8fafc] rounded-xl p-6 border border-[#e2eef0]">
+                <div key={index} className="bg-[#f8fafc] rounded-xl p-5 border border-[#e2eef0]">
                   <p className="text-2xl font-extrabold text-[#0098d9]">{stat.number}</p>
                   <p className="text-sm font-bold text-[#4b5563] uppercase tracking-wide mt-2">{stat.label}</p>
                 </div>
               ))}
             </div>
 
-            <div className="bg-[#f8fafc] rounded-xl p-8 border border-[#e2eef0]">
+            <div className="bg-[#f8fafc] rounded-xl p-6 border border-[#e2eef0]">
               <p className="eyebrow text-[#0098d9] mb-4">Who can access</p>
-              <ul className="space-y-4 text-[#4b5563] leading-[1.8]">
+              <ul className="space-y-3 text-[#4b5563] leading-[1.8]">
                 <li className="flex items-start gap-3">
                   <UsersRound className="size-4 text-[#0098d9] mt-0.5 flex-shrink-0" />
                   <span>Resident teachers placed in model schools</span>
@@ -194,9 +194,9 @@ export default function Portal({ language }: PortalProps) {
             </div>
 
             {/* Alumni Network Platforms */}
-            <div className="bg-[#f8fafc] rounded-xl p-8 border border-[#e2eef0]">
+            <div className="bg-[#f8fafc] rounded-xl p-6 border border-[#e2eef0]">
               <p className="eyebrow text-[#0098d9] mb-4">PTR Alumni Network Platforms</p>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
                 {socialLinks.map((social) => {
                   const IconMap: Record<string, typeof Instagram | typeof Facebook | typeof Send | typeof Youtube | typeof Linkedin | typeof Music2 | typeof AtSign> = {
                     instagram: Instagram,
@@ -209,7 +209,7 @@ export default function Portal({ language }: PortalProps) {
                   };
                   const Icon = IconMap[social.key] || UsersRound;
                   return (
-                    <div key={social.key} className="flex items-center gap-3 p-3 rounded-lg bg-white border border-[#e2eef0] hover:border-[#0098d9] transition-colors">
+                    <div key={social.key} className="flex min-w-0 items-center gap-3 p-3 rounded-lg bg-white border border-[#e2eef0] hover:border-[#0098d9] transition-colors">
                       <Icon className="size-4 text-[#0098d9] flex-shrink-0" />
                       <div className="min-w-0">
                         <p className="text-xs font-bold text-[#111]">{social.label}</p>
@@ -230,7 +230,7 @@ export default function Portal({ language }: PortalProps) {
           </div>
 
           {/* Right: Auth Card / Member Panel */}
-          <div className="bg-[#f8fafc] rounded-2xl p-7 md:p-8 border border-[#e2eef0] shadow-sm">
+          <div className="bg-[#f8fafc] rounded-2xl p-6 md:p-7 border border-[#e2eef0] shadow-sm">
             {user ? (
               // Authenticated Member Panel
               <div className="space-y-6">

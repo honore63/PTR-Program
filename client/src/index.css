@@ -186,9 +186,9 @@ main .mt-10 { margin-top: clamp(1.25rem, 2.5vw, 2rem); }
 main .mt-9 { margin-top: 1.5rem; }
 main .mt-8 { margin-top: 1.25rem; }
 main .mt-7 { margin-top: 1.125rem; }
-main [class~="gap-20"] { row-gap: clamp(2rem, 4vw, 3rem); }
-main [class~="gap-16"] { row-gap: clamp(1.75rem, 3.5vw, 2.75rem); }
-main [class~="gap-12"] { row-gap: clamp(1.5rem, 3vw, 2.25rem); }
+main [class~="gap-20"] { gap: clamp(2rem, 4vw, 3rem); }
+main [class~="gap-16"] { gap: clamp(1.75rem, 3.5vw, 2.75rem); }
+main [class~="gap-12"] { gap: clamp(1.5rem, 3vw, 2.25rem); }
 .button-primary, .button-secondary, .button-ghost-light { min-height: 44px; padding: .72rem 1.15rem; font-size: .78rem; }
 .stat-card { min-height: 190px; padding: 1.2rem; }
 .feature-card { padding: 1.25rem; }
@@ -207,6 +207,19 @@ main [class~="gap-12"] { row-gap: clamp(1.5rem, 3vw, 2.25rem); }
 .portal-proof { gap: 24px; margin-top: 32px; }
 .portal-login-inner { padding-block: 32px; }
 .portal-login-card { margin-top: 48px; }
+.portal-workspace-content { padding-block: clamp(2rem, 4vw, 3.5rem); }
+.portal-workspace-content > .grid { gap: clamp(1.5rem, 3vw, 2.25rem); }
+.portal-workspace-content > .grid > * { min-width: 0; }
+.admin-stat-card { display: grid; gap: 6px; min-width: 0; border: 1px solid #dce7ed; border-radius: 16px; background: #fff; padding: 16px; color: #0b2347; text-align: left; box-shadow: 0 8px 24px rgba(31,65,92,.04); transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease; cursor: pointer; }
+.admin-stat-card:hover { border-color: #9fd9c4; box-shadow: 0 12px 28px rgba(31,65,92,.08); transform: translateY(-2px); }
+.admin-stat-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #6d8499; font-size: .72rem; font-weight: 800; }
+.admin-stat-card strong { font-family: 'Manrope', sans-serif; font-size: 2rem; line-height: 1; letter-spacing: -.06em; }
+.admin-stat-card small { color: #8396a7; font-size: .65rem; line-height: 1.4; }
+.admin-starter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+.admin-starter-card { min-width: 0; border: 1px solid #e0eaf0; border-radius: 13px; background: #fbfdfe; padding: 14px; }
+.admin-starter-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.admin-starter-card h4 { margin: 12px 0 5px; color: #0b2347; font-size: .82rem; font-weight: 800; }
+.admin-starter-card p { margin: 0; color: #7b90a4; font-size: .7rem; line-height: 1.5; }
 
 @media (max-width: 900px) {
   .portal-login-card { margin-top: 26px; }
@@ -219,6 +232,7 @@ main [class~="gap-12"] { row-gap: clamp(1.5rem, 3vw, 2.25rem); }
   .admin-hero { padding: 18px; }
   .admin-panel { padding: 14px; }
   .admin-form-grid { gap: 12px; }
+  .admin-starter-grid { grid-template-columns: 1fr; gap: 9px; }
 }
 
 @media (max-width: 639px) {

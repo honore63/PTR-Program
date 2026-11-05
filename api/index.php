@@ -473,6 +473,14 @@ function routeRequest(): void
         respond(database()->query("SELECT * FROM bestPractices WHERE status = 'published' ORDER BY updatedAt DESC")->fetchAll());
     }
 
+    // ---------- Program Coordinators & Mentors (public) ----------
+    if ($route === '/coordinators' && $method === 'GET') {
+        respond(database()->query("SELECT * FROM coordinators WHERE status = 'published' AND isVisible = 1 ORDER BY displayOrder ASC, fullName ASC")->fetchAll());
+    }
+    if ($route === '/mentors' && $method === 'GET') {
+        respond(database()->query("SELECT * FROM mentors WHERE status = 'published' AND isVisible = 1 ORDER BY displayOrder ASC, fullName ASC")->fetchAll());
+    }
+
     // =========================================================================
     // Administrator-Protected Endpoints
     // =========================================================================
@@ -815,6 +823,76 @@ function routeRequest(): void
     if (preg_match('#^/admin/best-practices/(\d+)$#', $route, $matches) && $method === 'DELETE') {
         requireSameOrigin();
         $statement = database()->prepare('DELETE FROM bestPractices WHERE id = ?'); $statement->execute([(int) $matches[1]]);
+        respond(['success' => true]);
+    }
+
+    // ---------- Program Coordinators (admin) ----------
+    if ($route === '/admin/coordinators' && $method === 'GET') {
+        respond(database()->query('SELECT * FROM coordinators ORDER BY displayOrder ASC, fullName ASC')->fetchAll());
+    }
+    if ($route === '/admin/coordinators' && $method === 'POST') {
+        requireSameOrigin(); $data = jsonBody();
+        $fullName = inputString($data, 'fullName', 255, true);
+        $organization = inputString($data, 'organization', 255, true);
+        $email = inputString($data, 'email', 320);
+        $phone = inputString($data, 'phone', 64);
+        $photoUrl = inputString($data, 'photoUrl', 700);
+        $bio = inputString($data, 'bio', 5000);
+        $responsibilities = inputString($data, 'responsibilities', 5000);
+        $displayOrder = (isset($data['displayOrder']) && is_numeric($data['displayOrder'])) ? (int) $data['displayOrder'] : 0;
+        $isVisible = !empty($data['isVisible']);
+        $status = $data['status'] ?? 'published';
+        if (!in_array($status, ['draft', 'published'], true)) throw new ApiError(400, 'Invalid coordinator status.');
+        $id = isset($data['id']) ? (int) $data['id'] : 0;
+        if ($id > 0) {
+            $statement = database()->prepare('UPDATE coordinators SET fullName=?, organization=?, email=?, phone=?, photoUrl=?, bio=?, responsibilities=?, displayOrder=?, isVisible=?, status=? WHERE id=?');
+            $statement->execute([$fullName, $organization, $email, $phone, $photoUrl, $bio, $responsibilities, $displayOrder, $isVisible ? 1 : 0, $status, $id]);
+        } else {
+            $statement = database()->prepare('INSERT INTO coordinators (fullName, organization, email, phone, photoUrl, bio, responsibilities, displayOrder, isVisible, status) VALUES (?,?,?,?,?,?,?,?,?,?)');
+            $statement->execute([$fullName, $organization, $email, $phone, $photoUrl, $bio, $responsibilities, $displayOrder, $isVisible ? 1 : 0, $status]);
+            $id = (int) database()->lastInsertId();
+        }
+        $fetch = database()->prepare('SELECT * FROM coordinators WHERE id = ?'); $fetch->execute([$id]);
+        respond($fetch->fetch());
+    }
+    if (preg_match('#^/admin/coordinators/(\d+)$#', $route, $matches) && $method === 'DELETE') {
+        requireSameOrigin();
+        $statement = database()->prepare('DELETE FROM coordinators WHERE id = ?'); $statement->execute([(int) $matches[1]]);
+        respond(['success' => true]);
+    }
+
+    // ---------- Program Mentors (admin) ----------
+    if ($route === '/admin/mentors' && $method === 'GET') {
+        respond(database()->query('SELECT * FROM mentors ORDER BY displayOrder ASC, fullName ASC')->fetchAll());
+    }
+    if ($route === '/admin/mentors' && $method === 'POST') {
+        requireSameOrigin(); $data = jsonBody();
+        $fullName = inputString($data, 'fullName', 255, true);
+        $organization = inputString($data, 'organization', 255, true);
+        $email = inputString($data, 'email', 320);
+        $phone = inputString($data, 'phone', 64);
+        $photoUrl = inputString($data, 'photoUrl', 700);
+        $bio = inputString($data, 'bio', 5000);
+        $responsibilities = inputString($data, 'responsibilities', 5000);
+        $displayOrder = (isset($data['displayOrder']) && is_numeric($data['displayOrder'])) ? (int) $data['displayOrder'] : 0;
+        $isVisible = !empty($data['isVisible']);
+        $status = $data['status'] ?? 'draft';
+        if (!in_array($status, ['draft', 'published'], true)) throw new ApiError(400, 'Invalid mentor status.');
+        $id = isset($data['id']) ? (int) $data['id'] : 0;
+        if ($id > 0) {
+            $statement = database()->prepare('UPDATE mentors SET fullName=?, organization=?, email=?, phone=?, photoUrl=?, bio=?, responsibilities=?, displayOrder=?, isVisible=?, status=? WHERE id=?');
+            $statement->execute([$fullName, $organization, $email, $phone, $photoUrl, $bio, $responsibilities, $displayOrder, $isVisible ? 1 : 0, $status, $id]);
+        } else {
+            $statement = database()->prepare('INSERT INTO mentors (fullName, organization, email, phone, photoUrl, bio, responsibilities, displayOrder, isVisible, status) VALUES (?,?,?,?,?,?,?,?,?,?)');
+            $statement->execute([$fullName, $organization, $email, $phone, $photoUrl, $bio, $responsibilities, $displayOrder, $isVisible ? 1 : 0, $status]);
+            $id = (int) database()->lastInsertId();
+        }
+        $fetch = database()->prepare('SELECT * FROM mentors WHERE id = ?'); $fetch->execute([$id]);
+        respond($fetch->fetch());
+    }
+    if (preg_match('#^/admin/mentors/(\d+)$#', $route, $matches) && $method === 'DELETE') {
+        requireSameOrigin();
+        $statement = database()->prepare('DELETE FROM mentors WHERE id = ?'); $statement->execute([(int) $matches[1]]);
         respond(['success' => true]);
     }
 

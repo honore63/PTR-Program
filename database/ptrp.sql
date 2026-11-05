@@ -194,6 +194,64 @@ INSERT IGNORE INTO `bestPractices` (title, category, summary, body, status, crea
   ('Differentiated Instruction', 'Teaching practice', 'Tailoring instruction to meet diverse learner needs.', 'Differentiated instruction adapts content...', 'draft', NOW());
 
 -- ============================================================
+-- Program Coordinators & Mentors tables
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `coordinators` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `fullName` varchar(255) NOT NULL,
+  `organization` varchar(255) NOT NULL,
+  `email` varchar(320) DEFAULT NULL,
+  `phone` varchar(64) DEFAULT NULL,
+  `photoUrl` varchar(700) DEFAULT NULL,
+  `bio` text DEFAULT NULL,
+  `responsibilities` text DEFAULT NULL,
+  `displayOrder` int NOT NULL DEFAULT 0,
+  `isVisible` tinyint(1) NOT NULL DEFAULT 1,
+  `status` enum('draft','published') NOT NULL DEFAULT 'published',
+  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `coordinators_organization_idx` (`organization`),
+  KEY `coordinators_status_idx` (`status`),
+  KEY `coordinators_displayOrder_idx` (`displayOrder`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `mentors` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `fullName` varchar(255) NOT NULL,
+  `organization` varchar(255) NOT NULL,
+  `email` varchar(320) DEFAULT NULL,
+  `phone` varchar(64) DEFAULT NULL,
+  `photoUrl` varchar(700) DEFAULT NULL,
+  `bio` text DEFAULT NULL,
+  `responsibilities` text DEFAULT NULL,
+  `displayOrder` int NOT NULL DEFAULT 0,
+  `isVisible` tinyint(1) NOT NULL DEFAULT 1,
+  `status` enum('draft','published') NOT NULL DEFAULT 'draft',
+  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `mentors_organization_idx` (`organization`),
+  KEY `mentors_status_idx` (`status`),
+  KEY `mentors_displayOrder_idx` (`displayOrder`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- Seed program coordinators and mentors
+-- ============================================================
+-- Coordinators (verified names, placeholder contact details)
+INSERT IGNORE INTO `coordinators` (fullName, organization, email, phone, photoUrl, bio, responsibilities, displayOrder, isVisible, status) VALUES
+  ('Br. Biziyaremye Ferdinand', 'De La Salle', NULL, NULL, NULL, 'Program Coordinator for PTRP at De La Salle. Coordinates residency activities, mentorship pairing, and school placement for resident teachers.', 'Coordination of resident teachers, mentorship, and school partnerships at De La Salle.', 1, 1, 'published'),
+  ('Br. Elias Nshimiyimana', 'SAVE', NULL, NULL, NULL, 'Program Coordinator for PTRP at SAVE. Coordinates residency activities, mentorship pairing, and school placement for resident teachers.', 'Coordination of resident teachers, mentorship, and school partnerships at SAVE.', 2, 1, 'published');
+
+-- Mentors (placeholder names — administrators complete details later)
+INSERT IGNORE INTO `mentors` (fullName, organization, email, phone, photoUrl, bio, responsibilities, displayOrder, isVisible, status) VALUES
+  ('[Mentor Name - De La Salle]', 'De La Salle', NULL, NULL, NULL, 'Program mentor for resident teachers at De La Salle. Contact details and biography to be completed by the program administrator.', 'Mentor resident teachers during guided classroom practice.', 1, 1, 'draft'),
+  ('[Mentor Name - De La Salle]', 'De La Salle', NULL, NULL, NULL, 'Program mentor for resident teachers at De La Salle. Contact details and biography to be completed by the program administrator.', 'Mentor resident teachers during guided classroom practice.', 2, 1, 'draft'),
+  ('[Mentor Name - SAVE]', 'SAVE', NULL, NULL, NULL, 'Program mentor for resident teachers at SAVE. Contact details and biography to be completed by the program administrator.', 'Mentor resident teachers during guided classroom practice.', 1, 1, 'draft'),
+  ('[Mentor Name - SAVE]', 'SAVE', NULL, NULL, NULL, 'Program mentor for resident teachers at SAVE. Contact details and biography to be completed by the program administrator.', 'Mentor resident teachers during guided classroom practice.', 2, 1, 'draft');
+
+-- ============================================================
 -- Social Media Integration tables
 -- ============================================================
 CREATE TABLE IF NOT EXISTS `social_accounts` (

@@ -19,6 +19,7 @@ const ImpactPage = lazy(() => import("./pages/ImpactPage"));
 const NewsPage = lazy(() => import("./pages/NewsPage"));
 const PartnersPage = lazy(() => import("./pages/PartnersPage"));
 const Portal = lazy(() => import("./pages/Portal"));
+const ProgramTeamPage = lazy(() => import("./pages/ProgramTeamPage"));
 const ResourcesPage = lazy(() => import("./pages/ResourcesPage"));
 const SchoolsPage = lazy(() => import("./pages/SchoolsPage"));
 
@@ -33,6 +34,7 @@ const pageTitles: Record<string, string> = {
   "/resources": "Resources",
   "/partners": "Partners",
   "/contact": "Join & Contact",
+  "/team": "Program Team",
   "/portal": "Portal Login",
   "/admin": "Administrator Workspace",
   "/404": "Page Not Found",
@@ -93,6 +95,7 @@ function Router({ language }: { language: Language }) {
       <Route path="/resources"><ResourcesPage /></Route>
       <Route path="/partners"><PartnersPage /></Route>
       <Route path="/contact"><ContactPage /></Route>
+      <Route path="/team"><ProgramTeamPage /></Route>
       <Route path="/activities"><Redirect to="/news" /></Route>
       <Route path="/practices"><Redirect to="/resources" /></Route>
       <Route path="/portal"><Portal language={language} /></Route>

@@ -30,6 +30,7 @@ import {
 } from "@/data/ptrp";
 import { StatCard } from "@/components/ptrp/ContentCards";
 import { SectionHeading } from "@/components/ptrp/SectionHeading";
+import { queryKeys, useApiQuery } from "@/lib/api";
 
 type HomeProps = { language: Language };
 
@@ -40,21 +41,54 @@ export default function Home({ language }: HomeProps) {
   const [slide, setSlide] = useState(0);
   const [paused, setPaused] = useState(false);
   const heroImages = galleryPhotos.slice(0, 8);
+  const { data: managedBanner } = useApiQuery<{
+    title: string;
+    description: string;
+    eyebrow: string;
+    imageUrl: string;
+    imageAlt: string;
+    imagePosition: string;
+    isVisible: boolean | number;
+  } | null>(queryKeys.publicPageBanner("home"), "banners/home");
+  const managedImageVisible = Boolean(managedBanner && Number(managedBanner.isVisible));
+  const slides = managedBanner
+    ? managedImageVisible && managedBanner.imageUrl ? [{ src: managedBanner.imageUrl, alt: managedBanner.imageAlt }] : []
+    : heroImages;
+  const activeSlide = slides.length ? slides[managedBanner ? 0 : slide] : undefined;
+  const heroImageUrl = (src: string) => {
+    if (/^https?:\/\//i.test(src) || src.startsWith(import.meta.env.BASE_URL)) return src;
+    return `${import.meta.env.BASE_URL}${src.replace(/^\/+/, "")}`;
+  };
   useEffect(() => {
-    if (paused || heroImages.length < 2) return;
+    if (managedBanner || paused || heroImages.length < 2) return;
     const id = window.setInterval(() => setSlide((s) => (s + 1) % heroImages.length), 5000);
     return () => window.clearInterval(id);
-  }, [paused, heroImages.length]);
+  }, [managedBanner, paused, heroImages.length]);
 
   return <main>
     <section className="relative isolate overflow-hidden bg-[#071935] text-white" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
-      <div className="absolute inset-0" />
-      <div className="relative mx-auto grid max-w-[1400px] gap-8 px-5 py-8 md:px-8 md:py-12 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:gap-12 lg:px-12 lg:py-16">
-        <div className="order-2 lg:order-1">
+      {activeSlide && (
+        <div className="absolute inset-0 -z-10" aria-hidden="true">
+          {slides.map((photo, index) => (
+            <img
+              key={photo.src}
+              src={heroImageUrl(photo.src)}
+              alt=""
+              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ${index === (managedBanner ? 0 : slide) ? "opacity-100" : "opacity-0"}`}
+              style={{ objectPosition: managedBanner?.imagePosition || "center" }}
+              loading={index === 0 ? "eager" : "lazy"}
+            />
+          ))}
+        </div>
+      )}
+      <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#071935]/95 via-[#071935]/70 to-[#071935]/25" />
+      <div className="absolute inset-0 -z-10 bg-gradient-to-t from-[#071935]/80 via-transparent to-[#071935]/20" />
+      <div className="relative mx-auto flex min-h-[510px] max-w-[1400px] flex-col justify-center px-5 py-16 sm:min-h-[560px] md:px-8 md:py-20 lg:min-h-[620px] lg:px-12">
+        <div className="max-w-3xl">
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="flex flex-wrap items-center gap-3">
             <span className="inline-flex items-center gap-2 border border-[#38bdf8]/40 bg-[#0098d9]/15 px-3 py-1.5 text-[0.66rem] font-extrabold uppercase tracking-[0.16em] text-[#7dd3fc]">
               <span className="h-1.5 w-1.5 bg-[#38bdf8]" />
-              {t.hero.eyebrow}
+              {managedBanner?.eyebrow || t.hero.eyebrow}
             </span>
             <span className="text-[0.66rem] font-bold uppercase tracking-[0.14em] text-white/45">Official community of PTRP</span>
           </motion.div>
@@ -62,10 +96,10 @@ export default function Home({ language }: HomeProps) {
             {brand.name}
           </motion.p>
           <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.7 }} className="mt-3 max-w-3xl text-[2.6rem] font-extrabold leading-[1.02] tracking-[-0.045em] sm:text-[3.4rem] lg:text-[4.4rem]">
-            {t.hero.title}
+            {managedBanner?.title || t.hero.title}
           </motion.h1>
           <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.7 }} className="mt-6 max-w-2xl text-[1rem] leading-[1.8] text-white/72">
-            {t.hero.body}
+            {managedBanner?.description || t.hero.body}
           </motion.p>
           <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.7 }} className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link href="/contact" className="button-primary">{t.hero.primary}<ArrowUpRight className="size-4" /></Link>
@@ -75,28 +109,16 @@ export default function Home({ language }: HomeProps) {
             {t.hero.note}
           </motion.p>
         </div>
-        <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2, duration: 0.8 }} className="order-1 lg:order-2">
-          <div className="relative overflow-hidden border border-white/15 bg-[#0b2347]/60 shadow-2xl backdrop-blur-sm">
-            <div className="relative aspect-[4/3] w-full overflow-hidden bg-[#071935]">
-              {heroImages.map((photo, index) => (
-                <div key={photo.src} className={`absolute inset-0 transition-opacity duration-[1200ms] ease-out ${index === slide ? "opacity-100" : "opacity-0"}`}>
-                  <img src={`${import.meta.env.BASE_URL}${photo.src.startsWith("/") ? photo.src.slice(1) : photo.src}`} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-110 object-cover blur-2xl opacity-40" loading="lazy" />
-                  <img src={`${import.meta.env.BASE_URL}${photo.src.startsWith("/") ? photo.src.slice(1) : photo.src}`} alt="PTRP community moment" className="relative h-full w-full object-contain" loading={index === 0 ? "eager" : "lazy"} />
-                </div>
-              ))}
-            </div>
-            <div className="flex items-center justify-between gap-3 border-t border-white/10 bg-[#0b2347]/80 px-4 py-3">
-              <span className="text-[0.62rem] font-bold uppercase tracking-[0.12em] text-white/55">PTRP moments · {slide + 1} / {heroImages.length}</span>
-              <div className="flex items-center gap-2">
-                <button type="button" onClick={() => setSlide((s) => (s - 1 + heroImages.length) % heroImages.length)} aria-label="Previous slide" className="flex size-7 items-center justify-center border border-white/20 text-white/70 transition hover:border-[#38bdf8] hover:text-white">‹</button>
-                {heroImages.map((_, index) => (
-                  <button key={index} type="button" onClick={() => setSlide(index)} aria-label={`Show slide ${index + 1}`} className={`h-1.5 transition-all ${index === slide ? "w-6 bg-[#38bdf8]" : "w-1.5 bg-white/30 hover:bg-white/60"}`} />
-                ))}
-                <button type="button" onClick={() => setSlide((s) => (s + 1) % heroImages.length)} aria-label="Next slide" className="flex size-7 items-center justify-center border border-white/20 text-white/70 transition hover:border-[#38bdf8] hover:text-white">›</button>
-              </div>
-            </div>
+        {!managedBanner && slides.length > 1 && (
+          <div className="absolute bottom-5 right-5 flex items-center gap-2 rounded-full border border-white/20 bg-[#071935]/55 px-3 py-2 backdrop-blur-md md:bottom-8 md:right-8 lg:right-12">
+            <span className="mr-1 hidden text-[0.58rem] font-bold uppercase tracking-[0.1em] text-white/65 sm:inline">PTRP moments · {slide + 1}/{slides.length}</span>
+            <button type="button" onClick={() => setSlide((s) => (s - 1 + slides.length) % slides.length)} aria-label="Previous slide" className="flex size-7 items-center justify-center rounded-full border border-white/25 text-white/80 transition hover:border-[#38bdf8] hover:text-white">‹</button>
+            {slides.map((_, index) => (
+              <button key={index} type="button" onClick={() => setSlide(index)} aria-label={`Show slide ${index + 1}`} aria-pressed={index === slide} className={`h-1.5 rounded-full transition-all ${index === slide ? "w-6 bg-[#38bdf8]" : "w-1.5 bg-white/45 hover:bg-white/80"}`} />
+            ))}
+            <button type="button" onClick={() => setSlide((s) => (s + 1) % slides.length)} aria-label="Next slide" className="flex size-7 items-center justify-center rounded-full border border-white/25 text-white/80 transition hover:border-[#38bdf8] hover:text-white">›</button>
           </div>
-        </motion.div>
+        )}
       </div>
       <div className="relative mx-auto max-w-[1400px] px-5 pb-2 md:px-8 lg:px-12">
         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.3, duration: 0.7 }} className="mt-2 border border-white/15 bg-[#0b2347]/70 p-6 shadow-2xl backdrop-blur-md sm:p-8">

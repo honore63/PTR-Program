@@ -72,6 +72,23 @@ CREATE TABLE IF NOT EXISTS `navigationItems` (
   CONSTRAINT `navigationItems_updatedBy_fk` FOREIGN KEY (`updatedBy`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `pageBanners` (
+  `slug` varchar(80) NOT NULL,
+  `eyebrow` varchar(120) NOT NULL DEFAULT '',
+  `title` varchar(255) NOT NULL DEFAULT '',
+  `description` text NOT NULL,
+  `imageUrl` varchar(700) NOT NULL DEFAULT '',
+  `imageAlt` varchar(255) NOT NULL DEFAULT '',
+  `imagePosition` varchar(24) NOT NULL DEFAULT 'center',
+  `isVisible` tinyint(1) NOT NULL DEFAULT 1,
+  `updatedBy` int DEFAULT NULL,
+  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`slug`),
+  KEY `pageBanners_updatedBy_idx` (`updatedBy`),
+  CONSTRAINT `pageBanners_updatedBy_fk` FOREIGN KEY (`updatedBy`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 INSERT IGNORE INTO `navigationItems` (`label`, `href`, `sortOrder`, `isVisible`, `status`) VALUES
   ('Home', '/', 1, 1, 'published'),
   ('About', '/about', 2, 1, 'published'),

@@ -12,8 +12,9 @@ export default function PartnersPage() {
       eyebrow="Partners"
       title="Together, we make teachers matter."
       description="PTRP was made possible by a partnership of government, universities, and education organizations that share one belief: investing in teachers improves learning for children."
-      icon={Handshake}
-      meta="6 partners · Government, academia, civil society"
+      image="/gallery/gallery-03.jpg"
+      imageAlt="PTRP partners - education organizations and government"
+      imageCredit="Photo: MINEDUC · PTR Alumni Network"
     >
       <Link href="#partners" className="button-primary">Meet our partners <ArrowUpRight className="size-4" /></Link>
       <Link href="#partner-with-us" className="button-ghost-light">Partner with us</Link>

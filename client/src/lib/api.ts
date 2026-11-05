@@ -25,6 +25,8 @@ export const queryKeys = {
   publicCoordinators: ["api", "coordinators"] as const,
   publicMentors: ["api", "mentors"] as const,
   publicContent: (slug: string) => ["api", "content", slug] as const,
+  publicPageBanner: (slug: string) => ["api", "banners", slug] as const,
+  adminPageBanners: ["api", "admin", "banners"] as const,
   publicSettings: ["api", "settings"] as const,
   publicNavigation: ["api", "navigation"] as const,
   adminNavigation: ["api", "admin", "navigation"] as const,

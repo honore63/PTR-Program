@@ -98,8 +98,9 @@ export default function ContactPage() {
       eyebrow="Join & Contact"
       title="Join the PTR Alumni Network."
       description="Are you a graduate of the Primary Teacher Residency Program? Join your fellow alumni to share ideas, find support, and be part of the story of improving education in Rwanda."
-      icon={UsersRound}
-      meta="Membership · Partnerships · Media"
+      image="/storage/ptrp-pilot-launch.jpg"
+      imageAlt="PTRP contact - join the alumni network"
+      imageCredit="Photo: MINEDUC · PTR Alumni Network"
     >
       <Link href="#join" className="button-primary">Start your membership <ArrowUpRight className="size-4" /></Link>
       <Link href="#contact-details" className="button-ghost-light">Contact details</Link>

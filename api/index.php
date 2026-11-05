@@ -85,6 +85,34 @@ function basePath(): string
     return '/' . trim((string) (config()['base_path'] ?? '/PTRP'), '/');
 }
 
+function cmsTextIsValid(array $record, string $key, int $maxLength, bool $required = false): bool
+{
+    if (!array_key_exists($key, $record)) return !$required;
+    $value = $record[$key];
+    return is_string($value)
+        && strlen($value) <= $maxLength
+        && (!$required || trim($value) !== '');
+}
+
+function cmsUrlIsValid(mixed $value): bool
+{
+    if (!is_string($value) || strlen($value) > 2000) return false;
+    if ($value === '') return true;
+    if (str_starts_with($value, '/') && !str_starts_with($value, '//')) return true;
+    $parts = parse_url($value);
+    return is_array($parts)
+        && in_array(strtolower((string) ($parts['scheme'] ?? '')), ['http', 'https'], true)
+        && !empty($parts['host'])
+        && !isset($parts['user'])
+        && !isset($parts['pass']);
+}
+
+function queryLimit(int $default, int $maximum): int
+{
+    $limit = filter_var($_GET['limit'] ?? $default, FILTER_VALIDATE_INT);
+    return $limit !== false && $limit > 0 ? min($limit, $maximum) : $default;
+}
+
 function jsonBody(): array
 {
     $raw = file_get_contents('php://input');
@@ -468,6 +496,11 @@ function routeRequest(): void
     if ($route === '/navigation' && $method === 'GET') {
         respond(database()->query("SELECT id, label, href, parentId, sortOrder FROM navigationItems WHERE status = 'published' AND isVisible = 1 ORDER BY sortOrder ASC, id ASC")->fetchAll());
     }
+    if (preg_match('#^/banners/([a-zA-Z0-9_-]{1,80})$#', $route, $matches) && $method === 'GET') {
+        $statement = database()->prepare('SELECT slug, eyebrow, title, description, imageUrl, imageAlt, imagePosition, isVisible FROM pageBanners WHERE slug = ? LIMIT 1');
+        $statement->execute([$matches[1]]);
+        respond($statement->fetch() ?: null);
+    }
     if ($route === '/schools' && $method === 'GET') {
         respond(database()->query("SELECT * FROM schools WHERE status = 'published' ORDER BY name ASC")->fetchAll());
     }
@@ -494,10 +527,10 @@ function routeRequest(): void
 
     // ---------- Program Coordinators & Mentors (public) ----------
     if ($route === '/coordinators' && $method === 'GET') {
-        respond(database()->query("SELECT * FROM coordinators WHERE status = 'published' AND isVisible = 1 ORDER BY displayOrder ASC, fullName ASC")->fetchAll());
+        respond(database()->query("SELECT *, 'coordinator' AS role FROM coordinators WHERE status = 'published' AND isVisible = 1 ORDER BY displayOrder ASC, fullName ASC")->fetchAll());
     }
     if ($route === '/mentors' && $method === 'GET') {
-        respond(database()->query("SELECT * FROM mentors WHERE status = 'published' AND isVisible = 1 ORDER BY displayOrder ASC, fullName ASC")->fetchAll());
+        respond(database()->query("SELECT *, 'mentor' AS role FROM mentors WHERE status = 'published' AND isVisible = 1 ORDER BY displayOrder ASC, fullName ASC")->fetchAll());
     }
 
     // =========================================================================
@@ -505,9 +538,51 @@ function routeRequest(): void
     // =========================================================================
     requireAdmin();
 
+    if ($route === '/admin/banners' && $method === 'GET') {
+        respond(database()->query('SELECT slug, eyebrow, title, description, imageUrl, imageAlt, imagePosition, isVisible, updatedAt FROM pageBanners ORDER BY slug ASC')->fetchAll());
+    }
+    if ($route === '/admin/banners' && $method === 'POST') {
+        requireSameOrigin();
+        $user = currentUser();
+        $data = jsonBody();
+        $slug = inputString($data, 'slug', 80, true);
+        $eyebrow = inputString($data, 'eyebrow', 120);
+        $title = inputString($data, 'title', 255);
+        $description = inputString($data, 'description', 1000);
+        $imageUrl = inputString($data, 'imageUrl', 700);
+        $imageAlt = inputString($data, 'imageAlt', 255);
+        $imagePosition = inputString($data, 'imagePosition', 24);
+        $isVisible = filter_var($data['isVisible'] ?? null, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        $allowedSlugs = ['home', 'about', 'network', 'impact', 'news', 'gallery', 'alumni', 'resources', 'partners', 'contact', 'team', 'residents', 'register-resident'];
+        $allowedPositions = ['center', 'center 35%', 'center 65%', 'left center', 'right center'];
+        if (!in_array($slug, $allowedSlugs, true)) throw new ApiError(400, 'Unknown public page banner.');
+        if (!in_array($imagePosition, $allowedPositions, true)) throw new ApiError(400, 'Invalid banner image position.');
+        if ($isVisible === null) throw new ApiError(400, 'Banner image visibility must be true or false.');
+        if ($imageUrl !== '' && !cmsUrlIsValid($imageUrl)) throw new ApiError(400, 'Banner image URL must be a local path or an http/https URL.');
+
+        $statement = database()->prepare(
+            'INSERT INTO pageBanners (slug, eyebrow, title, description, imageUrl, imageAlt, imagePosition, isVisible, updatedBy)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE eyebrow = VALUES(eyebrow), title = VALUES(title), description = VALUES(description),
+               imageUrl = VALUES(imageUrl), imageAlt = VALUES(imageAlt), imagePosition = VALUES(imagePosition),
+               isVisible = VALUES(isVisible), updatedBy = VALUES(updatedBy)'
+        );
+        $statement->execute([$slug, $eyebrow, $title, $description, $imageUrl, $imageAlt, $imagePosition, $isVisible ? 1 : 0, $user['id']]);
+        $fetch = database()->prepare('SELECT slug, eyebrow, title, description, imageUrl, imageAlt, imagePosition, isVisible, updatedAt FROM pageBanners WHERE slug = ?');
+        $fetch->execute([$slug]);
+        respond($fetch->fetch());
+    }
+    if (preg_match('#^/admin/banners/([a-zA-Z0-9_-]{1,80})$#', $route, $matches) && $method === 'DELETE') {
+        requireSameOrigin();
+        $allowedSlugs = ['home', 'about', 'network', 'impact', 'news', 'gallery', 'alumni', 'resources', 'partners', 'contact', 'team', 'residents', 'register-resident'];
+        if (!in_array($matches[1], $allowedSlugs, true)) throw new ApiError(400, 'Unknown public page banner.');
+        database()->prepare('DELETE FROM pageBanners WHERE slug = ?')->execute([$matches[1]]);
+        respond(['success' => true]);
+    }
+
     if ($route === '/admin/overview' && $method === 'GET') {
         $row = database()->query("SELECT
-            13 AS publicPageCount,
+            (13 + (SELECT COUNT(*) FROM siteContent WHERE status = 'published' AND slug NOT IN ('home','about','network','impact','news','gallery','alumni','resources','partners','contact','team','residents','register-resident'))) AS publicPageCount,
             ((SELECT COUNT(*) FROM siteContent) +
              (SELECT COUNT(*) FROM newsArticles) +
              (SELECT COUNT(*) FROM galleryItems) +
@@ -550,10 +625,11 @@ function routeRequest(): void
             (SELECT COUNT(*) FROM bestPractices) AS practiceCount,
             (SELECT COUNT(*) FROM teachers WHERE status = 'pending') AS pendingTeachers,
             (SELECT COUNT(*) FROM alumni WHERE status = 'pending') AS pendingAlumni,
+            (SELECT COUNT(*) FROM social_accounts WHERE status = 'connected') AS socialCount,
             ((SELECT COUNT(*) FROM teachers WHERE status = 'pending') +
              (SELECT COUNT(*) FROM alumni WHERE status = 'pending') +
              (SELECT COUNT(*) FROM resident_teachers WHERE status = 'pending') +
-             (SELECT COUNT(*) FROM social_posts WHERE status = 'pending')) AS attentionCount
+             (SELECT COUNT(*) FROM social_posts WHERE websiteStatus = 'pending')) AS attentionCount
         ")->fetch();
         respond(array_map('intval', $row));
     }
@@ -586,17 +662,50 @@ function routeRequest(): void
         $cmsPageSlugs = ['home', 'about', 'network', 'impact', 'news', 'gallery', 'alumni', 'resources', 'partners', 'contact', 'team', 'residents', 'register-resident'];
         if (in_array($slug, $cmsPageSlugs, true)) {
             $layout = json_decode($body, true);
-            if (!is_array($layout) || !isset($layout['sections']) || !is_array($layout['sections']) || count($layout['sections']) > 100) {
+            if (
+                !is_array($layout)
+                || !isset($layout['sections'])
+                || !is_array($layout['sections'])
+                || count($layout['sections']) > 100
+                || !cmsTextIsValid($layout, 'eyebrow', 120)
+                || !cmsTextIsValid($layout, 'heroImageAlt', 255)
+                || !cmsTextIsValid($layout, 'heroImage', 2000)
+                || !cmsUrlIsValid($layout['heroImage'] ?? '')
+            ) {
                 throw new ApiError(400, 'Page content must be a JSON layout with a sections array.');
             }
             foreach ($layout['sections'] as $section) {
                 if (!is_array($section) || !in_array($section['type'] ?? '', ['text', 'image', 'cards', 'callout'], true)) {
                     throw new ApiError(400, 'Page content contains an unsupported section type.');
                 }
-                foreach (['imageUrl', 'buttonHref'] as $urlField) {
-                    $url = $section[$urlField] ?? '';
-                    if ($url !== '' && (!is_string($url) || (!str_starts_with($url, '/') && !preg_match('#^https?://#i', $url)))) {
-                        throw new ApiError(400, 'Page image and button links must use a local path or http/https URL.');
+                if (
+                    !cmsTextIsValid($section, 'title', 255)
+                    || !cmsTextIsValid($section, 'body', 20000)
+                    || !cmsTextIsValid($section, 'imageAlt', 255)
+                    || !cmsTextIsValid($section, 'buttonLabel', 120)
+                    || !cmsTextIsValid($section, 'imageUrl', 2000)
+                    || !cmsTextIsValid($section, 'buttonHref', 2000)
+                    || !cmsUrlIsValid($section['imageUrl'] ?? '')
+                    || !cmsUrlIsValid($section['buttonHref'] ?? '')
+                ) {
+                    throw new ApiError(400, 'Page section contains invalid text or links.');
+                }
+                if (isset($section['items'])) {
+                    if (!is_array($section['items']) || count($section['items']) > 30) {
+                        throw new ApiError(400, 'Card sections may contain at most 30 items.');
+                    }
+                    foreach ($section['items'] as $item) {
+                        if (
+                            !is_array($item)
+                            || !cmsTextIsValid($item, 'title', 255, true)
+                            || !cmsTextIsValid($item, 'body', 10000)
+                            || !cmsTextIsValid($item, 'imageUrl', 2000)
+                            || !cmsTextIsValid($item, 'href', 2000)
+                            || !cmsUrlIsValid($item['imageUrl'] ?? '')
+                            || !cmsUrlIsValid($item['href'] ?? '')
+                        ) {
+                            throw new ApiError(400, 'Page content contains an invalid card item.');
+                        }
                     }
                 }
             }
@@ -726,8 +835,7 @@ function routeRequest(): void
         $role = $_GET['role'] ?? null;
         $status = $_GET['status'] ?? null;
         $type = $_GET['type'] ?? null;
-        $limit = (int) (($_GET['limit'] ?? 50) > 0 ? $_GET['limit'] : 50);
-        $limit = min($limit, 200);
+        $limit = queryLimit(50, 200);
         $offset = (int) max(0, $_GET['offset'] ?? 0);
 
         $sql = "SELECT u.id, u.name, u.email, u.role, u.account_status, u.account_type, u.loginMethod, u.createdAt, u.lastSignedIn,
@@ -970,8 +1078,7 @@ function routeRequest(): void
     // ---------- Admin Activity Logs ----------
     if ($route === '/admin/activity-logs' && $method === 'GET') {
         requireAdmin();
-        $limit = (int) (($_GET['limit'] ?? 50) > 0 ? $_GET['limit'] : 50);
-        $limit = min($limit, 200);
+        $limit = queryLimit(50, 200);
         $rows = database()->query(
             "SELECT al.*, u.name AS adminName, u.email AS adminEmail
              FROM admin_activity_logs al
@@ -1248,8 +1355,7 @@ function routeRequest(): void
     // Resident Teacher Profiles - Public endpoints
     // =========================================================================
     if ($route === '/resident-teachers' && $method === 'GET') {
-        $limit = (int) (($_GET['limit'] ?? 20) > 0 ? $_GET['limit'] : 20);
-        $limit = min($limit, 100);
+        $limit = queryLimit(20, 100);
         $offset = (int) max(0, $_GET['offset'] ?? 0);
         $search = $_GET['search'] ?? null;
         $school = $_GET['school'] ?? null;
@@ -1298,8 +1404,7 @@ function routeRequest(): void
     }
 
     if ($route === '/resident-best-practices' && $method === 'GET') {
-        $limit = (int) (($_GET['limit'] ?? 50) > 0 ? $_GET['limit'] : 50);
-        $limit = min($limit, 200);
+        $limit = queryLimit(50, 200);
         $category = $_GET['category'] ?? null;
         $teacherId = $_GET['teacherId'] ?? null;
 
@@ -1475,9 +1580,6 @@ function routeRequest(): void
         respond($fetch->fetch());
     }
 
-    if (preg_match('#^/admin/resident-teachers/(\d+)$#', $route, $method === 'DELETE' ? '#^/admin/resident-teachers/(\d+)$#' : '#^$#')) {
-        // placeholder, real handler below
-    }
     if (preg_match('#^/admin/resident-teachers/(\d+)$#', $route, $matches) && $method === 'DELETE') {
         requireSameOrigin();
         $user = currentUser();
@@ -1497,6 +1599,15 @@ function routeRequest(): void
     }
 
     // Best Practices - Admin CRUD
+    if ($route === '/admin/resident-best-practices' && $method === 'GET') {
+        respond(database()->query(
+            "SELECT rbp.*, rt.fullName AS teacherName, rt.modelSchool
+             FROM resident_best_practices rbp
+             LEFT JOIN resident_teachers rt ON rbp.teacherId = rt.id
+             ORDER BY rbp.updatedAt DESC"
+        )->fetchAll());
+    }
+
     if ($route === '/admin/resident-best-practices' && $method === 'POST') {
         requireSameOrigin();
         $user = currentUser();
@@ -1570,8 +1681,7 @@ function routeRequest(): void
     }
 
     if ($route === '/social/posts' && $method === 'GET') {
-        $limit = (int) (($_GET['limit'] ?? 20) > 0 ? $_GET['limit'] : 20);
-        $limit = min($limit, 100);
+        $limit = queryLimit(20, 100);
         $platform = $_GET['platform'] ?? null;
         $section = $_GET['section'] ?? null;
 
@@ -1646,8 +1756,7 @@ function routeRequest(): void
     if ($route === '/admin/social/posts' && $method === 'GET') {
         $status = $_GET['status'] ?? 'pending';
         $platform = $_GET['platform'] ?? null;
-        $limit = (int) (($_GET['limit'] ?? 50) > 0 ? $_GET['limit'] : 50);
-        $limit = min($limit, 200);
+        $limit = queryLimit(50, 200);
 
         $sql = "SELECT sp.*, sa.accountName FROM social_posts sp
                 JOIN social_accounts sa ON sp.accountId = sa.id
@@ -1764,23 +1873,14 @@ function routeRequest(): void
     }
 
     if ($route === '/admin/social/sync-logs' && $method === 'GET') {
-        $limit = (int) (($_GET['limit'] ?? 50) > 0 ? $_GET['limit'] : 50);
-        $limit = min($limit, 200);
+        $limit = queryLimit(50, 200);
         $rows = database()->query(
-            "SELECT ssl.*, sa.accountName, sa.platform as accountPlatform
-             FROM social_sync_logs ssl
-             JOIN social_accounts sa ON ssl.accountId = sa.id
-             ORDER BY ssl.startedAt DESC LIMIT ?"
-        );
-        // Note: prepared statement with LIMIT needs bind
-        $statement = database()->prepare(
-            "SELECT ssl.*, sa.accountName, sa.platform as accountPlatform
-             FROM social_sync_logs ssl
-             JOIN social_accounts sa ON ssl.accountId = sa.id
-             ORDER BY ssl.startedAt DESC LIMIT ?"
-        );
-        $statement->execute([$limit]);
-        respond($statement->fetchAll());
+            "SELECT sync_log.*, sa.accountName, sa.platform as accountPlatform
+             FROM social_sync_logs sync_log
+             JOIN social_accounts sa ON sync_log.accountId = sa.id
+             ORDER BY sync_log.startedAt DESC LIMIT " . $limit
+        )->fetchAll();
+        respond($rows);
     }
 
     // =========================================================================

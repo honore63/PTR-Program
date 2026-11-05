@@ -16,7 +16,7 @@ import { SocialManager } from "./SocialManager";
 import { CmsPageRenderer, parseCmsPageLayout } from "@/components/ptrp/CmsPageRenderer";
 
 type AdminTab =
-  | "overview" | "content" | "uploads" | "users"
+  | "overview" | "content" | "banners" | "uploads" | "users"
   | "schools" | "teachers" | "alumni" | "news" | "gallery" | "practices"
   | "social" | "coordinators" | "mentors" | "resident-teachers" | "resident-best-practices"
   | "navigation" | "settings";
@@ -42,6 +42,22 @@ const cmsPageCatalog = [
   { slug: "team", label: "Program team", title: "PTRP Program Coordinators & Mentors" },
   { slug: "residents", label: "Resident teachers", title: "Resident Teachers" },
   { slug: "register-resident", label: "Resident registration", title: "Register as a Resident Teacher" },
+];
+
+const bannerCatalog = [
+  { slug: "home", label: "Homepage", imageUrl: "gallery/gallery-07.jpg" },
+  { slug: "about", label: "About", imageUrl: "gallery/gallery-01.jpg" },
+  { slug: "network", label: "Model schools", imageUrl: "gallery/gallery-07.jpg" },
+  { slug: "impact", label: "Impact", imageUrl: "gallery/gallery-05.jpg" },
+  { slug: "news", label: "News", imageUrl: "manus-storage/ptrp-residents-2.jpg" },
+  { slug: "gallery", label: "Gallery", imageUrl: "gallery/gallery-04.jpg" },
+  { slug: "alumni", label: "Alumni", imageUrl: "gallery/gallery-02.jpg" },
+  { slug: "resources", label: "Resources", imageUrl: "gallery/gallery-03.jpg" },
+  { slug: "partners", label: "Partners", imageUrl: "manus-storage/ptrp-pilot-launch.jpg" },
+  { slug: "contact", label: "Contact", imageUrl: "gallery/gallery-06.jpg" },
+  { slug: "team", label: "Program team", imageUrl: "gallery/gallery-05.jpg" },
+  { slug: "residents", label: "Resident teachers", imageUrl: "gallery/gallery-08.jpg" },
+  { slug: "register-resident", label: "Resident registration", imageUrl: "gallery/gallery-03.jpg" },
 ];
 
 const emptyCmsLayout = JSON.stringify({
@@ -155,6 +171,7 @@ export default function AdminDashboard() {
   const overview = useApiQuery<any>(queryKeys.adminOverview, "admin/overview", isAdmin);
   const recentUpdates = useApiQuery<any[]>(queryKeys.adminRecentUpdates, "admin/recent-updates", isAdmin);
   const content = useApiQuery<any[]>(queryKeys.adminContent, "admin/content", isAdmin);
+  const pageBanners = useApiQuery<any[]>(queryKeys.adminPageBanners, "admin/banners", isAdmin);
   const media = useApiQuery<any[]>(queryKeys.adminMedia, "admin/media", isAdmin);
   const users = useApiQuery<any[]>(queryKeys.adminUsers, "admin/users", isAdmin);
   const schools = useApiQuery<any[]>(queryKeys.adminSchools, "admin/schools", isAdmin);
@@ -184,6 +201,27 @@ export default function AdminDashboard() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.adminContent });
       await queryClient.invalidateQueries({ queryKey: queryKeys.adminOverview });
       await queryClient.invalidateQueries({ queryKey: queryKeys.publicContent(row.slug) });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const saveBanner = useMutation({
+    mutationFn: (input: Record<string, unknown>) => apiRequest("admin/banners", { method: "POST", body: input }),
+    onSuccess: async (_data, input) => {
+      const slug = String(input.slug);
+      toast.success("Page banner saved");
+      await invalidate(queryKeys.adminPageBanners);
+      await invalidate(queryKeys.publicPageBanner(slug));
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const deleteBanner = useMutation({
+    mutationFn: (slug: string) => apiRequest(`admin/banners/${slug}`, { method: "DELETE" }),
+    onSuccess: async (_data, slug) => {
+      toast.success("Page banner reset to its PTRP default");
+      await invalidate(queryKeys.adminPageBanners);
+      await invalidate(queryKeys.publicPageBanner(slug));
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -263,6 +301,7 @@ export default function AdminDashboard() {
   });
 
   const contentRows = useMemo(() => content.data ?? [], [content.data]);
+  const pageBannerRows = useMemo(() => pageBanners.data ?? [], [pageBanners.data]);
   const mediaRows = useMemo(() => media.data ?? [], [media.data]);
   const userRows = useMemo(() => users.data ?? [], [users.data]);
   const schoolRows = useMemo(() => schools.data ?? [], [schools.data]);
@@ -368,6 +407,7 @@ export default function AdminDashboard() {
   const navItems: { id: AdminTab; label: string; icon: any }[] = [
     { id: "overview", label: "Overview", icon: LayoutDashboard },
     { id: "content", label: "Website content", icon: FileText },
+    { id: "banners", label: "Page banners", icon: ImagePlus },
     { id: "uploads", label: "Media uploads", icon: ImagePlus },
     { id: "schools", label: "Schools", icon: School },
     { id: "teachers", label: "Resident teachers", icon: GraduationCap },
@@ -399,7 +439,7 @@ export default function AdminDashboard() {
         <header className="admin-header">
           <div>
             <p className="eyebrow text-[#168d6d]">Protected administration</p>
-            <h1>{tab === "overview" ? "Keep every public surface trustworthy." : tab === "content" ? "Edit website content" : tab === "uploads" ? "Manage media uploads" : tab === "schools" ? "Manage model schools" : tab === "teachers" ? "Manage resident teachers" : tab === "alumni" ? "Manage alumni" : tab === "news" ? "Manage news and events" : tab === "gallery" ? "Manage gallery" : tab === "practices" ? "Manage best practices" : tab === "social" ? "Social Media Integration" : tab === "coordinators" ? "Program Coordinators" : tab === "mentors" ? "Program Mentors" : tab === "resident-teachers" ? "Resident Teachers" : tab === "resident-best-practices" ? "Best Practices" : tab === "navigation" ? "Manage website navigation" : tab === "settings" ? "Website identity and contact settings" : "Access and roles"}</h1>
+            <h1>{tab === "overview" ? "Keep every public surface trustworthy." : tab === "content" ? "Edit website content" : tab === "banners" ? "Manage page image banners" : tab === "uploads" ? "Manage media uploads" : tab === "schools" ? "Manage model schools" : tab === "teachers" ? "Manage resident teachers" : tab === "alumni" ? "Manage alumni" : tab === "news" ? "Manage news and events" : tab === "gallery" ? "Manage gallery" : tab === "practices" ? "Manage best practices" : tab === "social" ? "Social Media Integration" : tab === "coordinators" ? "Program Coordinators" : tab === "mentors" ? "Program Mentors" : tab === "resident-teachers" ? "Resident Teachers" : tab === "resident-best-practices" ? "Best Practices" : tab === "navigation" ? "Manage website navigation" : tab === "settings" ? "Website identity and contact settings" : "Access and roles"}</h1>
             <p>Signed in as <strong>{user.name || user.email || "Administrator"}</strong>. Only approved administrators can change public content.</p>
           </div>
           <div className="admin-header-actions"><span className="admin-user-pill"><span className="admin-online-dot" /> Admin</span><button className="admin-icon-button" onClick={() => window.location.href = "/"} aria-label="Close admin workspace"><X className="size-4" /></button></div>
@@ -407,6 +447,7 @@ export default function AdminDashboard() {
 
         {tab === "overview" && <OverviewPanel stats={overview.data} recentUpdates={recentUpdates.data ?? []} onNavigate={setTab} onSeedHome={openEditor} />}
         {tab === "content" && <ContentManager rows={contentRows} editing={editing} form={contentForm} setForm={setContentForm} onSave={() => saveContent.mutate(contentForm)} saving={saveContent.isPending} onOpenEditor={openEditor} onCancel={() => setEditing(null)} onDelete={(row: any) => { if (window.confirm(`Delete the ${row.slug} page override? The bundled page will be shown again.`)) deleteContent.mutate({ id: row.id, slug: row.slug }); }} deleting={deleteContent.isPending} pageCatalog={cmsPageCatalog} />}
+        {tab === "banners" && <BannerManager rows={pageBannerRows} onSave={saveBanner.mutate} saving={saveBanner.isPending} onDelete={(slug: string) => { if (window.confirm("Reset this page banner to its bundled PTRP image and text?")) deleteBanner.mutate(slug); }} deleting={deleteBanner.isPending} />}
         {tab === "uploads" && <UploadManager rows={mediaRows} altText={uploadAlt} setAltText={setUploadAlt} fileRef={fileRef} onFile={uploadFile} uploading={uploadMedia.isPending} onArchive={(id: number) => updateMedia.mutate({ id, status: "archived" })} />}
         {tab === "users" && <UsersManager rows={userRows} stats={userStats.data} logs={activityLogs.data ?? []} onRole={(id: number, role: "user" | "admin") => setRole.mutate({ id, role })} onSetStatus={(id: number, status: "active" | "inactive") => setUserStatus.mutate({ id, account_status: status })} onUpdate={(id: number, data: any) => updateUser.mutate({ id, ...data })} onCreate={(data: any) => createUser.mutate(data)} onDelete={(id: number) => { if (window.confirm("Are you sure you want to remove this account?")) { deleteUser.mutate(id); } }} changing={setRole.isPending || setUserStatus.isPending || updateUser.isPending || createUser.isPending} onRefresh={() => { queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers }); queryClient.invalidateQueries({ queryKey: queryKeys.adminUserStats }); queryClient.invalidateQueries({ queryKey: queryKeys.adminActivityLogs }); }} />}
         {tab === "schools" && <SchoolsManager rows={schoolRows} onDelete={(id: number) => deleteSchool.mutate(id)} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminSchools })} />}
@@ -537,6 +578,137 @@ function ContentManager({ rows, editing, form, setForm, onSave, saving, onOpenEd
           <span>Page {Math.min(page, pageCount)} of {pageCount} · {filteredRows.length} records</span>
           <div className="flex gap-2"><button className="admin-table-action" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</button><button className="admin-table-action" disabled={page >= pageCount} onClick={() => setPage((current) => Math.min(pageCount, current + 1))}>Next</button></div>
         </div>
+      </section>
+    </div>
+  );
+}
+
+function BannerManager({ rows, onSave, onDelete, saving, deleting }: { rows: any[]; onSave: (input: Record<string, unknown>) => void; onDelete: (slug: string) => void; saving: boolean; deleting: boolean }) {
+  const [selectedSlug, setSelectedSlug] = useState(bannerCatalog[0].slug);
+  const [form, setForm] = useState(() => ({
+    eyebrow: "",
+    title: "",
+    description: "",
+    imageUrl: bannerCatalog[0].imageUrl,
+    imageAlt: "",
+    imagePosition: "center",
+    isVisible: true,
+  }));
+  const [uploading, setUploading] = useState(false);
+  const selectedPage = bannerCatalog.find((page) => page.slug === selectedSlug) ?? bannerCatalog[0];
+  const existing = rows.find((row) => row.slug === selectedSlug);
+
+  const selectPage = (slug: string) => {
+    const page = bannerCatalog.find((item) => item.slug === slug) ?? bannerCatalog[0];
+    const record = rows.find((row) => row.slug === slug);
+    setSelectedSlug(slug);
+    setForm({
+      eyebrow: record?.eyebrow ?? "",
+      title: record?.title ?? "",
+      description: record?.description ?? "",
+      imageUrl: record ? record.imageUrl : page.imageUrl,
+      imageAlt: record?.imageAlt ?? "",
+      imagePosition: record?.imagePosition ?? "center",
+      isVisible: record ? Boolean(Number(record.isVisible)) : true,
+    });
+  };
+
+  const uploadBanner = async (file: File) => {
+    if (!file.type.startsWith("image/") || file.type === "image/svg+xml") {
+      toast.error("Choose a PNG, JPEG, GIF, or WebP banner image.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Banner images are limited to 10 MB.");
+      return;
+    }
+    setUploading(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+        reader.onerror = () => reject(reader.error ?? new Error("Could not read the selected image."));
+        reader.readAsDataURL(file);
+      });
+      const uploaded = await apiRequest<{ url: string }>("admin/media/upload", {
+        method: "POST",
+        body: { filename: file.name, mimeType: file.type, size: file.size, base64, altText: form.imageAlt || `${selectedPage.label} PTRP banner` },
+      });
+      setForm((current) => ({ ...current, imageUrl: uploaded.url, isVisible: true }));
+      toast.success("Banner image uploaded. Save the banner to publish it.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Banner image upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const submit = () => {
+    if (form.imageUrl.trim() && !form.imageAlt.trim()) {
+      toast.error("Add descriptive alt text for the banner image.");
+      return;
+    }
+    onSave({ slug: selectedSlug, ...form });
+  };
+
+  const previewImage = form.imageUrl
+    ? /^https?:\/\//i.test(form.imageUrl) || form.imageUrl.startsWith(import.meta.env.BASE_URL)
+      ? form.imageUrl
+      : `${import.meta.env.BASE_URL}${form.imageUrl.replace(/^\/+/, "")}`
+    : "";
+
+  return (
+    <div className="admin-content">
+      <section className="admin-panel admin-editor">
+        <div className="admin-panel-heading">
+          <div><p className="eyebrow text-[#168d6d]">Public image headers</p><h3>Manage a page banner</h3></div>
+          <label className="text-sm font-bold text-[#264665]">Page
+            <select className="ml-2 rounded-lg border border-[#d9e5eb] bg-white px-3 py-2" value={selectedSlug} onChange={(event) => selectPage(event.target.value)}>
+              {bannerCatalog.map((page) => <option key={page.slug} value={page.slug}>{page.label}</option>)}
+            </select>
+          </label>
+        </div>
+        <p className="admin-muted">Upload a high-resolution landscape photo or use a media-library URL. Blank headline fields retain the page's original copy. Hiding the photo keeps the page title and description visible on the PTRP background.</p>
+        <div className="admin-form-grid">
+          <label>Eyebrow<input value={form.eyebrow} onChange={(event) => setForm({ ...form, eyebrow: event.target.value })} maxLength={120} placeholder="Keep the existing page label" /></label>
+          <label>Image position<select value={form.imagePosition} onChange={(event) => setForm({ ...form, imagePosition: event.target.value })}><option value="center">Center</option><option value="center 35%">Center (upper focus)</option><option value="center 65%">Center (lower focus)</option><option value="left center">Left focus</option><option value="right center">Right focus</option></select></label>
+          <label className="admin-full">Banner title<input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} maxLength={255} placeholder="Keep the existing page title" /></label>
+          <label className="admin-full">Banner description<textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} maxLength={1000} rows={3} placeholder="Keep the existing page description" /></label>
+          <label className="admin-full">Image URL<input value={form.imageUrl} onChange={(event) => setForm({ ...form, imageUrl: event.target.value })} maxLength={700} placeholder="Upload an image or paste a local/http(s) image URL" /></label>
+          <label>Image alt text<input value={form.imageAlt} onChange={(event) => setForm({ ...form, imageAlt: event.target.value })} maxLength={255} placeholder="Describe the photograph" /></label>
+          <label className="upload-drop">
+            <UploadCloud className="size-6 text-[#16a878]" />
+            <strong>{uploading ? "Uploading image…" : "Upload banner image"}</strong>
+            <small>PNG, JPEG, GIF or WebP · Up to 10 MB</small>
+            <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" disabled={uploading} onChange={(event) => event.target.files?.[0] && uploadBanner(event.target.files[0])} />
+          </label>
+          <label className="admin-full flex items-center gap-3">
+            <input type="checkbox" checked={form.isVisible} onChange={(event) => setForm({ ...form, isVisible: event.target.checked })} />
+            <span>Display the photo background on this page banner</span>
+          </label>
+        </div>
+        <div className="admin-form-actions">
+          {existing && <button className="button-secondary" disabled={deleting} onClick={() => onDelete(selectedSlug)}>Reset to default</button>}
+          <button className="button-primary" disabled={saving || uploading} onClick={submit}>{saving ? "Saving…" : "Save banner"}</button>
+        </div>
+      </section>
+      <section className="admin-panel">
+        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Live preview</p><h3>{selectedPage.label} banner</h3></div></div>
+        <div className="relative flex min-h-64 items-center overflow-hidden bg-[#071935] px-6 py-10 sm:px-10" aria-label="Banner preview">
+          {form.isVisible && previewImage && <img src={previewImage} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: form.imagePosition }} />}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#071935]/95 via-[#071935]/70 to-[#071935]/25" />
+          <div className="relative max-w-2xl text-white">
+            <p className="text-[0.62rem] font-extrabold uppercase tracking-[0.16em] text-[#7dd3fc]">PTR Alumni Network · {form.eyebrow || selectedPage.label}</p>
+            <h4 className="mt-4 text-3xl font-extrabold leading-tight tracking-[-0.04em]">{form.title || selectedPage.label}</h4>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-white/85">{form.description || "The existing page description will remain in place."}</p>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">{bannerCatalog.map((page) => {
+          const configured = rows.some((row) => row.slug === page.slug);
+          return <button key={page.slug} type="button" onClick={() => selectPage(page.slug)} className={`admin-table-action rounded-full border px-3 py-1.5 ${selectedSlug === page.slug ? "border-[#0098d9] text-[#007ab0]" : "border-[#dce8ed]"}`}>
+            {page.label}{configured ? " · managed" : ""}
+          </button>;
+        })}</div>
       </section>
     </div>
   );

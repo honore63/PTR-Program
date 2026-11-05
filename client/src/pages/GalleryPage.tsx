@@ -28,8 +28,9 @@ export default function GalleryPage() {
       eyebrow="Gallery"
       title="Our Journey in Pictures and Videos"
       description="From graduation and commissioning to the residency at both host colleges, model school practice, training, and alumni events — explore the story of PTRP and the network it created."
-      icon={Camera}
-      meta="7 albums · Approved media · Consent required"
+      image="/gallery/gallery-01.jpg"
+      imageAlt="PTRP gallery - community moments in pictures and videos"
+      imageCredit="Photo: MINEDUC · PTR Alumni Network"
     >
       <Link href="#albums" className="button-primary">Browse albums <ArrowUpRight className="size-4" /></Link>
       <Link href="/contact" className="button-ghost-light">Contribute media</Link>

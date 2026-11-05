@@ -22,8 +22,9 @@ export default function ResourcesPage() {
       eyebrow="Resources"
       title="Learn, teach, share."
       description="Practical guides, lesson planning tools, and network newsletters for PTRP alumni, mentors, and teachers. Every resource here is free to download and use in your classroom."
-      icon={BookOpen}
-      meta="8 resources · Free to download · Teacher-made"
+      image="/storage/ptrp-pilot-launch.jpg"
+      imageAlt="PTRP resources - teaching materials and guides"
+      imageCredit="Photo: MINEDUC · PTR Alumni Network"
     >
       <Link href="#library" className="button-primary">Browse the library <ArrowUpRight className="size-4" /></Link>
       <Link href="/contact" className="button-ghost-light">Share a resource</Link>

@@ -321,7 +321,9 @@ Start MySQL, then import the provided schema:
 mysql -u root -p < database/ptrp.sql
 ```
 
-Or, in phpMyAdmin, select **Import** and choose `database/ptrp.sql`. The script creates the `ptrp` database if needed, selects it, and creates the three application tables.
+Or, in phpMyAdmin, select **Import** and choose `database/ptrp.sql`. The script creates the `ptrp` database if needed and installs the application tables.
+
+For an existing XAMPP installation, back up `ptrp` first, then apply `database/migrations/20261105_website_cms.sql` in phpMyAdmin or with the MySQL CLI. This additive migration preserves existing content, adds CMS settings/navigation/page banners and the missing Admin Portal tables, and seeds the verified coordinators and 17 model-school records without duplicating matching schools.
 
 Verify:
 
@@ -331,7 +333,12 @@ SHOW TABLES;
 DESCRIBE users;
 DESCRIBE siteContent;
 DESCRIBE mediaAssets;
+DESCRIBE pageBanners;
 ```
+
+### Page image banners
+
+The shared public page-header design uses PTRP photography, responsive cover cropping, and a dark contrast overlay. Administrators can open **Admin Portal → Page banners** to choose any public page, upload or replace its image, set the crop position and alt text, adjust the banner title/description, preview it, or reset it to the bundled page default. Banner changes are stored per page in `pageBanners` and appear publicly without a frontend rebuild. The homepage retains its image carousel until an administrator explicitly saves a homepage banner.
 
 ### 4. Configure PHP
 

@@ -49,16 +49,26 @@ const pageTitles: Record<string, string> = {
 
 function PageMeta({ language }: { language: Language }) {
   const [location] = useLocation();
-  const { data: settings = {} } = useApiQuery<Record<string, string>>(queryKeys.publicSettings, "settings");
+  const { data: settingsData } = useApiQuery<Record<string, string>>(queryKeys.publicSettings, "settings");
+  const settings: Record<string, string> = settingsData ?? {};
+  const contentSlug = location === "/" ? "home" : location.replace(/^\/|\/$/g, "");
+  const { data: cmsPage } = useApiQuery<{ title: string; summary: string | null } | null>(
+    queryKeys.publicContent(contentSlug),
+    `content/${contentSlug}`,
+    !location.startsWith("/admin") && !location.startsWith("/portal") && !location.startsWith("/resident-teacher/"),
+  );
   useEffect(() => {
     const meta = sectionMeta[location];
     const pageTitle = pageTitles[location];
     const siteName = settings.siteName || brand.name;
-    const title = settings.metaTitle || (location === "/" ? `${siteName} — ${brand.subtitle}` : pageTitle ? `${pageTitle} — ${siteName}` : `${siteName} — ${brand.subtitle}`);
+    const resolvedTitle = cmsPage?.title || pageTitle;
+    const homeFallbackTitle = `${brand.name} — ${brand.subtitle}`;
+    const homeTitle = resolvedTitle && resolvedTitle !== homeFallbackTitle ? `${resolvedTitle} — ${brand.subtitle}` : homeFallbackTitle;
+    const title = settings.metaTitle || (location === "/" ? homeTitle : resolvedTitle ? `${resolvedTitle} — ${siteName}` : `${siteName} — ${brand.subtitle}`);
     const description = location === "/"
       ? "PTR Alumni Network is the official digital community for the Primary Teacher Residency Program (PTRP) in Rwanda — connecting resident teachers, alumni, mentors, and model schools."
       : meta?.description ?? "The official digital community for the Primary Teacher Residency Program (PTRP) in Rwanda.";
-    const resolvedDescription = settings.metaDescription || description;
+    const resolvedDescription = settings.metaDescription || cmsPage?.summary || description;
     document.title = title;
     document.documentElement.lang = language === "rw" ? "rw" : language;
 
@@ -88,7 +98,7 @@ function PageMeta({ language }: { language: Language }) {
       tag.setAttribute("content", content);
       document.head.appendChild(tag);
     }
-  }, [language, location, settings.metaDescription, settings.metaTitle, settings.siteName]);
+  }, [cmsPage?.summary, cmsPage?.title, language, location, settings.metaDescription, settings.metaTitle, settings.siteName]);
   return null;
 }
 
@@ -114,6 +124,7 @@ function Router({ language }: { language: Language }) {
       <Route path="/portal"><Portal language={language} /></Route>
       <Route path="/admin"><AdminDashboard /></Route>
       <Route path="/404"><NotFound language={language} /></Route>
+      <Route path="/:slug">{(params) => <CmsPageRoute slug={params.slug} fallback={<NotFound language={language} />} />}</Route>
       <Route><NotFound language={language} /></Route>
     </Switch>
   </Suspense>;
@@ -130,7 +141,8 @@ function CmsPageRoute({ slug, fallback }: { slug: string; fallback: React.ReactN
 
 function AppFrame() {
   const [location] = useLocation();
-  const { data: settings = {} } = useApiQuery<Record<string, string>>(queryKeys.publicSettings, "settings");
+  const { data: settingsData } = useApiQuery<Record<string, string> | null>(queryKeys.publicSettings, "settings");
+  const settings = settingsData ?? {};
   const [language, setLanguage] = useState<Language>(() => {
     try { return (localStorage.getItem("ptrp-language") as Language) || "en"; } catch { return "en"; }
   });
@@ -142,7 +154,7 @@ function AppFrame() {
     if (primaryColor && /^#[\da-f]{6}$/i.test(primaryColor)) document.documentElement.style.setProperty("--ptr-primary", primaryColor);
     if (accentColor && /^#[\da-f]{6}$/i.test(accentColor)) document.documentElement.style.setProperty("--ptr-accent", accentColor);
   }, [settings.accentColor, settings.primaryColor]);
-  return <><PageMeta language={language} />{!isStandaloneRoute && <SiteNav language={language} onLanguageChange={updateLanguage} settings={settings} />}<Router language={language} />{!isStandaloneRoute && <SiteFooter language={language} />}</>;
+  return <><PageMeta language={language} />{!isStandaloneRoute && <SiteNav language={language} onLanguageChange={updateLanguage} settings={settings} />}<Router language={language} />{!isStandaloneRoute && <SiteFooter language={language} settings={settings} />}</>;
 }
 
 function App() {

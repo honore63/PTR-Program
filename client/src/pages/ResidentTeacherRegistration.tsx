@@ -4,6 +4,7 @@ import {
   CheckCircle2, AlertTriangle, UsersRound, ArrowUpRight, Image as ImageIcon,
 } from "lucide-react";
 import { Link } from "wouter";
+import { PageHero } from "@/components/ptrp/PageHero";
 import { apiRequest } from "@/lib/api";
 import { toast } from "sonner";
 import { bestPracticeCategories } from "@/data/ptrp";
@@ -105,6 +106,15 @@ export default function ResidentTeacherRegistration() {
           <Link href="/" className="button-ghost-light">← Back to site</Link>
         </div>
       </header>
+
+      <PageHero
+        eyebrow="Join the Resident Teachers Directory"
+        title="Register as a Resident Teacher"
+        description="Share your professional story with the PTR Alumni Network. Your registration will be reviewed by an administrator before it appears publicly."
+        image="/gallery/gallery-03.jpg"
+        imageAlt="Resident teacher sharing professional story at a model school"
+        imageCredit="Photo: MINEDUC · PTR Alumni Network"
+      />
 
       <div className="mx-auto max-w-[1400px] px-5 md:px-8 lg:px-12 py-12 md:py-20 lg:py-24">
         <div className="grid gap-12 lg:grid-cols-[1fr_0.6fr] items-start">

@@ -58,8 +58,9 @@ export default function ProgramTeamPage() {
       eyebrow="Program Team"
       title="Meet our program coordinators and mentors."
       description="PTRP program coordinators and mentors guide resident teachers through classroom practice, mentorship, and professional growth at TTC De La Salle Byumba and SAVE."
-      icon={UsersRound}
-      meta={`2 coordinators · 4 mentors · 2 organizations`}
+      image="/manus-storage/ptrp-residents-1.jpg"
+      imageAlt="PTRP program team - coordinators and mentors"
+      imageCredit="Photo: MINEDUC · PTR Alumni Network"
     >
       <Link href="/contact" className="button-ghost-light">Contact the program <ArrowUpRight className="size-4" /></Link>
     </PageHero>

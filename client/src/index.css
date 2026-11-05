@@ -146,6 +146,18 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid 
 @keyframes hero-photo-drift { 0% { transform: scale(1.035) translate3d(0, 0, 0); } 100% { transform: scale(1.09) translate3d(-1.2%, -1%, 0); } }
 @media (prefers-reduced-motion: reduce) { .hero-image-frame { transform: none; transition: none; }.hero-image-frame:hover { transform: none; }.hero-image { animation: none; transform: none; }.hero-letter { will-change: auto; } }
 
+/* Shared, photo-led page banner system */
+.page-banner-photo .page-banner-image { filter: saturate(.9) contrast(1.04); }
+.page-banner-overlay { background: linear-gradient(90deg, rgba(7,25,53,.94) 0%, rgba(7,25,53,.76) 44%, rgba(7,25,53,.2) 100%), linear-gradient(0deg, rgba(7,25,53,.45), transparent 58%); }
+.page-banner:not(.page-banner-photo) .page-banner-overlay { background: radial-gradient(ellipse at 82% 18%, rgba(0,152,217,.24), transparent 38%), linear-gradient(110deg, #071935, #0b2347 65%, #103d64); }
+@media (max-width: 640px) {
+  .page-banner { min-height: 390px; }
+  .page-banner-overlay { background: linear-gradient(90deg, rgba(7,25,53,.87), rgba(7,25,53,.54)), linear-gradient(0deg, rgba(7,25,53,.52), transparent 70%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-banner-image { transition: none !important; }
+}
+
 /* Official social evidence */
 .social-evidence-grid { display: grid; grid-template-columns: 1.08fr .92fr; gap: 18px; }.social-video-card { overflow: hidden; border: 1px solid #dce8ed; border-radius: 24px; background: #fbfdfe; box-shadow: 0 18px 50px rgba(31,65,92,.06); }.social-video-frame { aspect-ratio: 16 / 9; background: #071935; }.social-video-frame iframe { display: block; width: 100%; height: 100%; border: 0; }.social-video-copy { padding: 25px 28px 30px; }.commissioning-card { border-radius: 24px; background: linear-gradient(145deg, #123663, #0b2347); padding: clamp(25px, 4vw, 38px); box-shadow: 0 22px 70px rgba(11,35,71,.2); }.commissioning-card h2 { max-width: 470px; }.commissioning-card a:hover { color: white; }
 @media (max-width: 800px) { .social-evidence-grid { grid-template-columns: 1fr; } }

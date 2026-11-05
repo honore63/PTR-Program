@@ -34,8 +34,9 @@ export default function AlumniPage() {
       eyebrow="Alumni Directory"
       title="Meet our alumni."
       description="The PTR Alumni Network connects graduates of the Primary Teacher Residency Program across Rwanda. This directory will grow as members complete their profiles and consent to be listed."
-      icon={UsersRound}
-      meta="100 alumni · 2 host TTCs · Profiles reviewed"
+      image="/gallery/gallery-02.jpg"
+      imageAlt="PTRP alumni directory - graduate teachers across Rwanda"
+      imageCredit="Photo: MINEDUC · PTR Alumni Network"
     >
       <Link href="#directory" className="button-primary">Browse the directory <ArrowUpRight className="size-4" /></Link>
       <Link href="/contact" className="button-ghost-light">Create your profile</Link>

@@ -99,6 +99,14 @@ export default function ResidentTeacherDetail() {
 
   return (
     <main className="min-h-screen bg-[#f6fafb]">
+      <PageHero
+        eyebrow="Resident Teachers Directory"
+        title={`${teacher.fullName} — Resident Teacher`}
+        description={teacher.bio || `${teacher.modelSchool ?? "A PTR model school"} · Resident teacher profile currently under review.`}
+        image={teacher.photoUrl || "/manus-storage/ptrp-residents-2.jpg"}
+        imageAlt={`${teacher.fullName} — PTR resident teacher profile`}
+        imageCredit="Photo: MINEDUC · PTR Alumni Network"
+      />
       <header className="border-b border-[#e2eef0] bg-white sticky top-0 z-40">
         <div className="mx-auto max-w-[1400px] px-5 md:px-8 h-[78px] flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">

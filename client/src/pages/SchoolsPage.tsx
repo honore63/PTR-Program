@@ -36,8 +36,9 @@ export default function SchoolsPage() {
       eyebrow="Model Schools"
       title="Our 17 model schools."
       description="Model schools are the primary demonstration schools where residents put what they learned into practice through guided teaching. Each school hosts teachers who learn by doing, with mentors beside them."
-      icon={School}
-      meta="17 schools · 16 districts · 2 host TTCs"
+      image="/manus-storage/ptrp-pilot-launch.jpg"
+      imageAlt="PTRP model schools - teacher residency demonstration schools"
+      imageCredit="Photo: MINEDUC · PTR Alumni Network"
     >
       <Link href="#school-map" className="button-primary">Explore the network map <ArrowUpRight className="size-4" /></Link>
       <Link href="#school-list" className="button-ghost-light">Browse all schools</Link>

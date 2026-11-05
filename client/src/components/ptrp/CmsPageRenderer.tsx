@@ -20,18 +20,72 @@ export type CmsPageLayout = {
   sections: CmsPageSection[];
 };
 
-export function parseCmsPageLayout(body: string): CmsPageLayout | null {
-  try {
-    const parsed: unknown = JSON.parse(body);
-    if (!parsed || typeof parsed !== "object" || !Array.isArray((parsed as CmsPageLayout).sections)) return null;
-    return parsed as CmsPageLayout;
-  } catch {
-    return null;
-  }
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isOptionalText(value: unknown, maxLength: number) {
+  return value === undefined || (typeof value === "string" && value.length <= maxLength);
 }
 
 function isSafeHref(href: string) {
-  return href.startsWith("/") || /^https?:\/\//i.test(href);
+  if (href.startsWith("/") && !href.startsWith("//")) return true;
+  try {
+    const url = new URL(href);
+    return (url.protocol === "http:" || url.protocol === "https:") && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}
+
+function isOptionalSafeHref(value: unknown) {
+  return value === undefined || (typeof value === "string" && value.length <= 2000 && (value === "" || isSafeHref(value)));
+}
+
+function isCmsPageLayout(value: unknown): value is CmsPageLayout {
+  if (!isRecord(value) || !Array.isArray(value.sections) || value.sections.length > 100) return false;
+  if (
+    !isOptionalText(value.eyebrow, 120)
+    || !isOptionalText(value.heroImageAlt, 255)
+    || !isOptionalText(value.heroImage, 2000)
+    || !isOptionalSafeHref(value.heroImage)
+  ) return false;
+
+  for (const section of value.sections) {
+    if (!isRecord(section) || !["text", "image", "cards", "callout"].includes(String(section.type))) return false;
+    if (
+      !isOptionalText(section.title, 255)
+      || !isOptionalText(section.body, 20000)
+      || !isOptionalText(section.imageAlt, 255)
+      || !isOptionalText(section.buttonLabel, 120)
+      || !isOptionalText(section.imageUrl, 2000)
+      || !isOptionalSafeHref(section.imageUrl)
+      || !isOptionalSafeHref(section.buttonHref)
+    ) return false;
+
+    if (section.items !== undefined) {
+      if (!Array.isArray(section.items) || section.items.length > 30) return false;
+      for (const item of section.items) {
+        if (!isRecord(item) || typeof item.title !== "string" || !item.title.trim() || item.title.length > 255) return false;
+        if (
+          !isOptionalText(item.body, 10000)
+          || !isOptionalText(item.imageUrl, 2000)
+          || !isOptionalSafeHref(item.imageUrl)
+          || !isOptionalSafeHref(item.href)
+        ) return false;
+      }
+    }
+  }
+  return true;
+}
+
+export function parseCmsPageLayout(body: string): CmsPageLayout | null {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    return isCmsPageLayout(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 function CmsLink({ href, children, className }: { href: string; children: React.ReactNode; className: string }) {

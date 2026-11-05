@@ -44,9 +44,8 @@ const socialIcons: Record<string, typeof AtSign | typeof Facebook | typeof Insta
 
 const currentYear = new Date().getFullYear();
 
-export function SiteFooter({ language }: { language: Language }) {
+export function SiteFooter({ language, settings }: { language: Language; settings: Record<string, string> }) {
   const t = copy[language];
-  const { data: settings = {} } = useApiQuery<Record<string, string>>(queryKeys.publicSettings, "settings");
   const { data: managedNavigation } = useApiQuery<Array<{ id: number; label: string; href: string; parentId: number | null }>>(queryKeys.publicNavigation, "navigation");
   const [newsletterEmail, setNewsletterEmail] = useState("");
   const [newsletterStatus, setNewsletterStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");

@@ -58,8 +58,9 @@ export default function ResidentsDirectory() {
         eyebrow="Resident Teachers Directory"
         title="Meet our resident teachers."
         description="Discover the resident teachers of the Primary Teacher Residency Program. Each profile showcases professional contributions, best practices, and classroom impact."
-        icon={UsersRound}
-        meta={`${filtered.length} teachers · ${allSchools.length - 1} schools · 10 practice areas`}
+        image="/manus-storage/ptrp-residents-2.jpg"
+        imageAlt="PTRP resident teachers directory"
+        imageCredit="Photo: MINEDUC · PTR Alumni Network"
       >
         <Link href="/register-resident" className="button-primary">Register as a Resident Teacher <ArrowUpRight className="size-4" /></Link>
       </PageHero>

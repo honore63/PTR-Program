@@ -12,7 +12,7 @@ import {
   School,
   UsersRound,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import {
   brand,
@@ -29,6 +29,8 @@ import {
   type Language,
 } from "@/data/ptrp";
 import { StatCard } from "@/components/ptrp/ContentCards";
+import { RotatingBannerHeading } from "@/components/ptrp/RotatingBannerHeading";
+import { getBannerHeadings } from "@/components/ptrp/bannerHeadings";
 import { SectionHeading } from "@/components/ptrp/SectionHeading";
 import { queryKeys, useApiQuery } from "@/lib/api";
 
@@ -55,6 +57,10 @@ export default function Home({ language }: HomeProps) {
     ? managedImageVisible && managedBanner.imageUrl ? [{ src: managedBanner.imageUrl, alt: managedBanner.imageAlt }] : []
     : heroImages;
   const activeSlide = slides.length ? slides[managedBanner ? 0 : slide] : undefined;
+  const bannerHeadings = useMemo(
+    () => getBannerHeadings("home", t.hero.title, managedBanner?.title),
+    [t.hero.title, managedBanner?.title],
+  );
   const heroImageUrl = (src: string) => {
     if (/^https?:\/\//i.test(src) || src.startsWith(import.meta.env.BASE_URL)) return src;
     return `${import.meta.env.BASE_URL}${src.replace(/^\/+/, "")}`;
@@ -81,37 +87,12 @@ export default function Home({ language }: HomeProps) {
           ))}
         </div>
       )}
-      <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#071935]/95 via-[#071935]/70 to-[#071935]/25" />
-      <div className="absolute inset-0 -z-10 bg-gradient-to-t from-[#071935]/80 via-transparent to-[#071935]/20" />
-      <div className="relative mx-auto flex min-h-[510px] max-w-[1400px] flex-col justify-center px-5 py-16 sm:min-h-[560px] md:px-8 md:py-20 lg:min-h-[620px] lg:px-12">
-        <div className="max-w-3xl">
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="flex flex-wrap items-center gap-3">
-            <span className="inline-flex items-center gap-2 border border-[#38bdf8]/40 bg-[#0098d9]/15 px-3 py-1.5 text-[0.66rem] font-extrabold uppercase tracking-[0.16em] text-[#7dd3fc]">
-              <span className="h-1.5 w-1.5 bg-[#38bdf8]" />
-              {managedBanner?.eyebrow || t.hero.eyebrow}
-            </span>
-            <span className="text-[0.66rem] font-bold uppercase tracking-[0.14em] text-white/45">Official community of PTRP</span>
-          </motion.div>
-          <motion.p initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06, duration: 0.6 }} className="mt-7 text-[0.85rem] font-extrabold uppercase tracking-[0.24em] text-white/80">
-            {brand.name}
-          </motion.p>
-          <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.7 }} className="mt-3 max-w-3xl text-[2.6rem] font-extrabold leading-[1.02] tracking-[-0.045em] sm:text-[3.4rem] lg:text-[4.4rem]">
-            {managedBanner?.title || t.hero.title}
-          </motion.h1>
-          <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.7 }} className="mt-6 max-w-2xl text-[1rem] leading-[1.8] text-white/72">
-            {managedBanner?.description || t.hero.body}
-          </motion.p>
-          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.7 }} className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Link href="/contact" className="button-primary">{t.hero.primary}<ArrowUpRight className="size-4" /></Link>
-            <a href="#story" className="button-ghost-light"><PlayCircle className="size-4" />{t.hero.secondary}</a>
-          </motion.div>
-          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.45, duration: 0.7 }} className="mt-7 text-[0.72rem] font-bold uppercase tracking-[0.16em] text-[#7dd3fc]">
-            {t.hero.note}
-          </motion.p>
-        </div>
+      <div className="absolute inset-0 -z-10 bg-gradient-to-r from-[#071935]/85 via-[#071935]/40 to-[#071935]/10" />
+      <div className="absolute inset-0 -z-10 bg-gradient-to-t from-[#071935]/50 via-transparent to-[#071935]/10" />
+      <div className="relative mx-auto flex min-h-[370px] max-w-[1400px] items-center px-5 py-14 sm:min-h-[440px] md:px-8 md:py-16 lg:min-h-[500px] lg:px-12">
+        <RotatingBannerHeading headings={bannerHeadings} className="max-w-4xl text-[2.6rem] font-extrabold leading-[1.02] tracking-[-0.045em] text-white sm:text-[3.4rem] lg:text-[4.4rem]" />
         {!managedBanner && slides.length > 1 && (
           <div className="absolute bottom-5 right-5 flex items-center gap-2 rounded-full border border-white/20 bg-[#071935]/55 px-3 py-2 backdrop-blur-md md:bottom-8 md:right-8 lg:right-12">
-            <span className="mr-1 hidden text-[0.58rem] font-bold uppercase tracking-[0.1em] text-white/65 sm:inline">PTRP moments · {slide + 1}/{slides.length}</span>
             <button type="button" onClick={() => setSlide((s) => (s - 1 + slides.length) % slides.length)} aria-label="Previous slide" className="flex size-7 items-center justify-center rounded-full border border-white/25 text-white/80 transition hover:border-[#38bdf8] hover:text-white">‹</button>
             {slides.map((_, index) => (
               <button key={index} type="button" onClick={() => setSlide(index)} aria-label={`Show slide ${index + 1}`} aria-pressed={index === slide} className={`h-1.5 rounded-full transition-all ${index === slide ? "w-6 bg-[#38bdf8]" : "w-1.5 bg-white/45 hover:bg-white/80"}`} />
@@ -120,36 +101,55 @@ export default function Home({ language }: HomeProps) {
           </div>
         )}
       </div>
-      <div className="relative mx-auto max-w-[1400px] px-5 pb-2 md:px-8 lg:px-12">
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.3, duration: 0.7 }} className="mt-2 border border-white/15 bg-[#0b2347]/70 p-6 shadow-2xl backdrop-blur-md sm:p-8">
+    </section>
+
+    <section className="bg-[#071935] text-white">
+      <div className="mx-auto grid max-w-[1400px] gap-8 px-5 py-10 md:px-8 md:py-12 lg:grid-cols-[minmax(0,1fr)_minmax(380px,0.82fr)] lg:items-center lg:gap-12 lg:px-12">
+        <div className="max-w-3xl">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="inline-flex items-center gap-2 border border-[#38bdf8]/40 bg-[#0098d9]/15 px-3 py-1.5 text-[0.66rem] font-extrabold uppercase tracking-[0.16em] text-[#7dd3fc]">
+              <span className="h-1.5 w-1.5 bg-[#38bdf8]" />
+              {managedBanner?.eyebrow || t.hero.eyebrow}
+            </span>
+            <span className="text-[0.66rem] font-bold uppercase tracking-[0.14em] text-white/55">Official community of PTRP</span>
+          </div>
+          <p className="mt-5 text-[0.85rem] font-extrabold uppercase tracking-[0.24em] text-white/80">{brand.name}</p>
+          <p className="mt-4 max-w-2xl text-base leading-7 text-white/75">{managedBanner?.description || t.hero.body}</p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <Link href="/contact" className="button-primary">{t.hero.primary}<ArrowUpRight className="size-4" /></Link>
+            <a href="#story" className="button-ghost-light"><PlayCircle className="size-4" />{t.hero.secondary}</a>
+          </div>
+          <p className="mt-5 text-[0.72rem] font-bold uppercase tracking-[0.16em] text-[#7dd3fc]">{t.hero.note}</p>
+        </div>
+        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.2, duration: 0.7 }} className="w-full border border-white/15 bg-white/[0.04] p-5 sm:p-7">
           <div className="flex items-start justify-between gap-5">
             <div>
               <p className="text-[0.62rem] font-extrabold uppercase tracking-[0.18em] text-[#38bdf8]">Program at a glance</p>
-              <p className="mt-2 text-2xl font-extrabold tracking-[-0.04em] text-white">From residency to alumni leadership</p>
+              <p className="mt-2 text-xl font-extrabold tracking-[-0.04em] text-white sm:text-2xl">From residency to alumni leadership</p>
             </div>
-            <GraduationCap className="size-9 shrink-0 text-[#38bdf8]" strokeWidth={1.4} />
+            <GraduationCap className="size-8 shrink-0 text-[#38bdf8] sm:size-9" strokeWidth={1.4} />
           </div>
-          <div className="mt-7 grid grid-cols-2 gap-px overflow-hidden border border-white/10 bg-white/10 sm:grid-cols-4">
+          <div className="mt-5 grid grid-cols-2 gap-px overflow-hidden border border-white/10 bg-white/10">
             {[
               { value: "100", label: "Teacher Residents" },
               { value: "12", label: "Months of residency" },
               { value: "17", label: "Model schools" },
               { value: "2", label: "Host TTCs" },
-            ].map((item) => <div key={item.label} className="bg-[#0b2347] p-4 sm:p-5"><p className="text-3xl font-extrabold tracking-[-0.06em] text-white">{item.value}</p><p className="mt-1 text-[0.64rem] font-bold uppercase tracking-[0.08em] text-white/45">{item.label}</p></div>)}
+            ].map((item) => <div key={item.label} className="bg-[#0b2347] p-4"><p className="text-3xl font-extrabold tracking-[-0.06em] text-white">{item.value}</p><p className="mt-1 text-[0.64rem] font-bold uppercase tracking-[0.08em] text-white/55">{item.label}</p></div>)}
           </div>
-          <div className="mt-6 flex items-start gap-3 border-t border-white/10 pt-5">
+          <div className="mt-5 flex items-start gap-3 border-t border-white/10 pt-4">
             <Quote className="mt-0.5 size-4 shrink-0 text-[#38bdf8]" />
-            <p className="text-[0.82rem] leading-6 text-white/65">{homeContent.quote}</p>
+            <p className="text-[0.82rem] leading-6 text-white/75">{homeContent.quote}</p>
           </div>
-          <a href={officialPilot.sourceUrl} target="_blank" rel="noreferrer" className="mt-6 inline-flex items-center gap-2 text-[0.66rem] font-bold uppercase tracking-[0.12em] text-[#38bdf8] hover:text-white">
+          <a href={officialPilot.sourceUrl} target="_blank" rel="noreferrer" className="mt-5 inline-flex items-center gap-2 text-[0.66rem] font-bold uppercase tracking-[0.12em] text-[#38bdf8] hover:text-white">
             {officialPilot.imageCredit ?? "Official source"} · Read the launch record <ArrowUpRight className="size-3.5" />
           </a>
         </motion.div>
       </div>
-      <div className="relative border-t border-white/10 bg-black/15">
-        <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-4 px-5 py-4 text-[0.61rem] font-bold uppercase tracking-[0.14em] text-white/45 md:px-8 lg:px-12">
+      <div className="border-t border-white/10 bg-black/15">
+        <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-4 px-5 py-4 text-[0.61rem] font-bold uppercase tracking-[0.14em] text-white/55 md:px-8 lg:px-12">
           <span>Primary Teacher Residency Program · Rwanda</span>
-          <a href="#who-we-are" className="inline-flex items-center gap-2 text-white/70 hover:text-white">Discover the network <ArrowDown className="size-3.5" /></a>
+          <a href="#who-we-are" className="inline-flex items-center gap-2 text-white/75 hover:text-white">Discover the network <ArrowDown className="size-3.5" /></a>
         </div>
       </div>
     </section>
@@ -173,7 +173,7 @@ export default function Home({ language }: HomeProps) {
           </div>
           <div className="relative">
             <div className="overflow-hidden border border-[#dce8ed] bg-[#eef7fa] shadow-[0_24px_70px_rgba(11,35,71,0.12)]">
-              <img src={officialPilot.image} alt="Teacher residents and education leaders at the PTRP pilot launch" className="aspect-[4/3] w-full object-contain" loading="lazy" />
+              <img src={heroImageUrl(officialPilot.image)} alt="Teacher residents and education leaders at the PTRP pilot launch" className="aspect-[4/3] w-full object-contain" loading="lazy" />
               <div className="flex flex-col gap-2 border-t border-[#dce8ed] bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-[0.7rem] font-extrabold uppercase tracking-[0.1em] text-[#0b2347]">Pilot launch · Kigali, 4 October 2023</p>
                 <a href={officialPilot.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[0.66rem] font-bold uppercase tracking-[0.08em] text-[#0098d9] hover:text-[#007ab0]">MINEDUC source <ArrowUpRight className="size-3.5" /></a>

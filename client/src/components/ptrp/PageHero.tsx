@@ -1,8 +1,10 @@
-import { motion } from "framer-motion";
+import { useMemo } from "react";
 import { GraduationCap } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useLocation } from "wouter";
 import { queryKeys, useApiQuery } from "@/lib/api";
+import { RotatingBannerHeading } from "./RotatingBannerHeading";
+import { getBannerHeadings } from "./bannerHeadings";
 
 type PageHeroProps = {
   eyebrow: string;
@@ -61,45 +63,46 @@ export function PageHero({ eyebrow, title, description, meta, icon: Icon = Gradu
     ? banner.imageUrl
     : image || defaultBannerImages[slug] || "";
   const showImage = Boolean(bannerImage) && (banner ? Boolean(Number(banner.isVisible)) : true);
+  const headings = useMemo(
+    () => getBannerHeadings(slug, title, banner?.title),
+    [slug, title, banner?.title],
+  );
 
   return (
-    <section className={`page-banner relative isolate flex min-h-[390px] items-center overflow-hidden bg-[#071935] text-white sm:min-h-[430px] lg:min-h-[470px] ${showImage ? "page-banner-photo" : ""}`}>
-      {showImage && (
-        <img
-          src={publicImageUrl(bannerImage)}
-          alt={banner?.imageAlt || imageAlt}
-          className="page-banner-image absolute inset-0 -z-10 h-full w-full object-cover"
-          style={{ objectPosition: banner?.imagePosition || "center" }}
-          fetchPriority="high"
-        />
-      )}
-      <div className="page-banner-overlay absolute inset-0 -z-10" />
-      <div className="relative mx-auto flex w-full max-w-[1400px] items-center px-5 py-14 sm:py-16 md:px-8 md:py-20 lg:px-12 lg:py-24">
-        <div className="max-w-3xl">
-          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }} className="eyebrow text-[#7dd3fc]">
-            <span className="eyebrow-dot bg-[#38bdf8]" />
+    <>
+      <section className={`page-banner relative isolate flex min-h-[300px] items-center overflow-hidden bg-[#071935] text-white sm:min-h-[360px] lg:min-h-[410px] ${showImage ? "page-banner-photo" : ""}`}>
+        {showImage && (
+          <img
+            src={publicImageUrl(bannerImage)}
+            alt={banner?.imageAlt || imageAlt}
+            className="page-banner-image absolute inset-0 -z-10 h-full w-full object-cover"
+            style={{ objectPosition: banner?.imagePosition || "center" }}
+            fetchPriority="high"
+          />
+        )}
+        <div className="page-banner-overlay absolute inset-0 -z-10" />
+        <div className="relative mx-auto flex w-full max-w-[1400px] items-center px-5 py-14 sm:py-16 md:px-8 lg:px-12">
+          <RotatingBannerHeading headings={headings} className="max-w-4xl text-[2.4rem] font-extrabold leading-[1.04] tracking-[-0.04em] sm:text-[3.2rem] md:text-[3.7rem] lg:text-[4.3rem]" />
+        </div>
+      </section>
+      <section className="page-banner-copy bg-[#f6fafb]">
+        <div className="mx-auto max-w-[1400px] px-5 py-8 md:px-8 md:py-10 lg:px-12">
+          <p className="eyebrow text-[#168d6d]">
+            <span className="eyebrow-dot bg-[#16a878]" />
             PTR Alumni Network · {banner?.eyebrow || eyebrow}
-          </motion.p>
-          <motion.h1 initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06, duration: 0.55 }} className="mt-5 max-w-3xl text-[2.4rem] font-extrabold leading-[1.04] tracking-[-0.04em] sm:text-[3.2rem] md:text-[3.7rem] lg:text-[4.3rem]">
-            {banner?.title || title}
-          </motion.h1>
-          <motion.p initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12, duration: 0.55 }} className="mt-5 max-w-2xl text-sm leading-7 text-white/85 sm:text-base sm:leading-8">
+          </p>
+          <p className="mt-3 max-w-4xl text-sm leading-7 text-[#42566b] sm:text-base sm:leading-8">
             {banner?.description || description}
-          </motion.p>
-          {children && <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18, duration: 0.55 }} className="mt-7 flex flex-wrap gap-3">{children}</motion.div>}
-          {meta && (
-            <div className="mt-7 flex items-center gap-2 text-[0.66rem] font-extrabold uppercase tracking-[0.14em] text-white/70">
-              <Icon className="size-4 text-[#7dd3fc]" strokeWidth={1.7} />
-              <span>{meta}</span>
+          </p>
+          {children && <div className="mt-5 flex flex-wrap gap-3">{children}</div>}
+          {(meta || (showImage && imageCredit)) && (
+            <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-[0.66rem] font-extrabold uppercase tracking-[0.12em] text-[#62768a]">
+              {meta && <span className="inline-flex items-center gap-2"><Icon className="size-4 text-[#0098d9]" strokeWidth={1.7} />{meta}</span>}
+              {showImage && imageCredit && <span>{imageCredit}</span>}
             </div>
           )}
         </div>
-      </div>
-      {showImage && imageCredit && (
-        <span className="absolute bottom-3 right-5 rounded-full border border-white/15 bg-[#071935]/50 px-3 py-1.5 text-[0.58rem] font-bold uppercase tracking-[0.1em] text-white/70 backdrop-blur-sm md:right-8 lg:right-12">
-          {imageCredit}
-        </span>
-      )}
-    </section>
+      </section>
+    </>
   );
 }

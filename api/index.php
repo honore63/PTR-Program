@@ -331,20 +331,22 @@ function routeRequest(): void
         respond(currentUser(false));
     }
 
-    // Login with Email & Password
+    // Login with Username & Password
     if ($route === '/auth/login' && $method === 'POST') {
         requireSameOrigin();
         $data = jsonBody();
-        $email = strtolower((string) inputString($data, 'email', 320, true));
+        $username = strtolower((string) inputString($data, 'username', 320, true));
         $password = (string) ($data['password'] ?? '');
         if ($password === '') throw new ApiError(400, 'Password is required.');
 
+        // The username is matched against the email column (existing accounts store
+        // their username/identifier in the email column). No email format is required.
         $stmt = database()->prepare('SELECT * FROM users WHERE LOWER(email) = ? LIMIT 1');
-        $stmt->execute([$email]);
+        $stmt->execute([$username]);
         $user = $stmt->fetch();
 
         if (!$user || empty($user['passwordHash']) || !password_verify($password, $user['passwordHash'])) {
-            throw new ApiError(401, 'Invalid email or password.');
+            throw new ApiError(401, 'Invalid username or password.');
         }
 
         // Update lastSignedIn

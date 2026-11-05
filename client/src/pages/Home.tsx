@@ -49,7 +49,7 @@ export default function Home({ language }: HomeProps) {
   return <main>
     <section className="relative isolate overflow-hidden bg-[#071935] text-white" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
       <div className="absolute inset-0" />
-      <div className="relative mx-auto grid max-w-[1400px] gap-8 px-5 py-12 md:px-8 md:py-16 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:gap-12 lg:px-12 lg:py-20">
+      <div className="relative mx-auto grid max-w-[1400px] gap-8 px-5 py-8 md:px-8 md:py-12 lg:grid-cols-[1.05fr_1fr] lg:items-center lg:gap-12 lg:px-12 lg:py-16">
         <div className="order-2 lg:order-1">
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="flex flex-wrap items-center gap-3">
             <span className="inline-flex items-center gap-2 border border-[#38bdf8]/40 bg-[#0098d9]/15 px-3 py-1.5 text-[0.66rem] font-extrabold uppercase tracking-[0.16em] text-[#7dd3fc]">

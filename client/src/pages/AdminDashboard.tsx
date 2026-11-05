@@ -26,7 +26,7 @@ const starterPages = [
 
 function AdminLoginForm() {
   const { login } = useAuth();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -34,13 +34,13 @@ function AdminLoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!email || !password) {
-      setError("Please enter your administrator email and password.");
+    if (!username || !password) {
+      setError("Please enter your administrator username and password.");
       return;
     }
     setLoading(true);
     try {
-      const u = await login({ email, password });
+      const u = await login({ username, password });
       if (u.role !== "admin") {
         setError("Your account is authenticated, but does not have administrator privileges.");
       } else {
@@ -69,14 +69,14 @@ function AdminLoginForm() {
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.9rem", textAlign: "left" }}>
           <div>
             <label style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#4b5563", display: "block", marginBottom: "0.3rem" }}>
-              Administrator Email
+              Username
             </label>
             <input
-              type="email"
+              type="text"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@school.rw"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Residents teachers"
               style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.9rem", color: "#111" }}
             />
           </div>

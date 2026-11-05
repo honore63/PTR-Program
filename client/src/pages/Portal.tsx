@@ -14,7 +14,7 @@ export default function Portal({ language }: PortalProps) {
   const { user, loading: authLoading, login, register, forgotPassword, resetPassword, logout } = useAuth();
 
   const [mode, setMode] = useState<AuthMode>("login");
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -27,13 +27,13 @@ export default function Portal({ language }: PortalProps) {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
-    if (!email || !password) {
-      setErrorMsg("Please enter both email address and password.");
+    if (!username || !password) {
+      setErrorMsg("Please enter both username and password.");
       return;
     }
     setSubmitting(true);
     try {
-      const loggedUser = await login({ email, password });
+      const loggedUser = await login({ username, password });
       toast.success("Signed in successfully!");
       if (loggedUser.role === "admin") {
         setLocation("/admin");
@@ -50,7 +50,7 @@ export default function Portal({ language }: PortalProps) {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
-    if (!name.trim() || !email.trim() || !password) {
+    if (!name.trim() || !username.trim() || !password) {
       setErrorMsg("Please fill in all required fields.");
       return;
     }
@@ -64,7 +64,7 @@ export default function Portal({ language }: PortalProps) {
     }
     setSubmitting(true);
     try {
-      const newUser = await register({ name: name.trim(), email: email.trim(), password });
+      const newUser = await register({ name: name.trim(), email: username.trim(), password });
       toast.success("Account registered successfully!");
       if (newUser.role === "admin") {
         setLocation("/admin");
@@ -81,13 +81,13 @@ export default function Portal({ language }: PortalProps) {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
-    if (!email.trim()) {
-      setErrorMsg("Please enter your registered email address.");
+    if (!username.trim()) {
+      setErrorMsg("Please enter your username.");
       return;
     }
     setSubmitting(true);
     try {
-      const res = await forgotPassword(email.trim());
+      const res = await forgotPassword(username.trim());
       setSuccessMsg(res.message || "Password reset instructions generated.");
       toast.success("Reset request submitted.");
       if (res.resetToken) {
@@ -307,7 +307,7 @@ export default function Portal({ language }: PortalProps) {
                   {mode === "reset" && "Set a new password"}
                 </h2>
                 <p className="text-xs text-[#6b7280] mb-6">
-                  {mode === "login" && "Enter your email address and password to access the network."}
+                  {mode === "login" && "Enter your username and password to access the network."}
                   {mode === "register" && "Register your profile with your educational email address."}
                   {mode === "forgot" && "Email-based password recovery is not available yet. Contact a network administrator for help."}
                   {mode === "reset" && "Enter your reset verification token and choose a new password."}
@@ -346,13 +346,13 @@ export default function Portal({ language }: PortalProps) {
                   {mode === "login" && (
                     <form onSubmit={handleLogin} className="space-y-5">
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold uppercase tracking-wide text-[#4b5563]">Email address</label>
+                        <label className="text-xs font-bold uppercase tracking-wide text-[#4b5563]">Username</label>
                         <input
-                          type="email"
+                          type="text"
                           required
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder="name@school.rw"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          placeholder="Residents teachers"
                           className="px-4 py-2.5 border border-[#d1d5db] rounded-lg text-sm text-[#111] focus:ring-2 focus:ring-[#0098d9] focus:border-transparent outline-none transition-all"
                         />
                       </div>
@@ -409,8 +409,8 @@ export default function Portal({ language }: PortalProps) {
                         <input
                           type="email"
                           required
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
                           placeholder="name@school.rw"
                           className="px-4 py-2.5 border border-[#d1d5db] rounded-lg text-sm text-[#111] focus:ring-2 focus:ring-[#0098d9] focus:border-transparent outline-none transition-all"
                         />
@@ -458,8 +458,8 @@ export default function Portal({ language }: PortalProps) {
                         <input
                           type="email"
                           required
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
                           placeholder="name@school.rw"
                           className="px-4 py-2.5 border border-[#d1d5db] rounded-lg text-sm text-[#111] focus:ring-2 focus:ring-[#0098d9] focus:border-transparent outline-none transition-all"
                         />

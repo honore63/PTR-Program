@@ -16,14 +16,14 @@ type PageHeroProps = {
 
 export function PageHero({ eyebrow, title, description, meta, icon: Icon = GraduationCap, image, imageAlt = "", imageCredit, children }: PageHeroProps) {
   return (
-    <section className="relative overflow-hidden bg-[#0b2347] pt-[78px] text-white">
+    <section className="relative overflow-hidden bg-[#0b2347] pt-12 text-white">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full border border-white/10" />
         <div className="absolute -bottom-40 left-1/3 h-96 w-96 rounded-full border border-white/10" />
         <div className="absolute right-0 top-0 h-full w-1/2 bg-gradient-to-l from-[#0098d9]/20 to-transparent" />
         <div className="absolute inset-0 opacity-[0.08]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,.7) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.7) 1px, transparent 1px)", backgroundSize: "44px 44px" }} />
       </div>
-      <div className="relative mx-auto grid max-w-[1400px] gap-10 px-5 py-16 md:px-8 md:py-20 lg:grid-cols-[1.15fr_0.85fr] lg:items-end lg:gap-16 lg:px-12 lg:py-24">
+      <div className="relative mx-auto grid max-w-[1400px] gap-8 px-5 py-12 md:px-8 md:py-14 lg:grid-cols-[1.15fr_0.85fr] lg:items-end lg:gap-12 lg:px-12 lg:py-16">
         <div className="max-w-3xl">
           <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="eyebrow text-[#38bdf8]">
             <span className="eyebrow-dot bg-[#38bdf8]" />

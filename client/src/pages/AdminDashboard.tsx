@@ -6,17 +6,21 @@ import {
   Archive, BarChart3, BookOpen, Building2, CheckCircle2, FileText, GraduationCap,
   ImagePlus, LayoutDashboard, Loader2, LogOut, Pencil, Plus, School, ShieldCheck,
   Trash2, UploadCloud, UserCog, UsersRound, X, KeyRound, AlertCircle,
+  RefreshCw,
+  Smartphone,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
+import { SocialManager } from "./SocialManager";
 
 type AdminTab =
   | "overview" | "content" | "uploads" | "users"
-  | "schools" | "teachers" | "alumni" | "news" | "gallery" | "practices";
+  | "schools" | "teachers" | "alumni" | "news" | "gallery" | "practices"
+  | "social";
 
 const starterPages = [
-  { slug: "home", title: "PTR Alumni Network home", summary: "Hero, program snapshot, and homepage narrative", body: "Keep this record for the public homepage. Replace demo copy only after official review." },
-  { slug: "about", title: "About PTR Alumni Network", summary: "Program background, mission, values, and approach", body: "Add the verified program background, mission, objectives, roles, and implementation approach here." },
-  { slug: "network", title: "Our Network", summary: "Resident teachers and model schools", body: "Add approved network details, school profiles, and verified locations here." },
+  { slug: "home", title: "PTR Alumni Network home", summary: "Hero, program snapshot, and homepage narrative", body: "Keep this record for the public homepage." },
+  { slug: "about", title: "About PTR Alumni Network", summary: "Program background, mission, values, and approach", body: "Add the verified program background here." },
+  { slug: "network", title: "Our Network", summary: "Resident teachers and model schools", body: "Add approved network details here." },
   { slug: "impact", title: "Impact and evidence", summary: "Verified indicators and demonstrated outcomes", body: "Only publish verified indicators, reporting dates, sources, and evidence-aware outcome language here." },
 ];
 
@@ -129,6 +133,9 @@ export default function AdminDashboard() {
   const news = useApiQuery<any[]>(queryKeys.adminNews, "admin/news", isAdmin);
   const gallery = useApiQuery<any[]>(queryKeys.adminGallery, "admin/gallery", isAdmin);
   const practices = useApiQuery<any[]>(queryKeys.adminPractices, "admin/best-practices", isAdmin);
+  const socialAccounts = useApiQuery<any[]>(queryKeys.adminSocialAccounts, "admin/social/accounts", isAdmin);
+  const socialPosts = useApiQuery<any[]>(queryKeys.adminSocialPosts, "admin/social/posts?status=pending", isAdmin);
+  const socialSyncLogs = useApiQuery<any[]>(queryKeys.adminSocialSyncLogs, "admin/social/sync-logs", isAdmin);
 
   const saveContent = useMutation({ mutationFn: (input: typeof contentForm) => apiRequest("admin/content", { method: "POST", body: input }), onSuccess: async () => { toast.success("Content saved"); setEditing(null); setContentForm({ slug: "", title: "", summary: "", body: "", status: "draft" }); await queryClient.invalidateQueries({ queryKey: queryKeys.adminContent }); await queryClient.invalidateQueries({ queryKey: queryKeys.adminOverview }); }, onError: (error: Error) => toast.error(error.message) });
 
@@ -137,6 +144,46 @@ export default function AdminDashboard() {
   const updateMedia = useMutation({ mutationFn: (input: { id: number; altText?: string | null; status?: "pending" | "approved" | "archived" }) => apiRequest(`admin/media/${input.id}`, { method: "PUT", body: { altText: input.altText, status: input.status } }), onSuccess: async () => { toast.success("Media status updated"); await queryClient.invalidateQueries({ queryKey: queryKeys.adminMedia }); }, onError: (error: Error) => toast.error(error.message) });
 
   const setRole = useMutation({ mutationFn: (input: { id: number; role: "user" | "admin" }) => apiRequest(`admin/users/${input.id}/role`, { method: "PATCH", body: { role: input.role } }), onSuccess: async () => { toast.success("Role updated"); await queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers }); }, onError: (error: Error) => toast.error(error.message) });
+
+  const connectAccount = useMutation({
+    mutationFn: (input: { platform: string; accountId: string; accountName: string; pageId?: string; accessToken: string; refreshToken?: string; tokenExpiresAt?: string }) =>
+      apiRequest("admin/social/accounts", { method: "POST", body: input }),
+    onSuccess: async () => { toast.success("Social account connected"); await invalidate(queryKeys.adminSocialAccounts); await invalidate(queryKeys.adminOverview); },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const disconnectAccount = useMutation({
+    mutationFn: (id: number) => apiRequest(`admin/social/accounts/${id}`, { method: "DELETE" }),
+    onSuccess: async () => { toast.success("Social account disconnected"); await invalidate(queryKeys.adminSocialAccounts); await invalidate(queryKeys.adminOverview); },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const moderatePost = useMutation({
+    mutationFn: (input: { id: number; action: "approve" | "reject" | "archive" }) =>
+      apiRequest(`admin/social/posts/${input.id}/${input.action}`, { method: "POST" }),
+    onSuccess: async () => { toast.success("Post updated"); await invalidate(queryKeys.adminSocialPosts); await invalidate(queryKeys.adminOverview); },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const publishPost = useMutation({
+    mutationFn: (input: { id: number; section: "gallery" | "news" | "videos" | "homepage" }) =>
+      apiRequest(`admin/social/posts/${input.id}/publish`, { method: "POST", body: { section: input.section } }),
+    onSuccess: async () => { toast.success("Post published to website"); await invalidate(queryKeys.adminSocialPosts); await invalidate(queryKeys.adminOverview); },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const syncAccounts = useMutation({
+    mutationFn: (accountId?: number) => apiRequest("admin/social/sync", { method: "POST", body: accountId ? { accountId } : {} }),
+    onSuccess: async (result: any) => {
+      const imported = result.results?.reduce((sum: number, r: any) => sum + (r.imported || 0), 0) || 0;
+      toast.success(`Sync complete — ${imported} new post(s) imported`);
+      await invalidate(queryKeys.adminSocialPosts);
+      await invalidate(queryKeys.adminSocialSyncLogs);
+      await invalidate(queryKeys.adminSocialAccounts);
+      await invalidate(queryKeys.adminOverview);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
 
   const contentRows = useMemo(() => content.data ?? [], [content.data]);
   const mediaRows = useMemo(() => media.data ?? [], [media.data]);
@@ -147,6 +194,9 @@ export default function AdminDashboard() {
   const newsRows = useMemo(() => news.data ?? [], [news.data]);
   const galleryRows = useMemo(() => gallery.data ?? [], [gallery.data]);
   const practiceRows = useMemo(() => practices.data ?? [], [practices.data]);
+  const socialAccountRows = useMemo(() => socialAccounts.data ?? [], [socialAccounts.data]);
+  const socialPostRows = useMemo(() => socialPosts.data ?? [], [socialPosts.data]);
+  const socialSyncLogRows = useMemo(() => socialSyncLogs.data ?? [], [socialSyncLogs.data]);
 
   const invalidate = (key: readonly unknown[]) => queryClient.invalidateQueries({ queryKey: key });
 
@@ -173,7 +223,7 @@ export default function AdminDashboard() {
         <p className="admin-access-subtitle">Your account is signed in as <strong>{user.email}</strong>, but is not assigned the administrator role.</p>
         <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", marginTop: "1.5rem" }}>
           <button className="button-secondary" onClick={() => logout()}>Sign out</button>
-          <button className="button-primary" onClick={() => window.location.href = "/"}>Return to site</button>
+          <button className="button-primary" onClick={() => window.location.href = "/"}><LogOut className="size-4" /> Return to site</button>
         </div>
       </div>
     </div>
@@ -201,6 +251,7 @@ export default function AdminDashboard() {
     { id: "news", label: "News & events", icon: BookOpen },
     { id: "gallery", label: "Gallery", icon: ImagePlus },
     { id: "practices", label: "Best practices", icon: Archive },
+    { id: "social", label: "Social Media", icon: Smartphone },
     { id: "users", label: "Access and roles", icon: UserCog },
   ];
 
@@ -218,7 +269,7 @@ export default function AdminDashboard() {
         <header className="admin-header">
           <div>
             <p className="eyebrow text-[#168d6d]">Protected administration</p>
-            <h1>{tab === "overview" ? "Keep every public surface trustworthy." : tab === "content" ? "Edit website content" : tab === "uploads" ? "Manage media uploads" : tab === "schools" ? "Manage model schools" : tab === "teachers" ? "Manage resident teachers" : tab === "alumni" ? "Manage alumni" : tab === "news" ? "Manage news and events" : tab === "gallery" ? "Manage gallery" : tab === "practices" ? "Manage best practices" : "Access and roles"}</h1>
+            <h1>{tab === "overview" ? "Keep every public surface trustworthy." : tab === "content" ? "Edit website content" : tab === "uploads" ? "Manage media uploads" : tab === "schools" ? "Manage model schools" : tab === "teachers" ? "Manage resident teachers" : tab === "alumni" ? "Manage alumni" : tab === "news" ? "Manage news and events" : tab === "gallery" ? "Manage gallery" : tab === "practices" ? "Manage best practices" : tab === "social" ? "Social Media Integration" : "Access and roles"}</h1>
             <p>Signed in as <strong>{user.name || user.email || "Administrator"}</strong>. Only approved administrators can change public content.</p>
           </div>
           <div className="admin-header-actions"><span className="admin-user-pill"><span className="admin-online-dot" /> Admin</span><button className="admin-icon-button" onClick={() => window.location.href = "/"} aria-label="Close admin workspace"><X className="size-4" /></button></div>
@@ -234,6 +285,7 @@ export default function AdminDashboard() {
         {tab === "news" && <NewsManager rows={newsRows} onDelete={(id: number) => deleteNews.mutate(id)} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminNews })} />}
         {tab === "gallery" && <GalleryManager rows={galleryRows} onDelete={(id: number) => deleteGallery.mutate(id)} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminGallery })} />}
         {tab === "practices" && <PracticesManager rows={practiceRows} onDelete={(id: number) => deletePractice.mutate(id)} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminPractices })} />}
+        {tab === "social" && <SocialManager accounts={socialAccountRows} posts={socialPostRows} syncLogs={socialSyncLogRows} onConnect={connectAccount.mutate} onDisconnect={disconnectAccount.mutate} onModerate={moderatePost.mutate} onPublish={publishPost.mutate} onSync={syncAccounts.mutate} connecting={connectAccount.isPending} syncing={syncAccounts.isPending} moderating={moderatePost.isPending} publishing={publishPost.isPending} onRefresh={() => { invalidate(queryKeys.adminSocialAccounts); invalidate(queryKeys.adminSocialPosts); invalidate(queryKeys.adminSocialSyncLogs); }} />}
       </section>
     </main>
   );
@@ -247,13 +299,14 @@ function OverviewPanel({ stats, onNavigate, onSeedHome }: any) {
     { id: "news", label: "News & updates", value: stats?.newsCount ?? 0, desc: "Articles, briefings, events" },
     { id: "gallery", label: "Gallery records", value: stats?.galleryCount ?? 0, desc: "Photos & event videos" },
     { id: "practices", label: "Best practices", value: stats?.practiceCount ?? 0, desc: "Documented classroom resources" },
-    { id: "content", label: "Site content", value: stats?.publishedCount ?? 0, desc: `${stats?.contentCount ?? 0} total revisions` },
+    { id: "content", label: "Site content", value: stats?.publishedCount ?? 0, desc: `${stats?.publishedCount ?? 0} total revisions` },
     { id: "uploads", label: "Media assets", value: stats?.mediaCount ?? 0, desc: "Images & documents" },
     { id: "users", label: "Administrators", value: stats?.adminCount ?? 0, desc: `${stats?.userCount ?? 0} total accounts` },
+    { id: "social", label: "Social media", value: stats?.socialCount ?? 0, desc: "Connected accounts & posts" },
   ];
   return (
     <div className="admin-content">
-      <div className="admin-overview-grid">
+      <div className="admin-stats">
         {cards.map((card) => (
           <button key={card.id} className="admin-stat-card" onClick={() => onNavigate(card.id)}>
             <div className="admin-stat-top"><span>{card.label}</span><ShieldCheck className="size-4 text-[#168d6d]" /></div>
@@ -268,7 +321,7 @@ function OverviewPanel({ stats, onNavigate, onSeedHome }: any) {
         <div className="admin-starter-grid">
           {starterPages.map((item) => (
             <article className="admin-starter-card" key={item.slug}>
-              <div className="admin-starter-top"><span className="admin-status admin-status-published">{item.slug}</span><button className="admin-table-action" onClick={() => onSeedHome(item)}>Edit</button></div>
+              <div className="admin-starter-top"><span className={`admin-status admin-status-published`}>{item.slug}</span><button className="admin-table-action" onClick={() => onSeedHome(item)}>Edit</button></div>
               <h4>{item.title}</h4>
               <p>{item.summary}</p>
             </article>
@@ -284,16 +337,16 @@ function ContentManager({ rows, editing, form, setForm, onSave, saving, onOpenEd
     <div className="admin-content">
       {editing !== null && (
         <section className="admin-panel admin-editor">
-          <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Editing record</p><h3>{form.slug || "New page copy"}</h3></div></div>
+          <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">{editing ? "Edit record" : "New record"}</p><h3>Content editor</h3></div><button className="admin-icon-button" onClick={onCancel} aria-label="Close editor"><X className="size-4" /></button></div>
           <div className="admin-form-grid">
-            <label>Slug<input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="home, about, network" /></label>
-            <label>Title<input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Page heading" /></label>
+            <label>Slug<input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="about" /></label>
+            <label>Title<input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Page title" /></label>
+            <label className="admin-full">Summary<textarea value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} rows={2} placeholder="Short description" /></label>
+            <label className="admin-full">Body<textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} rows={7} placeholder="Approved content" /></label>
             <label>Status<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as "draft" | "published" })}><option value="draft">Draft</option><option value="published">Published</option></select></label>
-            <label className="admin-full">Summary<input value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} placeholder="Short description" /></label>
-            <label className="admin-full">Body<textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} rows={10} placeholder="Article or page content" /></label>
           </div>
           <div className="admin-form-actions"><button className="button-secondary" onClick={onCancel}>Cancel</button><button className="button-primary" onClick={onSave} disabled={saving}>{saving ? "Saving…" : "Save record"}</button></div>
-        </section>
+          </section>
       )}
       <section className="admin-panel">
         <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Website content</p><h3>{rows.length} records</h3></div></div>
@@ -313,7 +366,7 @@ function UploadManager({ rows, altText, setAltText, fileRef, onFile, uploading, 
   return (
     <div className="admin-content">
       <section className="admin-panel upload-panel">
-        <div><p className="eyebrow text-[#168d6d]">Managed storage</p><h3>Add an approved media asset</h3><p className="admin-muted">Images, video, PDF, Word, PowerPoint, and text files up to 10 MB. Every upload is stored in local project storage.</p></div>
+        <div><p className="eyebrow text-[#168d6d]">Managed storage</p><h3>Add an approved media asset</h3><p className="admin-muted">Images, video, PDF, Word, PowerPoint, and text files up to 10 MB.</p></div>
         <div className="upload-controls">
           <label>Alt text<input value={altText} onChange={(e) => setAltText(e.target.value)} placeholder="Describe the image for accessibility" /></label>
           <label className="upload-drop"><UploadCloud className="size-7 text-[#16a878]" /><strong>{uploading ? "Uploading securely…" : "Choose a file"}</strong><small>Type and size are validated before storage</small><input ref={fileRef} type="file" accept="image/*,video/mp4,video/webm,application/pdf,.doc,.docx,.ppt,.pptx,.txt" disabled={uploading} onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} /></label>
@@ -354,8 +407,8 @@ function UsersManager({ rows, onRole, changing, onRefresh }: any) {
       setShowAdd(false);
       setAddForm({ name: "", email: "", password: "", role: "admin" });
       onRefresh();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to create user");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to create user");
     } finally {
       setSaving(false);
     }
@@ -372,8 +425,8 @@ function UsersManager({ rows, onRole, changing, onRefresh }: any) {
       toast.success("Password reset successfully");
       setResetId(null);
       setResetPasswordVal("");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to reset password");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to reset password");
     } finally {
       setSaving(false);
     }
@@ -385,8 +438,8 @@ function UsersManager({ rows, onRole, changing, onRefresh }: any) {
       await apiRequest(`admin/users/${id}`, { method: "DELETE" });
       toast.success("User removed");
       onRefresh();
-    } catch (err: any) {
-      toast.error(err.message || "Failed to delete user");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete user");
     }
   };
 
@@ -394,12 +447,7 @@ function UsersManager({ rows, onRole, changing, onRefresh }: any) {
     <div className="admin-content">
       {showAdd && (
         <section className="admin-panel admin-editor">
-          <div className="admin-panel-heading">
-            <div>
-              <p className="eyebrow text-[#168d6d]">User Provisioning</p>
-              <h3>Create Administrator or Member Account</h3>
-            </div>
-          </div>
+          <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">User Provisioning</p><h3>Create Administrator or Member Account</h3></div></div>
           <form onSubmit={handleAdd}>
             <div className="admin-form-grid">
               <label>Full Name<input required value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })} placeholder="Full name" /></label>
@@ -417,12 +465,7 @@ function UsersManager({ rows, onRole, changing, onRefresh }: any) {
 
       {resetId !== null && (
         <section className="admin-panel admin-editor" style={{ borderColor: "#0098d9" }}>
-          <div className="admin-panel-heading">
-            <div>
-              <p className="eyebrow text-[#0098d9]">Security</p>
-              <h3>Reset Password for Account #{resetId}</h3>
-            </div>
-          </div>
+          <div className="admin-panel-heading"><div><p className="eyebrow text-[#0098d9]">Security</p><h3>Reset Password for Account #{resetId}</h3></div></div>
           <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", marginTop: "1rem" }}>
             <input
               type="password"
@@ -431,56 +474,26 @@ function UsersManager({ rows, onRole, changing, onRefresh }: any) {
               onChange={(e) => setResetPasswordVal(e.target.value)}
               style={{ padding: "0.5rem 0.75rem", border: "1px solid #d1d5db", borderRadius: "6px", flex: 1 }}
             />
-            <button className="button-primary" onClick={() => handleResetPassword(resetId)} disabled={saving}>
-              {saving ? "Updating…" : "Set Password"}
-            </button>
-            <button className="button-secondary" onClick={() => { setResetId(null); setResetPasswordVal(""); }}>
-              Cancel
-            </button>
+            <button className="button-primary" onClick={() => handleResetPassword(resetId)} disabled={saving}>{saving ? "Updating…" : "Set Password"}</button>
+            <button className="button-secondary" onClick={() => { setResetId(null); setResetPasswordVal(""); }}>Cancel</button>
           </div>
         </section>
       )}
 
       <section className="admin-panel">
-        <div className="admin-panel-heading" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <p className="eyebrow text-[#168d6d]">Access control</p>
-            <h3>{rows.length} authenticated accounts</h3>
-          </div>
-          <button className="button-primary" onClick={() => setShowAdd(!showAdd)}>
-            <Plus className="size-4" /> Add Account
-          </button>
-        </div>
-        <p className="admin-muted">Manage administrators and network accounts using independent MySQL authentication.</p>
+        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Access control</p><h3>{rows.length} authenticated accounts</h3></div></div>
+        <p className="admin-muted">Only administrators can edit the site and manage uploads. Role changes are restricted server-side to the project owner.</p>
         <div className="admin-table-wrap">
-          <table className="admin-table"><thead><tr><th>Account</th><th>Role</th><th>Method</th><th>Last sign-in</th><th>Actions</th></tr></thead><tbody>
+          <table className="admin-table"><thead><tr><th>Account</th><th>Role</th><th>Last sign-in</th><th /></tr></thead><tbody>
             {rows.length ? rows.map((row: any) => (
-              <tr key={row.id}>
-                <td><strong>{row.name || "Unnamed account"}</strong><span>{row.email || "No email supplied"}</span></td>
-                <td><span className={`admin-status ${row.role === "admin" ? "admin-status-published" : "admin-status-draft"}`}>{row.role}</span></td>
-                <td><span style={{ fontSize: "0.75rem", color: "#6b7280" }}>{row.loginMethod || "local"}</span></td>
-                <td>{row.lastSignedIn ? new Date(row.lastSignedIn).toLocaleDateString() : "—"}</td>
-                <td className="admin-row-actions">
-                  <button className="admin-table-action" disabled={changing} onClick={() => onRole(row.id, row.role === "admin" ? "user" : "admin")}>
-                    {row.role === "admin" ? "Make User" : "Make Admin"}
-                  </button>
-                  <button className="admin-table-action" onClick={() => { setResetId(row.id); setResetPasswordVal(""); }}>
-                    <KeyRound className="size-3.5" />
-                  </button>
-                  <button className="admin-table-action admin-danger" onClick={() => handleDelete(row.id)}>
-                    <Trash2 className="size-3.5" />
-                  </button>
-                </td>
-              </tr>
-            )) : <tr><td colSpan={5} className="admin-empty">No accounts found in database.</td></tr>}
+              <tr key={row.id}><td><strong>{row.name || "Unnamed account"}</strong><span>{row.email || "No email supplied"}</span></td><td><span className={`admin-status ${row.role === "admin" ? "admin-status-published" : "admin-status-draft"}`}>{row.role}</span></td><td>{row.lastSignedIn ? new Date(row.lastSignedIn).toLocaleDateString() : "—"}</td><td><button className="admin-table-action" disabled={changing} onClick={() => onRole(row.id, row.role === "admin" ? "user" : "admin")}>{row.role === "admin" ? "Remove admin" : "Make admin"}</button></td></tr>
+            )) : <tr><td colSpan={4} className="admin-empty">No authenticated users have signed in yet.</td></tr>}
           </tbody></table>
         </div>
       </section>
     </div>
   );
 }
-
-// ---------- Generic simple CRUD managers ----------
 
 function SchoolsManager({ rows, onDelete, onRefresh }: any) {
   const [form, setForm] = useState({ id: 0, name: "", district: "", description: "", imageUrl: "", latitude: "", longitude: "", status: "published" });
@@ -490,7 +503,7 @@ function SchoolsManager({ rows, onDelete, onRefresh }: any) {
     try {
       await apiRequest("admin/schools", { method: "POST", body: { ...form, id: form.id || undefined, latitude: form.latitude || null, longitude: form.longitude || null } });
       toast.success("School saved"); setForm({ id: 0, name: "", district: "", description: "", imageUrl: "", latitude: "", longitude: "", status: "published" }); onRefresh();
-    } catch (e: any) { toast.error(e.message); } finally { setSaving(false); }
+    } catch (error: any) { toast.error(error.message); } finally { setSaving(false); }
   };
   return (
     <div className="admin-content">
@@ -527,7 +540,7 @@ function TeachersManager({ rows, schools, onDelete, onRefresh }: any) {
     try {
       await apiRequest("admin/teachers", { method: "POST", body: { ...form, id: form.id || undefined, schoolId: form.schoolId || null } });
       toast.success("Teacher saved"); setForm({ id: 0, fullName: "", email: "", phone: "", schoolId: "", bio: "", photoUrl: "", status: "pending" }); onRefresh();
-    } catch (e: any) { toast.error(e.message); } finally { setSaving(false); }
+    } catch (error: any) { toast.error(error.message); } finally { setSaving(false); }
   };
   return (
     <div className="admin-content">
@@ -537,7 +550,7 @@ function TeachersManager({ rows, schools, onDelete, onRefresh }: any) {
           <label>Full name<input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} /></label>
           <label>Email<input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
           <label>Phone<input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
-          <label>Model school<select value={form.schoolId} onChange={(e) => setForm({ ...form, schoolId: e.target.value })}><option value="">None selected</option>{schools.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+          <label>School<select value={form.schoolId} onChange={(e) => setForm({ ...form, schoolId: e.target.value })}><option value="">None selected</option>{schools.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
           <label>Photo URL<input value={form.photoUrl} onChange={(e) => setForm({ ...form, photoUrl: e.target.value })} /></label>
           <label>Status<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option value="pending">Pending</option><option value="approved">Approved</option><option value="inactive">Inactive</option></select></label>
           <label className="admin-full">Bio<textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} rows={3} /></label>
@@ -548,7 +561,7 @@ function TeachersManager({ rows, schools, onDelete, onRefresh }: any) {
         <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Resident teachers</p><h3>{rows.length} records</h3></div></div>
         <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Name</th><th>School</th><th>Status</th><th /></tr></thead><tbody>
           {rows.length ? rows.map((row: any) => (
-            <tr key={row.id}><td><strong>{row.fullName}</strong><span>{row.email || "No email"}</span></td><td>{row.schoolName || "—"}</td><td><span className={`admin-status ${row.status === "approved" ? "admin-status-published" : "admin-status-draft"}`}>{row.status}</span></td><td className="admin-row-actions"><button className="admin-table-action" onClick={() => setForm({ id: row.id, fullName: row.fullName, email: row.email ?? "", phone: row.phone ?? "", schoolId: row.schoolId ?? "", bio: row.bio ?? "", photoUrl: row.photoUrl ?? "", status: row.status })}>Edit</button><button className="admin-table-action admin-danger" onClick={() => onDelete(row.id)}><Trash2 className="size-3.5" /></button></td></tr>
+            <tr key={row.id}><td><strong>{row.fullName}</strong><span>{row.email}</span></td><td>{row.schoolName || "—"}</td><td><span className={`admin-status ${row.status === "approved" ? "admin-status-published" : "admin-status-draft"}`}>{row.status}</span></td><td className="admin-row-actions"><button className="admin-table-action" onClick={() => setForm({ id: row.id, fullName: row.fullName, email: row.email ?? "", phone: row.phone ?? "", schoolId: row.schoolId ?? "", bio: row.bio ?? "", photoUrl: row.photoUrl ?? "", status: row.status })}>Edit</button><button className="admin-table-action admin-danger" onClick={() => onDelete(row.id)}><Trash2 className="size-3.5" /></button></td></tr>
           )) : <tr><td colSpan={4} className="admin-empty">No teachers yet.</td></tr>}
         </tbody></table></div>
       </section>
@@ -557,14 +570,14 @@ function TeachersManager({ rows, schools, onDelete, onRefresh }: any) {
 }
 
 function AlumniManager({ rows, schools, onDelete, onRefresh }: any) {
-  const [form, setForm] = useState({ id: 0, fullName: "", email: "", phone: "", graduationYear: new Date().getFullYear(), schoolId: "", bio: "", status: "pending" });
+  const [form, setForm] = useState({ id: 0, fullName: "", email: "", phone: "", graduationYear: "", schoolId: "", bio: "", status: "pending" });
   const [saving, setSaving] = useState(false);
   const submit = async () => {
     setSaving(true);
     try {
-      await apiRequest("admin/alumni", { method: "POST", body: { ...form, id: form.id || undefined, schoolId: form.schoolId || null } });
-      toast.success("Alumni saved"); setForm({ id: 0, fullName: "", email: "", phone: "", graduationYear: new Date().getFullYear(), schoolId: "", bio: "", status: "pending" }); onRefresh();
-    } catch (e: any) { toast.error(e.message); } finally { setSaving(false); }
+      await apiRequest("admin/alumni", { method: "POST", body: { ...form, id: form.id || undefined, graduationYear: form.graduationYear ? Number(form.graduationYear) : null, schoolId: form.schoolId || null } });
+      toast.success("Alumni saved"); setForm({ id: 0, fullName: "", email: "", phone: "", graduationYear: "", schoolId: "", bio: "", status: "pending" }); onRefresh();
+    } catch (error: any) { toast.error(error.message); } finally { setSaving(false); }
   };
   return (
     <div className="admin-content">
@@ -574,19 +587,19 @@ function AlumniManager({ rows, schools, onDelete, onRefresh }: any) {
           <label>Full name<input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} /></label>
           <label>Email<input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
           <label>Phone<input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
-          <label>Graduation year<input type="number" value={form.graduationYear} onChange={(e) => setForm({ ...form, graduationYear: parseInt(e.target.value) || 0 })} /></label>
-          <label>Model school<select value={form.schoolId} onChange={(e) => setForm({ ...form, schoolId: e.target.value })}><option value="">None selected</option>{schools.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-          <label>Status<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select></label>
+          <label>Graduation year<input value={form.graduationYear} onChange={(e) => setForm({ ...form, graduationYear: e.target.value })} /></label>
+          <label>School<select value={form.schoolId} onChange={(e) => setForm({ ...form, schoolId: e.target.value })}><option value="">— None selected</option>{schools.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
           <label className="admin-full">Bio<textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} rows={3} /></label>
+          <label>Status<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option></select></label>
         </div>
         <div className="admin-form-actions"><button className="button-primary" onClick={submit} disabled={saving}>{saving ? "Saving…" : "Save alumni"}</button></div>
       </section>
       <section className="admin-panel">
-        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Alumni directory</p><h3>{rows.length} records</h3></div></div>
-        <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Name</th><th>Graduation</th><th>School</th><th>Status</th><th /></tr></thead><tbody>
+        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Alumni members</p><h3>{rows.length} records</h3></div></div>
+        <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Name</th><th>Graduation</th><th>Status</th><th /></tr></thead><tbody>
           {rows.length ? rows.map((row: any) => (
-            <tr key={row.id}><td><strong>{row.fullName}</strong><span>{row.email || "No email"}</span></td><td>{row.graduationYear || "—"}</td><td>{row.schoolName || "—"}</td><td><span className={`admin-status ${row.status === "approved" ? "admin-status-published" : "admin-status-draft"}`}>{row.status}</span></td><td className="admin-row-actions"><button className="admin-table-action" onClick={() => setForm({ id: row.id, fullName: row.fullName, email: row.email ?? "", phone: row.phone ?? "", graduationYear: row.graduationYear ?? 2024, schoolId: row.schoolId ?? "", bio: row.bio ?? "", status: row.status })}>Edit</button><button className="admin-table-action admin-danger" onClick={() => onDelete(row.id)}><Trash2 className="size-3.5" /></button></td></tr>
-          )) : <tr><td colSpan={5} className="admin-empty">No alumni yet.</td></tr>}
+            <tr key={row.id}><td><strong>{row.fullName}</strong><span>{row.email}</span></td><td>{row.graduationYear || "—"}</td><td><span className={`admin-status ${row.status === "approved" ? "admin-status-published" : "admin-status-draft"}`}>{row.status}</span></td><td className="admin-row-actions"><button className="admin-table-action" onClick={() => setForm({ id: row.id, fullName: row.fullName, email: row.email ?? "", phone: row.phone ?? "", graduationYear: row.graduationYear ?? "", schoolId: row.schoolId ?? "", bio: row.bio ?? "", status: row.status })}>Edit</button><button className="admin-table-action admin-danger" onClick={() => onDelete(row.id)}><Trash2 className="size-3.5" /></button></td></tr>
+          )) : <tr><td colSpan={4} className="admin-empty">No alumni yet.</td></tr>}
         </tbody></table></div>
       </section>
     </div>
@@ -600,19 +613,19 @@ function NewsManager({ rows, onDelete, onRefresh }: any) {
     setSaving(true);
     try {
       await apiRequest("admin/news", { method: "POST", body: { ...form, id: form.id || undefined } });
-      toast.success("News article saved"); setForm({ id: 0, slug: "", title: "", category: "Announcements", excerpt: "", body: "", imageUrl: "", status: "draft" }); onRefresh();
-    } catch (e: any) { toast.error(e.message); } finally { setSaving(false); }
+      toast.success("Article saved"); setForm({ id: 0, slug: "", title: "", category: "Announcements", excerpt: "", body: "", imageUrl: "", status: "draft" }); onRefresh();
+    } catch (error: any) { toast.error(error.message); } finally { setSaving(false); }
   };
   return (
     <div className="admin-content">
       <section className="admin-panel admin-editor">
-        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">News & events</p><h3>{form.id ? "Edit article" : "Publish article"}</h3></div></div>
+        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">News and events</p><h3>{form.id ? "Edit article" : "Create article"}</h3></div></div>
         <div className="admin-form-grid">
-          <label>Slug<input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="article-slug" /></label>
+          <label>Slug<input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} /></label>
           <label>Title<input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
           <label>Category<input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} /></label>
           <label>Image URL<input value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} /></label>
-          <label className="admin-full">Excerpt<input value={form.excerpt} onChange={(e) => setForm({ ...form, excerpt: e.target.value })} placeholder="Brief summary" /></label>
+          <label className="admin-full">Excerpt<textarea value={form.excerpt} onChange={(e) => setForm({ ...form, excerpt: e.target.value })} rows={2} /></label>
           <label className="admin-full">Body<textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} rows={6} /></label>
           <label>Status<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option value="draft">Draft</option><option value="published">Published</option></select></label>
         </div>
@@ -638,7 +651,7 @@ function GalleryManager({ rows, onDelete, onRefresh }: any) {
     try {
       await apiRequest("admin/gallery", { method: "POST", body: { ...form, id: form.id || undefined } });
       toast.success("Gallery item saved"); setForm({ id: 0, title: "", caption: "", url: "", mediaType: "image", category: "", status: "approved" }); onRefresh();
-    } catch (e: any) { toast.error(e.message); } finally { setSaving(false); }
+    } catch (error: any) { toast.error(error.message); } finally { setSaving(false); }
   };
   return (
     <div className="admin-content">
@@ -674,7 +687,7 @@ function PracticesManager({ rows, onDelete, onRefresh }: any) {
     try {
       await apiRequest("admin/best-practices", { method: "POST", body: { ...form, id: form.id || undefined } });
       toast.success("Practice saved"); setForm({ id: 0, title: "", category: "Teaching practice", summary: "", body: "", documentUrl: "", imageUrl: "", status: "draft" }); onRefresh();
-    } catch (e: any) { toast.error(e.message); } finally { setSaving(false); }
+    } catch (error: any) { toast.error(error.message); } finally { setSaving(false); }
   };
   return (
     <div className="admin-content">

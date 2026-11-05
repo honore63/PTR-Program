@@ -816,6 +816,298 @@ function routeRequest(): void
         respond(['success' => true]);
     }
 
+    // =========================================================================
+    // Social Media Integration - Public endpoints
+    // =========================================================================
+    if ($route === '/social/platforms' && $method === 'GET') {
+        $settings = config();
+        $platforms = [
+            'facebook' => [
+                'name' => 'Facebook',
+                'icon' => 'facebook',
+                'configured' => !empty($settings['social_facebook_app_id']) && !empty($settings['social_facebook_app_secret']),
+                'oauthUrl' => null,
+            ],
+            'instagram' => [
+                'name' => 'Instagram',
+                'icon' => 'instagram',
+                'configured' => !empty($settings['social_instagram_app_id']) && !empty($settings['social_instagram_app_secret']),
+                'oauthUrl' => null,
+            ],
+            'youtube' => [
+                'name' => 'YouTube',
+                'icon' => 'youtube',
+                'configured' => !empty($settings['social_youtube_api_key']),
+                'oauthUrl' => null,
+            ],
+            'tiktok' => [
+                'name' => 'TikTok',
+                'icon' => 'tiktok',
+                'configured' => !empty($settings['social_tiktok_app_id']) && !empty($settings['social_tiktok_app_secret']),
+                'oauthUrl' => null,
+            ],
+        ];
+        respond($platforms);
+    }
+
+    if ($route === '/social/posts' && $method === 'GET') {
+        $limit = (int) (($_GET['limit'] ?? 20) > 0 ? $_GET['limit'] : 20);
+        $limit = min($limit, 100);
+        $platform = $_GET['platform'] ?? null;
+        $section = $_GET['section'] ?? null;
+
+        $sql = "SELECT sp.*, sa.accountName, sa.platform as accountPlatform
+                FROM social_posts sp
+                JOIN social_accounts sa ON sp.accountId = sa.id
+                WHERE sp.websiteStatus = 'approved'";
+        $params = [];
+        if ($platform) {
+            $sql .= " AND sp.platform = ?";
+            $params[] = $platform;
+        }
+        if ($section) {
+            $sql .= " AND sp.websiteSection = ?";
+            $params[] = $section;
+        }
+        $sql .= " ORDER BY sp.publishedAt DESC LIMIT ?";
+        $params[] = $limit;
+
+        $statement = database()->prepare($sql);
+        $statement->execute($params);
+        respond($statement->fetchAll());
+    }
+
+    // =========================================================================
+    // Social Media Integration - Administrator endpoints
+    // =========================================================================
+    requireAdmin();
+
+    if ($route === '/admin/social/accounts' && $method === 'GET') {
+        $rows = database()->query("SELECT id, platform, accountId, accountName, pageId, status, lastSyncAt, syncError, createdAt, updatedAt FROM social_accounts ORDER BY platform, accountName")->fetchAll();
+        respond($rows);
+    }
+
+    if ($route === '/admin/social/accounts' && $method === 'POST') {
+        requireSameOrigin();
+        $user = currentUser();
+        $data = jsonBody();
+        $platform = inputString($data, 'platform', 50, true);
+        $accountId = inputString($data, 'accountId', 255, true);
+        $accountName = inputString($data, 'accountName', 255, true);
+        $pageId = inputString($data, 'pageId', 255);
+        $accessToken = inputString($data, 'accessToken', 5000);
+        $refreshToken = inputString($data, 'refreshToken', 5000);
+        $tokenExpiresAt = isset($data['tokenExpiresAt']) && $data['tokenExpiresAt'] !== '' ? $data['tokenExpiresAt'] : null;
+
+        if (!in_array($platform, ['facebook', 'instagram', 'youtube', 'tiktok'], true)) {
+            throw new ApiError(400, 'Invalid platform.');
+        }
+
+        $statement = database()->prepare(
+            'INSERT INTO social_accounts (platform, accountId, accountName, pageId, accessToken, refreshToken, tokenExpiresAt, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, \'connected\')
+             ON DUPLICATE KEY UPDATE accountName = VALUES(accountName), pageId = VALUES(pageId),
+             accessToken = VALUES(accessToken), refreshToken = VALUES(refreshToken),
+             tokenExpiresAt = VALUES(tokenExpiresAt), status = \'connected\', updatedAt = NOW()'
+        );
+        $statement->execute([$platform, $accountId, $accountName, $pageId, $accessToken, $refreshToken, $tokenExpiresAt]);
+
+        $fetch = database()->prepare('SELECT * FROM social_accounts WHERE id = ?');
+        $fetch->execute([(int) database()->lastInsertId()]);
+        respond($fetch->fetch(), 201);
+    }
+
+    if (preg_match('#^/admin/social/accounts/(\d+)$#', $route, $matches) && $method === 'DELETE') {
+        requireSameOrigin();
+        $statement = database()->prepare('DELETE FROM social_accounts WHERE id = ?');
+        $statement->execute([(int) $matches[1]]);
+        respond(['success' => true]);
+    }
+
+    if ($route === '/admin/social/posts' && $method === 'GET') {
+        $status = $_GET['status'] ?? 'pending';
+        $platform = $_GET['platform'] ?? null;
+        $limit = (int) (($_GET['limit'] ?? 50) > 0 ? $_GET['limit'] : 50);
+        $limit = min($limit, 200);
+
+        $sql = "SELECT sp.*, sa.accountName FROM social_posts sp
+                JOIN social_accounts sa ON sp.accountId = sa.id
+                WHERE sp.websiteStatus = ?";
+        $params = [$status];
+        if ($platform) {
+            $sql .= " AND sp.platform = ?";
+            $params[] = $platform;
+        }
+        $sql .= " ORDER BY sp.createdAt DESC LIMIT ?";
+        $params[] = $limit;
+
+        $statement = database()->prepare($sql);
+        $statement->execute($params);
+        respond($statement->fetchAll());
+    }
+
+    if (preg_match('#^/admin/social/posts/(\d+)/(approve|reject|publish|archive)$#', $route, $matches) && $method === 'POST') {
+        requireSameOrigin();
+        $user = currentUser();
+        $postId = (int) $matches[1];
+        $action = $matches[2];
+
+        $statement = database()->prepare('SELECT * FROM social_posts WHERE id = ? LIMIT 1');
+        $statement->execute([$postId]);
+        $post = $statement->fetch();
+        if (!$post) throw new ApiError(404, 'Social post not found.');
+
+        if ($action === 'approve') {
+            $newStatus = 'approved';
+        } elseif ($action === 'reject') {
+            $newStatus = 'rejected';
+        } elseif ($action === 'archive') {
+            $newStatus = 'archived';
+        } elseif ($action === 'publish') {
+            $data = jsonBody();
+            $section = inputString($data, 'section', 50, true);
+            if (!in_array($section, ['gallery', 'news', 'videos', 'homepage'], true)) {
+                throw new ApiError(400, 'Invalid website section.');
+            }
+            $newStatus = 'published';
+            $statement = database()->prepare('UPDATE social_posts SET websiteStatus = ?, websiteSection = ?, updatedBy = ? WHERE id = ?');
+            $statement->execute([$newStatus, $section, $user['id'], $postId]);
+        } else {
+            throw new ApiError(400, 'Invalid action.');
+        }
+
+        if ($action !== 'publish') {
+            $statement = database()->prepare('UPDATE social_posts SET websiteStatus = ?, updatedBy = ? WHERE id = ?');
+            $statement->execute([$newStatus, $user['id'], $postId]);
+        }
+
+        $fetch = database()->prepare('SELECT * FROM social_posts WHERE id = ?');
+        $fetch->execute([$postId]);
+        respond($fetch->fetch());
+    }
+
+    if ($route === '/admin/social/sync' && $method === 'POST') {
+        requireSameOrigin();
+        $user = currentUser();
+        $data = jsonBody();
+        $accountId = isset($data['accountId']) ? (int) $data['accountId'] : null;
+
+        $accounts = [];
+        if ($accountId) {
+            $stmt = database()->prepare('SELECT * FROM social_accounts WHERE id = ? AND status = \'connected\'');
+            $stmt->execute([$accountId]);
+            $row = $stmt->fetch();
+            if (!$row) throw new ApiError(404, 'Connected account not found.');
+            $accounts[] = $row;
+        } else {
+            $stmt = database()->query("SELECT * FROM social_accounts WHERE status = 'connected'");
+            $accounts = $stmt->fetchAll();
+        }
+
+        $results = [];
+        foreach ($accounts as $account) {
+            $logId = null;
+            $logStmt = database()->prepare(
+                'INSERT INTO social_sync_logs (accountId, platform, status, recordsFetched, recordsImported, recordsUpdated, startedAt)
+                 VALUES (?, ?, \'failed\', 0, 0, 0, NOW())'
+            );
+            $logStmt->execute([$account['id'], $account['platform']]);
+            $logId = (int) database()->lastInsertId();
+
+            try {
+                $result = syncSocialAccount($account);
+                database()->prepare(
+                    'UPDATE social_sync_logs SET status = ?, recordsFetched = ?, recordsImported = ?, recordsUpdated = ?, completedAt = NOW() WHERE id = ?'
+                )->execute([
+                    $result['status'],
+                    $result['fetched'] ?? 0,
+                    $result['imported'] ?? 0,
+                    $result['updated'] ?? 0,
+                    $logId,
+                ]);
+                // Update account sync timestamp
+                database()->prepare(
+                    'UPDATE social_accounts SET lastSyncAt = NOW(), syncError = NULL WHERE id = ?'
+                )->execute([$account['id']]);
+                $results[] = ['accountId' => $account['id'], 'platform' => $account['platform'], 'status' => 'success', 'imported' => $result['imported'] ?? 0];
+            } catch (Throwable $e) {
+                database()->prepare(
+                    'UPDATE social_sync_logs SET status = ?, errorMessage = ?, completedAt = NOW() WHERE id = ?'
+                )->execute(['failed', $e->getMessage(), $logId]);
+                database()->prepare(
+                    'UPDATE social_accounts SET syncError = ? WHERE id = ?'
+                )->execute([$e->getMessage(), $account['id']]);
+                $results[] = ['accountId' => $account['id'], 'platform' => $account['platform'], 'status' => 'failed', 'error' => $e->getMessage()];
+            }
+        }
+
+        respond(['results' => $results]);
+    }
+
+    if ($route === '/admin/social/sync-logs' && $method === 'GET') {
+        $limit = (int) (($_GET['limit'] ?? 50) > 0 ? $_GET['limit'] : 50);
+        $limit = min($limit, 200);
+        $rows = database()->query(
+            "SELECT ssl.*, sa.accountName, sa.platform as accountPlatform
+             FROM social_sync_logs ssl
+             JOIN social_accounts sa ON ssl.accountId = sa.id
+             ORDER BY ssl.startedAt DESC LIMIT ?"
+        );
+        // Note: prepared statement with LIMIT needs bind
+        $statement = database()->prepare(
+            "SELECT ssl.*, sa.accountName, sa.platform as accountPlatform
+             FROM social_sync_logs ssl
+             JOIN social_accounts sa ON ssl.accountId = sa.id
+             ORDER BY ssl.startedAt DESC LIMIT ?"
+        );
+        $statement->execute([$limit]);
+        respond($statement->fetchAll());
+    }
+
+    // =========================================================================
+    // Social Media OAuth callback (platform redirects here after user authorization)
+    // =========================================================================
+    if ($route === '/social/oauth/callback' && $method === 'GET') {
+        $platform = $_GET['platform'] ?? '';
+        $code = $_GET['code'] ?? '';
+        $state = $_GET['state'] ?? '';
+        $error = $_GET['error'] ?? '';
+
+        if ($error) {
+            header('Location: /PTRP/admin#social?error=' . urlencode($error));
+            exit;
+        }
+        if (!$platform || !$code) {
+            header('Location: /PTRP/admin#social?error=missing_params');
+            exit;
+        }
+
+        try {
+            $accountData = exchangeOAuthCode($platform, $code, $state);
+            // Store account - redirect to admin with success
+            $stmt = database()->prepare(
+                'INSERT INTO social_accounts (platform, accountId, accountName, pageId, accessToken, refreshToken, tokenExpiresAt, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, \'connected\')
+                 ON DUPLICATE KEY UPDATE accountName = VALUES(accountName), accessToken = VALUES(accessToken),
+                 refreshToken = VALUES(refreshToken), tokenExpiresAt = VALUES(tokenExpiresAt), status = \'connected\', updatedAt = NOW()'
+            );
+            $stmt->execute([
+                $platform,
+                $accountData['accountId'],
+                $accountData['accountName'],
+                $accountData['pageId'] ?? null,
+                $accountData['accessToken'],
+                $accountData['refreshToken'] ?? null,
+                $accountData['tokenExpiresAt'] ?? null,
+            ]);
+            header('Location: /PTRP/admin#social?connected=1');
+            exit;
+        } catch (Throwable $e) {
+            header('Location: /PTRP/admin#social?error=' . urlencode($e->getMessage()));
+            exit;
+        }
+    }
+
     throw new ApiError(404, 'API endpoint not found: ' . $route);
 }
 
@@ -826,4 +1118,273 @@ try {
 } catch (Throwable $error) {
     error_log('PTRP API error: ' . $error->getMessage());
     respond(['error' => 'The request could not be completed: ' . $error->getMessage()], 500);
+}
+
+/* ============================================================================
+   Social Media Helper Functions
+   ============================================================================ */
+
+/**
+ * Build the OAuth authorization URL for a platform.
+ */
+function socialOAuthUrl(string $platform): array {
+    $settings = config();
+    $base = rtrim((string) ($settings['social_oauth_callback_base'] ?? ''), '/');
+    $callback = $base . basePath() . '/api/social/oauth/callback?platform=' . urlencode($platform);
+
+    switch ($platform) {
+        case 'facebook':
+            $appId = $settings['social_facebook_app_id'] ?? '';
+            if (!$appId) throw new ApiError(503, 'Facebook App ID not configured.');
+            $url = 'https://www.facebook.com/v19.0/dialog/oauth?' . http_build_query([
+                'client_id' => $appId,
+                'redirect_uri' => $callback,
+                'scope' => 'pages_read_engagement,pages_manage_posts,instagram_basic',
+                'state' => bin2hex(random_bytes(16)),
+            ]);
+            return ['url' => $url, 'platform' => 'facebook'];
+        case 'instagram':
+            $appId = $settings['social_instagram_app_id'] ?? $settings['social_facebook_app_id'] ?? '';
+            if (!$appId) throw new ApiError(503, 'Instagram/Facebook App ID not configured.');
+            $url = 'https://api.instagram.com/oauth/authorize?' . http_build_query([
+                'client_id' => $appId,
+                'redirect_uri' => $callback,
+                'scope' => 'instagram_basic,instagram_content_publish',
+                'response_type' => 'code',
+                'state' => bin2hex(random_bytes(16)),
+            ]);
+            return ['url' => $url, 'platform' => 'instagram'];
+        case 'youtube':
+            $apiKey = $settings['social_youtube_api_key'] ?? '';
+            if (!$apiKey) throw new ApiError(503, 'YouTube API key not configured.');
+            // YouTube uses OAuth 2.0; for server-side we need client credentials.
+            // This endpoint returns the API key status; full OAuth requires client_id/secret.
+            return ['url' => null, 'platform' => 'youtube', 'note' => 'YouTube Data API v3 key configured. Public channel feeds can be fetched without OAuth.' ];
+        case 'tiktok':
+            $appId = $settings['social_tiktok_app_id'] ?? '';
+            if (!$appId) throw new ApiError(503, 'TikTok App ID not configured.');
+            $url = 'https://www.tiktok.com/v2/auth/authorize?' . http_build_query([
+                'client_key' => $appId,
+                'redirect_uri' => $callback,
+                'scope' => 'user.info.basic,video.list',
+                'response_type' => 'code',
+                'state' => bin2hex(random_bytes(16)),
+            ]);
+            return ['url' => $url, 'platform' => 'tiktok'];
+        default:
+            throw new ApiError(400, 'Unknown platform.');
+    }
+}
+
+/**
+ * Exchange an OAuth authorization code for tokens and account info.
+ */
+function exchangeOAuthCode(string $platform, string $code, string $state): array {
+    $settings = config();
+    $base = rtrim((string) ($settings['social_oauth_callback_base'] ?? ''), '/');
+    $callback = $base . basePath() . '/api/social/oauth/callback?platform=' . urlencode($platform);
+
+    switch ($platform) {
+        case 'facebook':
+            $appId = $settings['social_facebook_app_id'] ?? '';
+            $appSecret = $settings['social_facebook_app_secret'] ?? '';
+            if (!$appId || !$appSecret) throw new ApiError(503, 'Facebook app credentials not configured.');
+            // Exchange code for short-lived token
+            $tokenResp = @file_get_contents('https://graph.facebook.com/v19.0/oauth/access_token?' . http_build_query([
+                'client_id' => $appId,
+                'redirect_uri' => $callback,
+                'client_secret' => $appSecret,
+                'code' => $code,
+            ]));
+            if ($tokenResp === false) throw new ApiError(502, 'Facebook token exchange failed.');
+            $tokenData = json_decode($tokenResp, true);
+            if (empty($tokenData['access_token'])) throw new ApiError(502, 'Facebook did not return an access token.');
+            $accessToken = $tokenData['access_token'];
+            // Get long-lived token
+            $longResp = @file_get_contents('https://graph.facebook.com/v19.0/oauth/access_token?' . http_build_query([
+                'grant_type' => 'fb_exchange_token',
+                'client_id' => $appId,
+                'client_secret' => $appSecret,
+                'fb_exchange_token' => $accessToken,
+            ]));
+            if ($longResp !== false) {
+                $longData = json_decode($longResp, true);
+                if (!empty($longData['access_token'])) {
+                    $accessToken = $longData['access_token'];
+                }
+            }
+            // Get accounts/pages
+            $meResp = @file_get_contents('https://graph.facebook.com/v19.0/me/accounts?access_token=' . urlencode($accessToken));
+            if ($meResp === false) throw new ApiError(502, 'Failed to fetch Facebook accounts.');
+            $meData = json_decode($meResp, true);
+            if (empty($meData['data'])) throw new ApiError(502, 'No Facebook pages found for this account.');
+            $page = $meData['data'][0];
+            return [
+                'platform' => 'facebook',
+                'accountId' => $page['id'],
+                'accountName' => $page['name'],
+                'pageId' => $page['id'],
+                'accessToken' => $page['access_token'],
+                'refreshToken' => null,
+                'tokenExpiresAt' => null,
+            ];
+
+        case 'instagram':
+            $appId = $settings['social_instagram_app_id'] ?? $settings['social_facebook_app_id'] ?? '';
+            $appSecret = $settings['social_instagram_app_secret'] ?? $settings['social_facebook_app_secret'] ?? '';
+            if (!$appId || !$appSecret) throw new ApiError(503, 'Instagram app credentials not configured.');
+            $tokenResp = @file_get_contents('https://api.instagram.com/oauth/access_token', false, stream_context_create([
+                'http' => [
+                    'method' => 'POST',
+                    'header' => 'Content-Type: application/x-www-form-urlencoded',
+                    'content' => http_build_query([
+                        'client_id' => $appId,
+                        'client_secret' => $appSecret,
+                        'grant_type' => 'authorization_code',
+                        'redirect_uri' => $callback,
+                        'code' => $code,
+                    ]),
+                ],
+            ]));
+            if ($tokenResp === false) throw new ApiError(502, 'Instagram token exchange failed.');
+            $tokenData = json_decode($tokenResp, true);
+            if (empty($tokenData['access_token'])) throw new ApiError(502, 'Instagram did not return an access token.');
+            $accessToken = $tokenData['access_token'];
+            $igUserId = $tokenData['user_id'];
+            // Get user info
+            $meResp = @file_get_contents('https://graph.instagram.com/v19.0/' . $igUserId . '?fields=id,username,account_type&access_token=' . urlencode($accessToken));
+            if ($meResp === false) throw new ApiError(502, 'Failed to fetch Instagram user info.');
+            $meData = json_decode($meResp, true);
+            return [
+                'platform' => 'instagram',
+                'accountId' => $meData['id'] ?? $igUserId,
+                'accountName' => $meData['username'] ?? 'Instagram User',
+                'pageId' => null,
+                'accessToken' => $accessToken,
+                'refreshToken' => null,
+                'tokenExpiresAt' => null,
+            ];
+
+        case 'tiktok':
+            $appId = $settings['social_tiktok_app_id'] ?? '';
+            $appSecret = $settings['social_tiktok_app_secret'] ?? '';
+            if (!$appId || !$appSecret) throw new ApiError(503, 'TikTok app credentials not configured.');
+            $tokenResp = @file_get_contents('https://open.tiktokapis.com/v2/oauth/token/', false, stream_context_create([
+                'http' => [
+                    'method' => 'POST',
+                    'header' => 'Content-Type: application/x-www-form-urlencoded',
+                    'content' => http_build_query([
+                        'client_key' => $appId,
+                        'client_secret' => $appSecret,
+                        'code' => $code,
+                        'grant_type' => 'authorization_code',
+                        'redirect_uri' => $callback,
+                    ]),
+                ],
+            ]));
+            if ($tokenResp === false) throw new ApiError(502, 'TikTok token exchange failed.');
+            $tokenData = json_decode($tokenResp, true);
+            if (empty($tokenData['access_token'])) throw new ApiError(502, 'TikTok did not return an access token.');
+            // Get user info
+            $meResp = @file_get_contents('https://open.tiktokapis.com/v2/research/user/info/?fields=open_id,username,display_name', false, stream_context_create([
+                'http' => [
+                    'method' => 'POST',
+                    'header' => 'Authorization: Bearer ' . $tokenData['access_token'] . '\r\nContent-Type: application/json',
+                    'content' => json_encode(new stdClass()),
+                ],
+            ]));
+            if ($meResp === false) throw new ApiError(502, 'Failed to fetch TikTok user info.');
+            $meData = json_decode($meResp, true);
+            $userData = $meData['data']['user'] ?? [];
+            return [
+                'platform' => 'tiktok',
+                'accountId' => $userData['open_id'] ?? '',
+                'accountName' => $userData['username'] ?? 'TikTok User',
+                'pageId' => null,
+                'accessToken' => $tokenData['access_token'],
+                'refreshToken' => $tokenData['refresh_token'] ?? null,
+                'tokenExpiresAt' => isset($tokenData['expires_in']) ? date('Y-m-d H:i:s', time() + (int) $tokenData['expires_in']) : null,
+            ];
+
+        default:
+            throw new ApiError(400, 'OAuth not implemented for platform: ' . $platform);
+    }
+}
+
+/**
+ * Sync a connected social media account: fetch recent posts and import new ones.
+ */
+function syncSocialAccount(array $account): array {
+    $platform = $account['platform'];
+    $accessToken = $account['accessToken'] ?? '';
+    $fetched = 0;
+    $imported = 0;
+    $updated = 0;
+
+    switch ($platform) {
+        case 'facebook':
+        case 'instagram':
+            // Use Graph API to fetch recent posts
+            $pageId = $account['pageId'] ?? $account['accountId'];
+            $fields = 'id,message,created_time,permalink_url,full_picture,media_type';
+            $url = 'https://graph.facebook.com/v19.0/' . urlencode($pageId) . '/posts?' . http_build_query([
+                'fields' => $fields,
+                'access_token' => $accessToken,
+                'limit' => 25,
+            ]);
+            $resp = @file_get_contents($url);
+            if ($resp === false) throw new ApiError(502, 'Failed to fetch posts from ' . ucfirst($platform) . '.');
+            $data = json_decode($resp, true);
+            if (empty($data['data'])) return ['status' => 'success', 'fetched' => 0, 'imported' => 0, 'updated' => 0];
+            $posts = $data['data'];
+            $fetched = count($posts);
+            foreach ($posts as $post) {
+                $platformPostId = $post['id'] ?? '';
+                if (!$platformPostId) continue;
+                // Check if exists
+                $exists = database()->prepare('SELECT id, websiteStatus FROM social_posts WHERE platform = ? AND platformPostId = ? LIMIT 1');
+                $exists->execute([$platform, $platformPostId]);
+                $row = $exists->fetch();
+                $message = $post['message'] ?? '';
+                $mediaUrl = $post['full_picture'] ?? null;
+                $mediaType = ($post['media_type'] ?? '') === 'VIDEO' ? 'video' : (($post['media_type'] ?? '') === 'PHOTO' ? 'image' : (empty($message) ? 'text' : 'text'));
+                $publishedAt = $post['created_time'] ?? date('Y-m-d H:i:s');
+                $postUrl = $post['permalink_url'] ?? null;
+
+                if ($row) {
+                    database()->prepare(
+                        'UPDATE social_posts SET message = ?, mediaUrl = ?, mediaType = ?, postUrl = ?, publishedAt = ?, updatedAt = NOW() WHERE id = ?'
+                    )->execute([$message, $mediaUrl, $mediaType, $postUrl, $publishedAt, $row['id']]);
+                    $updated++;
+                } else {
+                    database()->prepare(
+                        'INSERT INTO social_posts (accountId, platform, platformPostId, authorName, message, mediaUrl, mediaType, thumbnailUrl, postUrl, publishedAt, websiteStatus)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \'pending\')'
+                    )->execute([
+                        $account['id'], $platform, $platformPostId, $account['accountName'], $message, $mediaUrl, $mediaType, $mediaUrl, $postUrl, $publishedAt,
+                    ]);
+                    $imported++;
+                }
+            }
+            break;
+
+        case 'youtube':
+            $apiKey = config()['social_youtube_api_key'] ?? '';
+            if (!$apiKey) throw new ApiError(503, 'YouTube API key not configured.');
+            // For YouTube, we need a channel ID. Without OAuth we can't get the user's channel.
+            // This is a documented limitation: YouTube public channel feeds require the channel ID.
+            throw new ApiError(503, 'YouTube sync requires a connected channel ID via the admin UI. Please add the account with your channel ID manually, or configure OAuth.');
+            break;
+
+        case 'tiktok':
+            // TikTok for Business API requires app approval for most endpoints.
+            // Public video fetch is limited without approved app.
+            throw new ApiError(503, 'TikTok automatic sync requires an approved TikTok for Business application. Please add the account manually or contact support.');
+            break;
+
+        default:
+            throw new ApiError(400, 'Unsupported platform for sync: ' . $platform);
+    }
+
+    return ['status' => 'success', 'fetched' => $fetched, 'imported' => $imported, 'updated' => $updated];
 }

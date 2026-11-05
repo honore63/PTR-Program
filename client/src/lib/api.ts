@@ -19,6 +19,11 @@ export const queryKeys = {
   adminNews: ["api", "admin", "news"] as const,
   adminGallery: ["api", "admin", "gallery"] as const,
   adminPractices: ["api", "admin", "best-practices"] as const,
+  socialPlatforms: ["api", "social", "platforms"] as const,
+  socialPosts: ["api", "social", "posts"] as const,
+  adminSocialAccounts: ["api", "admin", "social", "accounts"] as const,
+  adminSocialPosts: ["api", "admin", "social", "posts"] as const,
+  adminSocialSyncLogs: ["api", "admin", "social", "sync-logs"] as const,
 };
 
 export async function apiRequest<T>(

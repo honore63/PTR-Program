@@ -154,3 +154,105 @@ CREATE TABLE IF NOT EXISTS `bestPractices` (
   `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- Seed default admin user
+-- ============================================================
+-- Default admin: email = "Residents teachers", password = "Ptrp100"
+-- Password hash for "Ptrp100" using PASSWORD_BCRYPT cost 12
+INSERT IGNORE INTO `users` (email, passwordHash, name, role, loginMethod, lastSignedIn)
+VALUES ('Residents teachers', '$2y$12$qzy0UYcQIDtMAKIa0QN0/ezs/U8aJxs3qAPkZfyiiwhVBZUPWrEOa', 'Resident Teachers', 'admin', 'local', NOW());
+
+-- ============================================================
+-- Seed sample data for demonstration
+-- ============================================================
+INSERT IGNORE INTO `schools` (name, district, description, status) VALUES
+  ('Lincoln High School', 'Springfield', 'Partner demonstration school for teacher residency.', 'published'),
+  ('Roosevelt Elementary', 'Shelbyville', 'Primary demonstration school for guided teaching practice.', 'published'),
+  ('Washington Middle School', 'Capital City', 'Model school for residency training.', 'published');
+
+INSERT IGNORE INTO `teachers` (fullName, email, phone, schoolId, bio, photoUrl, status) VALUES
+  ('Maria Garcia', 'maria.garcia@school.edu', '555-0101', 1, 'Third-grade teacher with 5 years of experience.', NULL, 'approved'),
+  ('James Wilson', 'james.wilson@school.edu', '555-0102', 2, 'Science teacher focusing on inquiry-based learning.', NULL, 'pending'),
+  ('Sarah Chen', 'sarah.chen@school.edu', '555-0103', 3, 'English literature teacher and mentor.', NULL, 'pending');
+
+INSERT IGNORE INTO `alumni` (fullName, email, phone, graduationYear, schoolId, bio, status) VALUES
+  ('David Johnson', 'david.johnson@alumni.edu', '555-0201', 2024, 1, 'Teaching 4th grade at Lincoln High School.', 'pending'),
+  ('Lisa Wong', 'lisa.wong@alumni.edu', '555-0202', 2024, 2, 'Teaching 2nd grade at Roosevelt Elementary.', 'pending'),
+  ('Michael Brown', 'michael.brown@alumni.edu', '555-0203', 2024, 3, 'Teaching 6th grade math at Washington Middle School.', 'pending');
+
+INSERT IGNORE INTO `newsArticles` (slug, title, category, excerpt, body, imageUrl, status, publishedAt) VALUES
+  ('welcome-to-alumni-network', 'Welcome to the PTR Alumni Network', 'Announcements', 'Welcome to the official community of PTRP alumni.', 'Welcome to the official digital community of the Primary Teacher Residency Program.', NULL, 'published', NOW()),
+  ('first-cohort-graduates', 'First Cohort Graduates Successfully', 'Success Stories', 'Celebrating the first class of PTRP graduates.', 'The first cohort of Primary Teacher Residents has successfully completed the 12-month residency program.', NULL, 'published', NOW());
+
+INSERT IGNORE INTO `galleryItems` (title, caption, url, mediaType, category, status, createdBy) VALUES
+  ('Graduation Ceremony', 'Graduation day for the first PTRP cohort', '/manus-storage/ptrp-pilot-launch.jpg', 'image', 'events', 'approved', 1),
+  ('Classroom Practice', 'Resident teachers in guided practice', '/manus-storage/ptrp-residents-1.jpg', 'image', 'practice', 'approved', 1);
+
+INSERT IGNORE INTO `bestPractices` (title, category, summary, body, status, createdAt) VALUES
+  ('Inquiry-Based Learning', 'Teaching practice', 'Encouraging students to ask questions and explore.', 'Inquiry-based learning is a student-centered approach...', 'published', NOW()),
+  ('Differentiated Instruction', 'Teaching practice', 'Tailoring instruction to meet diverse learner needs.', 'Differentiated instruction adapts content...', 'draft', NOW());
+
+-- ============================================================
+-- Social Media Integration tables
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `social_accounts` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `platform` enum('facebook','instagram','youtube','tiktok') NOT NULL,
+  `accountId` varchar(255) NOT NULL,
+  `accountName` varchar(255) NOT NULL,
+  `pageId` varchar(255) DEFAULT NULL,
+  `accessToken` text DEFAULT NULL,
+  `refreshToken` text DEFAULT NULL,
+  `tokenExpiresAt` datetime DEFAULT NULL,
+  `scopes` text DEFAULT NULL,
+  `status` enum('connected','error','disconnected') NOT NULL DEFAULT 'connected',
+  `lastSyncAt` timestamp NULL DEFAULT NULL,
+  `syncError` text DEFAULT NULL,
+  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `social_accounts_platform_account_unique` (`platform`, `accountId`),
+  KEY `social_accounts_status_idx` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `social_posts` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `accountId` int NOT NULL,
+  `platform` enum('facebook','instagram','youtube','tiktok') NOT NULL,
+  `platformPostId` varchar(255) NOT NULL,
+  `authorName` varchar(255) DEFAULT NULL,
+  `message` text DEFAULT NULL,
+  `mediaUrl` varchar(700) DEFAULT NULL,
+  `mediaType` enum('image','video','carousel','text') DEFAULT NULL,
+  `thumbnailUrl` varchar(700) DEFAULT NULL,
+  `postUrl` varchar(700) DEFAULT NULL,
+  `publishedAt` datetime DEFAULT NULL,
+  `websiteStatus` enum('pending','approved','rejected','published','archived') NOT NULL DEFAULT 'pending',
+  `websiteSection` enum('gallery','news','videos','homepage') DEFAULT NULL,
+  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `social_posts_platform_post_unique` (`platform`, `platformPostId`),
+  KEY `social_posts_account_idx` (`accountId`),
+  KEY `social_posts_websiteStatus_idx` (`websiteStatus`),
+  KEY `social_posts_publishedAt_idx` (`publishedAt`),
+  CONSTRAINT `social_posts_account_fk` FOREIGN KEY (`accountId`) REFERENCES `social_accounts` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `social_sync_logs` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `accountId` int NOT NULL,
+  `platform` enum('facebook','instagram','youtube','tiktok') NOT NULL,
+  `status` enum('success','partial','failed') NOT NULL,
+  `recordsFetched` int NOT NULL DEFAULT 0,
+  `recordsImported` int NOT NULL DEFAULT 0,
+  `recordsUpdated` int NOT NULL DEFAULT 0,
+  `errorMessage` text DEFAULT NULL,
+  `startedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `completedAt` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `social_sync_logs_account_idx` (`accountId`),
+  KEY `social_sync_logs_startedAt_idx` (`startedAt`),
+  CONSTRAINT `social_sync_logs_account_fk` FOREIGN KEY (`accountId`) REFERENCES `social_accounts` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -184,24 +184,35 @@ export const impactContent = {
   ],
 };
 
-export const modelSchools = [
-  { id: 1, name: "GS Matimba", district: "Nyagatare" },
-  { id: 2, name: "GS Jean de la Mennais Kirambo", district: "Burera" },
-  { id: 3, name: "GS Byumba Catholique", district: "Gicumbi" },
-  { id: 4, name: "GS Bihinga", district: "Gatsibo" },
-  { id: 5, name: "GS Akanzu", district: "Rwamagana" },
-  { id: 6, name: "Rukara Model School", district: "Kayonza" },
-  { id: 7, name: "GS Zaza A", district: "Ngoma" },
-  { id: 8, name: "GS Mayange A", district: "Bugesera" },
-  { id: 9, name: "GS St Jean Paul II", district: "Gisagara", note: "Recently called ES Save · district to confirm" },
-  { id: 10, name: "GS St Laurent Cyahinda", district: "Nyaruguru" },
-  { id: 11, name: "GS Mururu", district: "Rusizi" },
-  { id: 12, name: "GS Uwinkomo", district: "Nyamagabe" },
-  { id: 13, name: "GS Rubengera I", district: "Karongi" },
-  { id: 14, name: "GS Muramba B", district: "Ngororero" },
-  { id: 15, name: "GS St Etienne", district: "Muhanga" },
-  { id: 16, name: "G.S Umubano I", district: "Rubavu" },
-  { id: 17, name: "GS Nyarusange", district: "District to be confirmed", note: "District to confirm" },
+export type ModelSchool = {
+  id: number;
+  name: string;
+  district: string;
+  position: [number, number];
+  mapQuery: string;
+  address: string;
+  locationIsApproximate: boolean;
+  note?: string;
+};
+
+export const modelSchools: ModelSchool[] = [
+  { id: 1, name: "GS Matimba", district: "Nyagatare", position: [-1.1192116, 30.4293638], mapQuery: "GS Matimba Nyagatare Rwanda", address: "Matimba, Nyagatare", locationIsApproximate: true },
+  { id: 2, name: "GS Jean de la Mennais Kirambo", district: "Burera", position: [-1.5078282, 29.843203], mapQuery: "GS Jean de la Mennais Kirambo Burera Rwanda", address: "FRRV+V78, Unnamed Road, Kirambo", locationIsApproximate: false },
+  { id: 3, name: "GS Byumba Catholique", district: "Gicumbi", position: [-1.5739545, 30.0547538], mapQuery: "GS Byumba Catholique Gicumbi Rwanda", address: "EPA Byumba, Byumba", locationIsApproximate: true },
+  { id: 4, name: "GS Bihinga", district: "Gatsibo", position: [-1.6119493, 30.3823329], mapQuery: "GS Bihinga Gatsibo Rwanda", address: "99QJ+6WG, Kabarore", locationIsApproximate: true },
+  { id: 5, name: "GS Akanzu", district: "Rwamagana", position: [-2.0310475, 30.3336315], mapQuery: "GS Akanzu Rwamagana Rwanda", address: "Akanzu Secondary School, Rwamagana", locationIsApproximate: true },
+  { id: 6, name: "Rukara Model School", district: "Kayonza", position: [-1.8007845, 30.5034396], mapQuery: "Rukara Model School Kayonza Rwanda", address: "Rukara, Kayonza", locationIsApproximate: true },
+  { id: 7, name: "GS Zaza A", district: "Ngoma", position: [-2.1547942, 30.4303954], mapQuery: "GS Zaza A Ngoma Rwanda", address: "Zaza, Ngoma", locationIsApproximate: false },
+  { id: 8, name: "GS Mayange A", district: "Bugesera", position: [-2.1857909, 30.0958743], mapQuery: "GS Mayange A Bugesera Rwanda", address: "Mayange, Bugesera", locationIsApproximate: false },
+  { id: 9, name: "GS St Jean Paul II", district: "Gisagara", position: [-2.6529852, 29.8352303], mapQuery: "ES Save Gisagara Rwanda", address: "Save, Gisagara", note: "Recently called ES Save", locationIsApproximate: true },
+  { id: 10, name: "GS St Laurent Cyahinda", district: "Nyaruguru", position: [-2.7426028, 29.6127451], mapQuery: "GS St Laurent Cyahinda Nyaruguru Rwanda", address: "7J47+X35, Unnamed Road, Nyakizu", locationIsApproximate: false },
+  { id: 11, name: "GS Mururu", district: "Rusizi", position: [-2.5067736, 28.8952211], mapQuery: "GS Mururu Rusizi Rwanda", address: "Mururu, Rusizi", locationIsApproximate: true },
+  { id: 12, name: "GS Uwinkomo", district: "Nyamagabe", position: [-2.5028998, 29.4770416], mapQuery: "GS Uwinkomo Nyamagabe Rwanda", address: "Winkomo, Nyamagabe", locationIsApproximate: false },
+  { id: 13, name: "GS Rubengera I", district: "Karongi", position: [-2.0424556, 29.4126085], mapQuery: "GS Rubengera I Karongi Rwanda", address: "Rubengera, Karongi", locationIsApproximate: false },
+  { id: 14, name: "GS Muramba B", district: "Ngororero", position: [-1.7638062, 29.6151639], mapQuery: "GS Muramba B Ngororero Rwanda", address: "Muramba, Ngororero", locationIsApproximate: false },
+  { id: 15, name: "GS St Etienne", district: "Muhanga", position: [-2.129946, 29.7774184], mapQuery: "GS St Etienne Muhanga Rwanda", address: "Shyogwe, Muhanga", locationIsApproximate: false },
+  { id: 16, name: "G.S Umubano I", district: "Rubavu", position: [-1.681955, 29.253744], mapQuery: "GS Umubano I Rubavu Rwanda", address: "Umubano I, Rubavu", locationIsApproximate: false },
+  { id: 17, name: "GS Nyarusange", district: "Rwamagana", position: [-1.9335036, 30.452974], mapQuery: "GS Nyarusange Rwanda", address: "3F83+H5X, Rwamagana", note: "Google Maps identifies Nyarusange Secondary School in Rwamagana; confirm this is the PTRP school.", locationIsApproximate: true },
 ];
 
 export const hostColleges = [

@@ -75,7 +75,7 @@ The PTR Alumni Network exists to keep that community connected after graduation:
 | Home | `/` | Hero, programme introduction, key numbers, featured quote, video, latest three news posts, partners, and join call-to-action |
 | About the Program | `/about` | PTRP background, vision and mission, objectives, residency model, host colleges |
 | Impact | `/impact` | Programme outcomes, evidence-aware indicators, alumni transition narrative |
-| Model Schools | `/network` | All 17 model schools, text search, district filter, and an illustrative map |
+| Model Schools | `/network` | All 17 model schools on an interactive, filterable map, with per-school Google Maps directions |
 | News & Activities | `/news` | Categorised posts with filtering and featured content |
 | Gallery | `/gallery` | Albums for photos and video with an accessible lightbox |
 | Alumni Directory | `/alumni` | Filterable directory preview; profiles are placeholders until members consent |
@@ -122,7 +122,7 @@ This repository is honest about what is and is not implemented. The following li
 - **Admin roles are `user` and `admin` only.** Editor and Member tiers are not implemented.
 - **Email-notification and analytics modules** are not implemented.
 - **Admin content records are not yet rendered by the public marketing pages** (see the note above). Schools and news are now served from the database when records exist; model schools and news posts in `ptrp.ts` remain the fallback when the database is empty.
-- **Map pins are illustrative**, not exact coordinates.
+- **School location records are incomplete.** The `/network` map uses OpenStreetMap tiles and Google Maps search-result coordinates, and links to Google Maps for directions. Amber pins are area-level references where Google Maps did not identify an exact school entrance. Confirm the destination before travelling; sector/address details and exact coordinates should be verified by program administrators.
 - **Some school and contact details are marked pending** where no verified source exists.
 - **The language switcher is partial.** Page bodies and navigation labels remain in English.
 
@@ -141,6 +141,7 @@ These limitations should be addressed before presenting the admin workspace as a
 | Vite | 7.3.7 | Development server and production build |
 | Tailwind CSS | 4.1.14 | Utility-first styling, with `tw-animate-css` |
 | wouter | 3.3.5 | Client-side routing |
+| React-Leaflet / Leaflet | 5.0.0 / 1.9.4 | Interactive model-school map using OpenStreetMap tiles |
 | framer-motion | 12.23.22 | Navigation and modal animation |
 | TanStack Query | 5.90.2 | API queries and mutations |
 | lucide-react | 0.453.0 | Icons |

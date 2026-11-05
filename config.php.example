@@ -7,4 +7,19 @@ return [
     'db_password' => '',
     'base_path' => '/PTRP',
     'manus_jwt_secret' => '',
+    // ----- Social Media Integration API credentials -----
+    // Facebook Graph API
+    'social_facebook_app_id' => '',
+    'social_facebook_app_secret' => '',
+    // Instagram Graph API (uses Facebook app credentials)
+    'social_instagram_app_id' => '',
+    'social_instagram_app_secret' => '',
+    // YouTube Data API v3
+    'social_youtube_api_key' => '',
+    // TikTok for Business API
+    'social_tiktok_app_id' => '',
+    'social_tiktok_app_secret' => '',
+    'social_tiktok_redirect_uri' => '',
+    // OAuth callback base URL (your domain, e.g. https://example.com/PTRP/api/social/oauth/callback)
+    'social_oauth_callback_base' => '',
 ];

@@ -10,6 +10,7 @@ export class ApiError extends Error {
 export const queryKeys = {
   authMe: ["api", "auth", "me"] as const,
   adminOverview: ["api", "admin", "overview"] as const,
+  adminRecentUpdates: ["api", "admin", "recent-updates"] as const,
   adminContent: ["api", "admin", "content"] as const,
   adminMedia: ["api", "admin", "media"] as const,
   adminUsers: ["api", "admin", "users"] as const,
@@ -23,6 +24,11 @@ export const queryKeys = {
   adminMentors: ["api", "admin", "mentors"] as const,
   publicCoordinators: ["api", "coordinators"] as const,
   publicMentors: ["api", "mentors"] as const,
+  publicContent: (slug: string) => ["api", "content", slug] as const,
+  publicSettings: ["api", "settings"] as const,
+  publicNavigation: ["api", "navigation"] as const,
+  adminNavigation: ["api", "admin", "navigation"] as const,
+  adminSettings: ["api", "admin", "settings"] as const,
   socialPlatforms: ["api", "social", "platforms"] as const,
   socialPosts: ["api", "social", "posts"] as const,
   adminSocialAccounts: ["api", "admin", "social", "accounts"] as const,
@@ -33,6 +39,8 @@ export const queryKeys = {
   publicResidentTeachers: ["api", "resident-teachers"] as const,
   publicResidentTeacher: ["api", "resident-teacher"] as const,
   publicResidentBestPractices: ["api", "resident-best-practices"] as const,
+  adminUserStats: ["api", "admin", "user-stats"] as const,
+  adminActivityLogs: ["api", "admin", "activity-logs"] as const,
 };
 
 export async function apiRequest<T>(

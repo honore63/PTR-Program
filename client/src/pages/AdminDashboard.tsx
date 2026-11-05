@@ -6,15 +6,20 @@ import {
   Archive, BarChart3, BookOpen, Building2, CheckCircle2, FileText, GraduationCap,
   ImagePlus, LayoutDashboard, Loader2, LogOut, Pencil, Plus, School, ShieldCheck,
   Trash2, UploadCloud, UserCog, UsersRound, X, KeyRound, AlertCircle,
-  RefreshCw, Smartphone, Briefcase,
+  RefreshCw,
+  Smartphone,
+  UserRound,
+  Briefcase,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { SocialManager } from "./SocialManager";
+import { CmsPageRenderer, parseCmsPageLayout } from "@/components/ptrp/CmsPageRenderer";
 
 type AdminTab =
   | "overview" | "content" | "uploads" | "users"
   | "schools" | "teachers" | "alumni" | "news" | "gallery" | "practices"
-  | "social" | "coordinators" | "mentors" | "resident-teachers" | "resident-best-practices";
+  | "social" | "coordinators" | "mentors" | "resident-teachers" | "resident-best-practices"
+  | "navigation" | "settings";
 
 const starterPages = [
   { slug: "home", title: "PTR Alumni Network home", summary: "Hero, program snapshot, and homepage narrative", body: "Keep this record for the public homepage." },
@@ -22,6 +27,31 @@ const starterPages = [
   { slug: "network", title: "Our Network", summary: "Resident teachers and model schools", body: "Add approved network details here." },
   { slug: "impact", title: "Impact and evidence", summary: "Verified indicators and demonstrated outcomes", body: "Only publish verified indicators, reporting dates, sources, and evidence-aware outcome language here." },
 ];
+
+const cmsPageCatalog = [
+  { slug: "home", label: "Homepage", title: "Celebrating Excellence in Teacher Education" },
+  { slug: "about", label: "About", title: "About the Program" },
+  { slug: "network", label: "Model schools", title: "Our 17 model schools" },
+  { slug: "impact", label: "Impact", title: "From Residents to Education Leaders" },
+  { slug: "news", label: "News", title: "What We Are Doing" },
+  { slug: "gallery", label: "Gallery", title: "Our Journey in Pictures and Videos" },
+  { slug: "alumni", label: "Alumni", title: "Meet Our Alumni" },
+  { slug: "resources", label: "Resources", title: "Learn, Teach, Share" },
+  { slug: "partners", label: "Partners", title: "Together, We Make Teachers Matter" },
+  { slug: "contact", label: "Contact", title: "Join the PTR Alumni Network" },
+  { slug: "team", label: "Program team", title: "PTRP Program Coordinators & Mentors" },
+  { slug: "residents", label: "Resident teachers", title: "Resident Teachers" },
+  { slug: "register-resident", label: "Resident registration", title: "Register as a Resident Teacher" },
+];
+
+const emptyCmsLayout = JSON.stringify({
+  eyebrow: "PTR Alumni Network",
+  heroImage: "",
+  heroImageAlt: "",
+  sections: [
+    { type: "text", title: "Welcome", body: "Add approved page content here." },
+  ],
+}, null, 2);
 
 function AdminLoginForm() {
   const { login } = useAuth();
@@ -34,7 +64,7 @@ function AdminLoginForm() {
     e.preventDefault();
     setError(null);
     if (!username || !password) {
-      setError("Please enter your administrator email and password.");
+      setError("Please enter your administrator username and password.");
       return;
     }
     setLoading(true);
@@ -68,15 +98,14 @@ function AdminLoginForm() {
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.9rem", textAlign: "left" }}>
           <div>
             <label style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#4b5563", display: "block", marginBottom: "0.3rem" }}>
-              Email
+              Username
             </label>
             <input
-              type="email"
+              type="text"
               required
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="ptrp@admin.org"
-              autoComplete="username"
+              placeholder="Residents teachers"
               style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.9rem", color: "#111" }}
             />
           </div>
@@ -124,6 +153,7 @@ export default function AdminDashboard() {
   const queryClient = useQueryClient();
 
   const overview = useApiQuery<any>(queryKeys.adminOverview, "admin/overview", isAdmin);
+  const recentUpdates = useApiQuery<any[]>(queryKeys.adminRecentUpdates, "admin/recent-updates", isAdmin);
   const content = useApiQuery<any[]>(queryKeys.adminContent, "admin/content", isAdmin);
   const media = useApiQuery<any[]>(queryKeys.adminMedia, "admin/media", isAdmin);
   const users = useApiQuery<any[]>(queryKeys.adminUsers, "admin/users", isAdmin);
@@ -140,14 +170,57 @@ export default function AdminDashboard() {
   const mentors = useApiQuery<any[]>(queryKeys.adminMentors, "admin/mentors", isAdmin);
   const residentTeachers = useApiQuery<any[]>(queryKeys.adminResidentTeachers, "admin/resident-teachers", isAdmin);
   const residentBestPractices = useApiQuery<any[]>(queryKeys.adminResidentBestPractices, "admin/resident-best-practices", isAdmin);
+  const navigation = useApiQuery<any[]>(queryKeys.adminNavigation, "admin/navigation", isAdmin);
+  const settings = useApiQuery<any[]>(queryKeys.adminSettings, "admin/settings", isAdmin);
+  const userStats = useApiQuery<any>(queryKeys.adminUserStats, "admin/users/stats", isAdmin);
+  const activityLogs = useApiQuery<any[]>(queryKeys.adminActivityLogs, "admin/activity-logs", isAdmin);
 
-  const saveContent = useMutation({ mutationFn: (input: typeof contentForm) => apiRequest("admin/content", { method: "POST", body: input }), onSuccess: async () => { toast.success("Content saved"); setEditing(null); setContentForm({ slug: "", title: "", summary: "", body: "", status: "draft" }); await queryClient.invalidateQueries({ queryKey: queryKeys.adminContent }); await queryClient.invalidateQueries({ queryKey: queryKeys.adminOverview }); }, onError: (error: Error) => toast.error(error.message) });
+  const saveContent = useMutation({ mutationFn: (input: typeof contentForm) => apiRequest("admin/content", { method: "POST", body: input }), onSuccess: async (_data, input) => { toast.success("Page content saved"); setEditing(null); setContentForm({ slug: "", title: "", summary: "", body: "", status: "draft" }); await queryClient.invalidateQueries({ queryKey: queryKeys.adminContent }); await queryClient.invalidateQueries({ queryKey: queryKeys.adminOverview }); await queryClient.invalidateQueries({ queryKey: queryKeys.publicContent(input.slug) }); }, onError: (error: Error) => toast.error(error.message) });
+
+  const deleteContent = useMutation({
+    mutationFn: (row: { id: number; slug: string }) => apiRequest(`admin/content/${row.id}`, { method: "DELETE" }),
+    onSuccess: async (_data, row) => {
+      toast.success("Page override deleted");
+      await queryClient.invalidateQueries({ queryKey: queryKeys.adminContent });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.adminOverview });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.publicContent(row.slug) });
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const saveNavigation = useMutation({
+    mutationFn: (input: Record<string, unknown>) => apiRequest("admin/navigation", { method: "POST", body: input }),
+    onSuccess: async () => {
+      toast.success("Navigation item saved");
+      await invalidate(queryKeys.adminNavigation);
+      await invalidate(queryKeys.publicNavigation);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const saveSetting = useMutation({
+    mutationFn: (input: { settingKey: string; settingValue: string }) => apiRequest("admin/settings", { method: "POST", body: input }),
+    onSuccess: async () => {
+      toast.success("Website setting saved");
+      await invalidate(queryKeys.adminSettings);
+      await invalidate(queryKeys.publicSettings);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
 
   const uploadMedia = useMutation({ mutationFn: (input: { filename: string; mimeType: string; size: number; base64: string; altText: string | null }) => apiRequest("admin/media/upload", { method: "POST", body: input }), onSuccess: async () => { toast.success("Upload added to the media library"); setUploadAlt(""); if (fileRef.current) fileRef.current.value = ""; await queryClient.invalidateQueries({ queryKey: queryKeys.adminMedia }); await queryClient.invalidateQueries({ queryKey: queryKeys.adminOverview }); }, onError: (error: Error) => toast.error(error.message) });
 
   const updateMedia = useMutation({ mutationFn: (input: { id: number; altText?: string | null; status?: "pending" | "approved" | "archived" }) => apiRequest(`admin/media/${input.id}`, { method: "PUT", body: { altText: input.altText, status: input.status } }), onSuccess: async () => { toast.success("Media status updated"); await queryClient.invalidateQueries({ queryKey: queryKeys.adminMedia }); }, onError: (error: Error) => toast.error(error.message) });
 
-  const setRole = useMutation({ mutationFn: (input: { id: number; role: "user" | "admin" }) => apiRequest(`admin/users/${input.id}/role`, { method: "PATCH", body: { role: input.role } }), onSuccess: async () => { toast.success("Role updated"); await queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers }); }, onError: (error: Error) => toast.error(error.message) });
+  const setRole = useMutation({ mutationFn: (input: { id: number; role: "user" | "admin" }) => apiRequest(`admin/users/${input.id}/role`, { method: "PATCH", body: { role: input.role } }), onSuccess: async () => { toast.success("Role updated"); await invalidate(queryKeys.adminUsers); await invalidate(queryKeys.adminUserStats); }, onError: (error: Error) => toast.error(error.message) });
+
+  const setUserStatus = useMutation({ mutationFn: (input: { id: number; account_status: "active" | "inactive" }) => apiRequest(`admin/users/${input.id}/status`, { method: "PATCH", body: { account_status: input.account_status } }), onSuccess: async () => { toast.success("Account status updated"); await invalidate(queryKeys.adminUsers); await invalidate(queryKeys.adminUserStats); }, onError: (error: Error) => toast.error(error.message) });
+
+  const updateUser = useMutation({ mutationFn: (input: { id: number; name?: string; email?: string; role?: "user" | "admin"; account_type?: "public" | "resident_teacher" | "admin"; account_status?: "active" | "inactive" }) => apiRequest(`admin/users/${input.id}`, { method: "PATCH", body: input }), onSuccess: async () => { toast.success("Account updated"); await invalidate(queryKeys.adminUsers); await invalidate(queryKeys.adminUserStats); }, onError: (error: Error) => toast.error(error.message) });
+
+  const createUser = useMutation({ mutationFn: (input: { name: string; email: string; password: string; role: "user" | "admin"; account_type: "public" | "resident_teacher" | "admin"; account_status: "active" | "inactive" }) => apiRequest("admin/users", { method: "POST", body: input }), onSuccess: async () => { toast.success("User created successfully"); await invalidate(queryKeys.adminUsers); await invalidate(queryKeys.adminUserStats); }, onError: (error: Error) => toast.error(error.message || "Failed to create user") });
+
+  const deleteUser = useMutation({ mutationFn: (id: number) => apiRequest(`admin/users/${id}`, { method: "DELETE" }), onSuccess: async () => { toast.success("Account deleted"); await invalidate(queryKeys.adminUsers); await invalidate(queryKeys.adminUserStats); await invalidate(queryKeys.adminActivityLogs); }, onError: (error: Error) => toast.error(error.message) });
 
   const connectAccount = useMutation({
     mutationFn: (input: { platform: string; accountId: string; accountName: string; pageId?: string; accessToken: string; refreshToken?: string; tokenExpiresAt?: string }) =>
@@ -205,6 +278,8 @@ export default function AdminDashboard() {
   const mentorRows = useMemo(() => mentors.data ?? [], [mentors.data]);
   const residentTeacherRows = useMemo(() => residentTeachers.data ?? [], [residentTeachers.data]);
   const residentBestPracticeRows = useMemo(() => residentBestPractices.data ?? [], [residentBestPractices.data]);
+  const navigationRows = useMemo(() => navigation.data ?? [], [navigation.data]);
+  const settingRows = useMemo(() => settings.data ?? [], [settings.data]);
 
   const invalidate = (key: readonly unknown[]) => queryClient.invalidateQueries({ queryKey: key });
 
@@ -224,6 +299,16 @@ export default function AdminDashboard() {
   const deleteMentor = makeDelete("admin/mentors", queryKeys.adminMentors);
   const deleteResidentTeacher = makeDelete("admin/resident-teachers", queryKeys.adminResidentTeachers);
   const deleteResidentBestPractice = makeDelete("admin/resident-best-practices", queryKeys.adminResidentBestPractices);
+  const deleteNavigation = makeDelete("admin/navigation", queryKeys.adminNavigation);
+  const deleteSetting = useMutation({
+    mutationFn: (settingKey: string) => apiRequest(`admin/settings/${encodeURIComponent(settingKey)}`, { method: "DELETE" }),
+    onSuccess: async () => {
+      toast.success("Website setting deleted");
+      await invalidate(queryKeys.adminSettings);
+      await invalidate(queryKeys.publicSettings);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
 
   const setResidentTeacherStatus = useMutation({
     mutationFn: (input: { id: number; status: string; isFeatured?: boolean; displayOrder?: number }) =>
@@ -260,9 +345,17 @@ export default function AdminDashboard() {
     </div>
   );
 
-  const openEditor = (row?: typeof contentRows[number]) => {
-    if (row) { setEditing(row.id); setContentForm({ slug: row.slug, title: row.title, summary: row.summary ?? "", body: row.body, status: row.status }); }
-    else { setEditing(0); setContentForm({ slug: "", title: "", summary: "", body: "", status: "draft" }); }
+  const openEditor = (row?: typeof contentRows[number] | typeof cmsPageCatalog[number]) => {
+    if (row && "id" in row) {
+      setEditing(row.id);
+      setContentForm({ slug: row.slug, title: row.title, summary: row.summary ?? "", body: row.body, status: row.status });
+    } else if (row) {
+      setEditing(0);
+      setContentForm({ slug: row.slug, title: row.title, summary: "", body: emptyCmsLayout, status: "draft" });
+    } else {
+      setEditing(0);
+      setContentForm({ slug: "", title: "", summary: "", body: emptyCmsLayout, status: "draft" });
+    }
     setTab("content");
   };
 
@@ -284,9 +377,11 @@ export default function AdminDashboard() {
     { id: "practices", label: "Best practices", icon: Archive },
     { id: "social", label: "Social Media", icon: Smartphone },
     { id: "coordinators", label: "Coordinators", icon: Building2 },
-    { id: "mentors", label: "Mentors", icon: UsersRound },
+    { id: "mentors", label: "Mentors", icon: UserRound },
     { id: "resident-teachers", label: "Resident Teachers", icon: UsersRound },
     { id: "resident-best-practices", label: "Best Practices", icon: Briefcase },
+    { id: "navigation", label: "Navigation", icon: FileText },
+    { id: "settings", label: "Website settings", icon: Building2 },
     { id: "users", label: "Access and roles", icon: UserCog },
   ];
 
@@ -304,16 +399,16 @@ export default function AdminDashboard() {
         <header className="admin-header">
           <div>
             <p className="eyebrow text-[#168d6d]">Protected administration</p>
-            <h1>{tab === "overview" ? "Keep every public surface trustworthy." : tab === "content" ? "Edit website content" : tab === "uploads" ? "Manage media uploads" : tab === "schools" ? "Manage model schools" : tab === "teachers" ? "Manage resident teachers" : tab === "alumni" ? "Manage alumni" : tab === "news" ? "Manage news and events" : tab === "gallery" ? "Manage gallery" : tab === "practices" ? "Manage best practices" : tab === "social" ? "Social Media Integration" : tab === "coordinators" ? "Program Coordinators" : tab === "mentors" ? "Program Mentors" : tab === "resident-teachers" ? "Resident Teachers" : tab === "resident-best-practices" ? "Best Practices" : "Access and roles"}</h1>
+            <h1>{tab === "overview" ? "Keep every public surface trustworthy." : tab === "content" ? "Edit website content" : tab === "uploads" ? "Manage media uploads" : tab === "schools" ? "Manage model schools" : tab === "teachers" ? "Manage resident teachers" : tab === "alumni" ? "Manage alumni" : tab === "news" ? "Manage news and events" : tab === "gallery" ? "Manage gallery" : tab === "practices" ? "Manage best practices" : tab === "social" ? "Social Media Integration" : tab === "coordinators" ? "Program Coordinators" : tab === "mentors" ? "Program Mentors" : tab === "resident-teachers" ? "Resident Teachers" : tab === "resident-best-practices" ? "Best Practices" : tab === "navigation" ? "Manage website navigation" : tab === "settings" ? "Website identity and contact settings" : "Access and roles"}</h1>
             <p>Signed in as <strong>{user.name || user.email || "Administrator"}</strong>. Only approved administrators can change public content.</p>
           </div>
           <div className="admin-header-actions"><span className="admin-user-pill"><span className="admin-online-dot" /> Admin</span><button className="admin-icon-button" onClick={() => window.location.href = "/"} aria-label="Close admin workspace"><X className="size-4" /></button></div>
         </header>
 
-        {tab === "overview" && <OverviewPanel stats={overview.data} onNavigate={setTab} onSeedHome={() => openEditor()} />}
-        {tab === "content" && <ContentManager rows={contentRows} editing={editing} form={contentForm} setForm={setContentForm} onSave={() => saveContent.mutate(contentForm)} saving={saveContent.isPending} onOpenEditor={openEditor} onCancel={() => setEditing(null)} />}
+        {tab === "overview" && <OverviewPanel stats={overview.data} recentUpdates={recentUpdates.data ?? []} onNavigate={setTab} onSeedHome={openEditor} />}
+        {tab === "content" && <ContentManager rows={contentRows} editing={editing} form={contentForm} setForm={setContentForm} onSave={() => saveContent.mutate(contentForm)} saving={saveContent.isPending} onOpenEditor={openEditor} onCancel={() => setEditing(null)} onDelete={(row: any) => { if (window.confirm(`Delete the ${row.slug} page override? The bundled page will be shown again.`)) deleteContent.mutate({ id: row.id, slug: row.slug }); }} deleting={deleteContent.isPending} pageCatalog={cmsPageCatalog} />}
         {tab === "uploads" && <UploadManager rows={mediaRows} altText={uploadAlt} setAltText={setUploadAlt} fileRef={fileRef} onFile={uploadFile} uploading={uploadMedia.isPending} onArchive={(id: number) => updateMedia.mutate({ id, status: "archived" })} />}
-        {tab === "users" && <UsersManager rows={userRows} onRole={(id: number, role: "user" | "admin") => setRole.mutate({ id, role })} changing={setRole.isPending} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers })} />}
+        {tab === "users" && <UsersManager rows={userRows} stats={userStats.data} logs={activityLogs.data ?? []} onRole={(id: number, role: "user" | "admin") => setRole.mutate({ id, role })} onSetStatus={(id: number, status: "active" | "inactive") => setUserStatus.mutate({ id, account_status: status })} onUpdate={(id: number, data: any) => updateUser.mutate({ id, ...data })} onCreate={(data: any) => createUser.mutate(data)} onDelete={(id: number) => { if (window.confirm("Are you sure you want to remove this account?")) { deleteUser.mutate(id); } }} changing={setRole.isPending || setUserStatus.isPending || updateUser.isPending || createUser.isPending} onRefresh={() => { queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers }); queryClient.invalidateQueries({ queryKey: queryKeys.adminUserStats }); queryClient.invalidateQueries({ queryKey: queryKeys.adminActivityLogs }); }} />}
         {tab === "schools" && <SchoolsManager rows={schoolRows} onDelete={(id: number) => deleteSchool.mutate(id)} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminSchools })} />}
         {tab === "teachers" && <TeachersManager rows={teacherRows} schools={schoolRows} onDelete={(id: number) => deleteTeacher.mutate(id)} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminTeachers })} />}
         {tab === "alumni" && <AlumniManager rows={alumniRows} schools={schoolRows} onDelete={(id: number) => deleteAlumni.mutate(id)} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminAlumni })} />}
@@ -325,20 +420,23 @@ export default function AdminDashboard() {
         {tab === "mentors" && <TeamManager rows={mentorRows} role="mentor" onDelete={(id: number) => deleteMentor.mutate(id)} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminMentors })} />}
         {tab === "resident-teachers" && <ResidentTeachersManager rows={residentTeacherRows} onSave={saveResidentTeacher.mutate} onSetStatus={setResidentTeacherStatus.mutate} onDelete={deleteResidentTeacher.mutate} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminResidentTeachers })} saving={saveResidentTeacher.isPending || setResidentTeacherStatus.isPending} />}
         {tab === "resident-best-practices" && <ResidentBestPracticesManager rows={residentBestPracticeRows} teachers={residentTeacherRows} onSave={saveResidentBestPractice.mutate} onDelete={deleteResidentBestPractice.mutate} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminResidentBestPractices })} saving={saveResidentBestPractice.isPending} />}
+        {tab === "navigation" && <NavigationManager rows={navigationRows} onSave={saveNavigation.mutate} onDelete={(id: number) => { if (window.confirm("Delete this navigation item and its dropdown items?")) deleteNavigation.mutate(id); }} saving={saveNavigation.isPending} />}
+        {tab === "settings" && <WebsiteSettingsManager rows={settingRows} onSave={saveSetting.mutate} onDelete={(key: string) => { if (window.confirm(`Delete the ${key} setting?`)) deleteSetting.mutate(key); }} saving={saveSetting.isPending} />}
       </section>
     </main>
   );
 }
 
-function OverviewPanel({ stats, onNavigate, onSeedHome }: any) {
+function OverviewPanel({ stats, recentUpdates, onNavigate, onSeedHome }: any) {
   const cards = [
+    { id: "content", label: "Public pages", value: stats?.publicPageCount ?? cmsPageCatalog.length, desc: "Editable website routes" },
+    { id: "content", label: "Content items", value: stats?.contentCount ?? 0, desc: `${stats?.publishedCount ?? 0} published · ${stats?.draftCount ?? 0} drafts or hidden` },
     { id: "schools", label: "Model schools", value: stats?.schoolCount ?? 0, desc: "TTC-partner demonstration schools" },
     { id: "teachers", label: "Resident teachers", value: stats?.teacherCount ?? 0, desc: `${stats?.pendingTeachers ?? 0} pending review` },
     { id: "alumni", label: "Alumni network", value: stats?.alumniCount ?? 0, desc: `${stats?.pendingAlumni ?? 0} pending review` },
     { id: "news", label: "News & updates", value: stats?.newsCount ?? 0, desc: "Articles, briefings, events" },
     { id: "gallery", label: "Gallery records", value: stats?.galleryCount ?? 0, desc: "Photos & event videos" },
     { id: "practices", label: "Best practices", value: stats?.practiceCount ?? 0, desc: "Documented classroom resources" },
-    { id: "content", label: "Site content", value: stats?.publishedCount ?? 0, desc: `${stats?.publishedCount ?? 0} total revisions` },
     { id: "uploads", label: "Media assets", value: stats?.mediaCount ?? 0, desc: "Images & documents" },
     { id: "users", label: "Administrators", value: stats?.adminCount ?? 0, desc: `${stats?.userCount ?? 0} total accounts` },
     { id: "social", label: "Social media", value: stats?.socialCount ?? 0, desc: "Connected accounts & posts" },
@@ -367,35 +465,162 @@ function OverviewPanel({ stats, onNavigate, onSeedHome }: any) {
           ))}
         </div>
       </section>
+      <section className="admin-panel">
+        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Content health</p><h3>{stats?.attentionCount ?? 0} items need review</h3></div><span className="admin-status admin-status-draft">Drafts: {stats?.draftCount ?? 0}</span></div>
+        <p className="admin-muted mt-3">Pending registrations, unpublished records, and draft page content are not visible to public visitors.</p>
+        <div className="admin-table-wrap mt-3"><table className="admin-table"><thead><tr><th>Recent update</th><th>Content type</th><th>Updated</th></tr></thead><tbody>
+          {recentUpdates.map((row: any) => <tr key={`${row.contentType}-${row.id}`}><td><strong>{row.title}</strong></td><td>{row.contentType}</td><td>{row.updatedAt ? new Date(row.updatedAt).toLocaleString() : "—"}</td></tr>)}
+          {!recentUpdates.length && <tr><td colSpan={3} className="admin-empty">No recent database content updates.</td></tr>}
+        </tbody></table></div>
+      </section>
     </div>
   );
 }
 
-function ContentManager({ rows, editing, form, setForm, onSave, saving, onOpenEditor, onCancel }: any) {
+function ContentManager({ rows, editing, form, setForm, onSave, saving, onOpenEditor, onCancel, onDelete, deleting, pageCatalog }: any) {
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const [showPreview, setShowPreview] = useState(false);
+  const pageSize = 10;
+  const filteredRows = rows.filter((row: any) => {
+    const matchesSearch = `${row.slug} ${row.title} ${row.summary ?? ""}`.toLowerCase().includes(search.trim().toLowerCase());
+    return matchesSearch && (statusFilter === "all" || row.status === statusFilter);
+  });
+  const pageCount = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+  const pageRows = filteredRows.slice((page - 1) * pageSize, page * pageSize);
+  const layout = parseCmsPageLayout(form.body);
+  const canSave = /^[a-zA-Z0-9_-]{1,120}$/.test(form.slug) && form.title.trim() && form.summary.trim() && !!layout;
+
   return (
     <div className="admin-content">
       {editing !== null && (
         <section className="admin-panel admin-editor">
-          <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">{editing ? "Edit record" : "New record"}</p><h3>Content editor</h3></div><button className="admin-icon-button" onClick={onCancel} aria-label="Close editor"><X className="size-4" /></button></div>
+          <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">{editing ? "Edit page" : "New page"}</p><h3>Page content editor</h3></div><button className="admin-icon-button" onClick={onCancel} aria-label="Close editor"><X className="size-4" /></button></div>
+          <p className="admin-muted">Page records replace the bundled page only after publication. Content is rendered as safe text and image blocks; HTML and scripts are not executed.</p>
           <div className="admin-form-grid">
-            <label>Slug<input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="about" /></label>
-            <label>Title<input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Page title" /></label>
-            <label className="admin-full">Summary<textarea value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} rows={2} placeholder="Short description" /></label>
-            <label className="admin-full">Body<textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} rows={7} placeholder="Approved content" /></label>
+            <label>Slug<input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, "-") })} placeholder="about" disabled={!!editing} /></label>
+            <label>Page title<input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Page title" /></label>
+            <label className="admin-full">Page description<textarea value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} rows={2} placeholder="Short page description" /></label>
+            <label className="admin-full">Page sections (JSON)<textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} rows={14} spellCheck={false} aria-invalid={!layout} /></label>
+            <div className="admin-full flex flex-wrap items-center justify-between gap-3">
+              <p className={`text-xs ${layout ? "text-[#168d6d]" : "text-red-600"}`}>{layout ? `${layout.sections.length} valid content section(s)` : "Invalid JSON. Fix the page layout before saving."}</p>
+              <button type="button" className="button-secondary" onClick={() => setShowPreview((visible) => !visible)} disabled={!layout}>{showPreview ? "Hide preview" : "Preview page"}</button>
+            </div>
             <label>Status<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as "draft" | "published" })}><option value="draft">Draft</option><option value="published">Published</option></select></label>
           </div>
-          <div className="admin-form-actions"><button className="button-secondary" onClick={onCancel}>Cancel</button><button className="button-primary" onClick={onSave} disabled={saving}>{saving ? "Saving…" : "Save record"}</button></div>
-          </section>
+          <div className="admin-form-actions"><button className="button-secondary" onClick={onCancel}>Cancel</button><button className="button-primary" onClick={onSave} disabled={saving || !canSave}>{saving ? "Saving…" : form.status === "published" ? "Publish page" : "Save draft"}</button></div>
+          {showPreview && layout && <div className="mt-6 overflow-hidden rounded-xl border border-[#dce8ed]"><CmsPageRenderer title={form.title} summary={form.summary} layout={layout} /></div>}
+        </section>
       )}
       <section className="admin-panel">
-        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Website content</p><h3>{rows.length} records</h3></div></div>
+        <div className="admin-panel-heading">
+          <div><p className="eyebrow text-[#168d6d]">Website pages</p><h3>{filteredRows.length} matching page records</h3></div>
+          <button className="button-primary" onClick={() => onOpenEditor()}><Plus className="size-4" /> Add page</button>
+        </div>
+        <p className="admin-muted mt-3">Existing bundled content remains as the fallback until a matching page override is published.</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+          <label className="flex items-center border border-[#d9e5eb] rounded-lg px-3"><span className="sr-only">Search pages</span><input className="w-full bg-transparent py-2 text-sm outline-none" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Search pages by slug, title, or description" /></label>
+          <label className="flex items-center border border-[#d9e5eb] rounded-lg px-3"><span className="sr-only">Filter page status</span><select className="bg-transparent py-2 text-sm outline-none" value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1); }}><option value="all">All statuses</option><option value="published">Published</option><option value="draft">Draft</option></select></label>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {pageCatalog.filter((item: any) => !rows.some((row: any) => row.slug === item.slug)).map((item: any) => <button key={item.slug} className="admin-table-action rounded-full border border-[#dce8ed] px-3 py-1.5" onClick={() => onOpenEditor(item)}>Create {item.label} page</button>)}
+        </div>
         <div className="admin-table-wrap">
           <table className="admin-table"><thead><tr><th>Slug</th><th>Title</th><th>Status</th><th>Updated</th><th /></tr></thead><tbody>
-            {rows.length ? rows.map((row: any) => (
-              <tr key={row.id}><td><strong>{row.slug}</strong></td><td>{row.title}</td><td><span className={`admin-status ${row.status === "published" ? "admin-status-published" : "admin-status-draft"}`}>{row.status}</span></td><td>{row.updatedAt ? new Date(row.updatedAt).toLocaleDateString() : "—"}</td><td><button className="admin-table-action" onClick={() => onOpenEditor(row)}>Edit</button></td></tr>
-            )) : <tr><td colSpan={5} className="admin-empty">No content records yet.</td></tr>}
+            {pageRows.length ? pageRows.map((row: any) => (
+              <tr key={row.id}><td><strong>{row.slug}</strong><span>/{row.slug}</span></td><td>{row.title}</td><td><span className={`admin-status ${row.status === "published" ? "admin-status-published" : "admin-status-draft"}`}>{row.status}</span></td><td>{row.updatedAt ? new Date(row.updatedAt).toLocaleDateString() : "—"}</td><td className="admin-row-actions"><button className="admin-table-action" onClick={() => onOpenEditor(row)}><Pencil className="size-3.5" /> Edit</button><button className="admin-table-action admin-danger" disabled={deleting} onClick={() => onDelete(row)}><Trash2 className="size-3.5" /></button></td></tr>
+            )) : <tr><td colSpan={5} className="admin-empty">{rows.length ? "No page records match these filters." : "No page overrides yet. Create one to manage an existing page."}</td></tr>}
           </tbody></table>
         </div>
+        <div className="mt-4 flex items-center justify-between gap-3 text-xs text-[#64748b]">
+          <span>Page {Math.min(page, pageCount)} of {pageCount} · {filteredRows.length} records</span>
+          <div className="flex gap-2"><button className="admin-table-action" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</button><button className="admin-table-action" disabled={page >= pageCount} onClick={() => setPage((current) => Math.min(pageCount, current + 1))}>Next</button></div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function NavigationManager({ rows, onSave, onDelete, saving }: any) {
+  const [form, setForm] = useState({ id: 0, label: "", href: "", parentId: "", sortOrder: 0, isVisible: true, status: "published" });
+  const [search, setSearch] = useState("");
+  const filtered = rows.filter((row: any) => `${row.label} ${row.href}`.toLowerCase().includes(search.trim().toLowerCase()));
+  const edit = (row: any) => setForm({ id: row.id, label: row.label, href: row.href, parentId: row.parentId ? String(row.parentId) : "", sortOrder: Number(row.sortOrder) || 0, isVisible: Boolean(Number(row.isVisible)), status: row.status });
+  const submit = () => {
+    if (!form.label.trim() || !form.href.trim()) {
+      toast.error("Enter a navigation label and destination.");
+      return;
+    }
+    onSave({ ...form, id: form.id || undefined, parentId: form.parentId ? Number(form.parentId) : null, sortOrder: Number(form.sortOrder) || 0 });
+    setForm({ id: 0, label: "", href: "", parentId: "", sortOrder: 0, isVisible: true, status: "published" });
+  };
+  return (
+    <div className="admin-content">
+      <section className="admin-panel admin-editor">
+        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Navigation</p><h3>{form.id ? "Edit menu item" : "Add menu item"}</h3></div></div>
+        <div className="admin-form-grid">
+          <label>Menu label<input value={form.label} onChange={(event) => setForm({ ...form, label: event.target.value })} maxLength={120} /></label>
+          <label>Link destination<input value={form.href} onChange={(event) => setForm({ ...form, href: event.target.value })} placeholder="/about or https://example.com" maxLength={500} /></label>
+          <label>Dropdown parent<select value={form.parentId} onChange={(event) => setForm({ ...form, parentId: event.target.value })}><option value="">Top-level item</option>{rows.filter((row: any) => !row.parentId && row.id !== form.id).map((row: any) => <option key={row.id} value={row.id}>{row.label}</option>)}</select></label>
+          <label>Display order<input type="number" min="0" max="9999" value={form.sortOrder} onChange={(event) => setForm({ ...form, sortOrder: Number(event.target.value) || 0 })} /></label>
+          <label>Visibility<select value={form.isVisible ? "yes" : "no"} onChange={(event) => setForm({ ...form, isVisible: event.target.value === "yes" })}><option value="yes">Visible</option><option value="no">Hidden</option></select></label>
+          <label>Publication<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option value="published">Published</option><option value="draft">Draft</option></select></label>
+        </div>
+        <div className="admin-form-actions">{form.id !== 0 && <button className="button-secondary" onClick={() => setForm({ id: 0, label: "", href: "", parentId: "", sortOrder: 0, isVisible: true, status: "published" })}>Cancel edit</button>}<button className="button-primary" disabled={saving} onClick={submit}>{saving ? "Saving…" : form.id ? "Save menu item" : "Add menu item"}</button></div>
+      </section>
+      <section className="admin-panel">
+        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Published and draft links</p><h3>{rows.length} navigation items</h3></div></div>
+        <label className="mt-4 flex items-center rounded-lg border border-[#d9e5eb] px-3"><span className="sr-only">Search navigation items</span><input className="w-full bg-transparent py-2 text-sm outline-none" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search menu labels and destinations" /></label>
+        <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Label</th><th>Destination</th><th>Parent</th><th>Order</th><th>Status</th><th /></tr></thead><tbody>
+          {filtered.map((row: any) => <tr key={row.id}><td><strong>{row.label}</strong></td><td>{row.href}</td><td>{rows.find((item: any) => item.id === Number(row.parentId))?.label ?? "—"}</td><td>{row.sortOrder}</td><td><span className={`admin-status ${row.status === "published" && Number(row.isVisible) ? "admin-status-published" : "admin-status-draft"}`}>{row.status}{!Number(row.isVisible) ? " · hidden" : ""}</span></td><td className="admin-row-actions"><button className="admin-table-action" onClick={() => edit(row)}><Pencil className="size-3.5" /> Edit</button><button className="admin-table-action admin-danger" onClick={() => onDelete(row.id)}><Trash2 className="size-3.5" /></button></td></tr>)}
+          {!filtered.length && <tr><td colSpan={6} className="admin-empty">No navigation items found. Existing links remain active until at least one menu item is published.</td></tr>}
+        </tbody></table></div>
+      </section>
+    </div>
+  );
+}
+
+function WebsiteSettingsManager({ rows, onSave, onDelete, saving }: any) {
+  const [settingKey, setSettingKey] = useState("");
+  const [settingValue, setSettingValue] = useState("");
+  const [search, setSearch] = useState("");
+  const examples = [
+    ["siteName", "PTR Alumni Network"], ["logoUrl", "/ptrp-logo.svg"], ["contactEmail", "info@example.org"],
+    ["contactPhone", ""], ["contactAddress", ""], ["footerText", ""], ["primaryColor", "#0b2347"],
+    ["accentColor", "#0098d9"], ["metaTitle", ""], ["metaDescription", ""],
+    ["social.facebook", ""], ["social.instagram", ""], ["social.youtube", ""], ["social.linkedin", ""],
+  ];
+  const filtered = rows.filter((row: any) => `${row.settingKey} ${row.settingValue}`.toLowerCase().includes(search.trim().toLowerCase()));
+  const edit = (row: any) => { setSettingKey(row.settingKey); setSettingValue(row.settingValue); };
+  const submit = () => {
+    if (!/^[a-z][a-z0-9._-]{0,99}$/.test(settingKey) || !settingValue.trim()) {
+      toast.error("Enter a valid setting key and a non-empty value.");
+      return;
+    }
+    onSave({ settingKey, settingValue });
+    setSettingKey("");
+    setSettingValue("");
+  };
+  return (
+    <div className="admin-content">
+      <section className="admin-panel admin-editor">
+        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Brand, contact, and SEO</p><h3>{settingKey ? `Edit ${settingKey}` : "Add website setting"}</h3></div></div>
+        <p className="admin-muted">Recommended keys connect to the live header, footer, social links, and page metadata. Values are public and must never contain credentials.</p>
+        <div className="admin-form-grid">
+          <label>Setting key<input value={settingKey} onChange={(event) => setSettingKey(event.target.value)} placeholder="contactEmail" maxLength={100} /></label>
+          <label className="admin-full">Value<textarea value={settingValue} onChange={(event) => setSettingValue(event.target.value)} rows={2} maxLength={50000} /></label>
+        </div>
+        <div className="admin-form-actions">{settingKey && <button className="button-secondary" onClick={() => { setSettingKey(""); setSettingValue(""); }}>Cancel</button>}<button className="button-primary" disabled={saving} onClick={submit}>{saving ? "Saving…" : "Save setting"}</button></div>
+        <div className="mt-4 flex flex-wrap gap-2">{examples.filter(([key]) => !rows.some((row: any) => row.settingKey === key)).map(([key, value]) => <button key={key} className="admin-table-action rounded-full border border-[#dce8ed] px-3 py-1.5" onClick={() => { setSettingKey(key); setSettingValue(value); }}>{key}</button>)}</div>
+      </section>
+      <section className="admin-panel">
+        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Website configuration</p><h3>{rows.length} settings</h3></div></div>
+        <label className="mt-4 flex items-center rounded-lg border border-[#d9e5eb] px-3"><span className="sr-only">Search website settings</span><input className="w-full bg-transparent py-2 text-sm outline-none" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search settings" /></label>
+        <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Key</th><th>Value</th><th>Updated</th><th /></tr></thead><tbody>
+          {filtered.map((row: any) => <tr key={row.settingKey}><td><strong>{row.settingKey}</strong></td><td className="max-w-[420px] truncate">{row.settingValue}</td><td>{row.updatedAt ? new Date(row.updatedAt).toLocaleDateString() : "—"}</td><td className="admin-row-actions"><button className="admin-table-action" onClick={() => edit(row)}><Pencil className="size-3.5" /> Edit</button><button className="admin-table-action admin-danger" onClick={() => onDelete(row.settingKey)}><Trash2 className="size-3.5" /></button></td></tr>)}
+          {!filtered.length && <tr><td colSpan={4} className="admin-empty">No website settings found. Add one of the recommended keys to override its bundled default.</td></tr>}
+        </tbody></table></div>
       </section>
     </div>
   );
@@ -426,25 +651,42 @@ function UploadManager({ rows, altText, setAltText, fileRef, onFile, uploading, 
   );
 }
 
-function UsersManager({ rows, onRole, changing, onRefresh }: any) {
+function UsersManager({ rows, stats, logs, onRole, onSetStatus, onUpdate, onCreate, onDelete, changing, onRefresh }: any) {
   const [showAdd, setShowAdd] = useState(false);
   const [resetId, setResetId] = useState<number | null>(null);
+  const [editId, setEditId] = useState<number | null>(null);
   const [resetPasswordVal, setResetPasswordVal] = useState("");
-  const [addForm, setAddForm] = useState({ name: "", email: "", password: "", role: "admin" as "user" | "admin" });
+  const [addForm, setAddForm] = useState({ name: "", email: "", password: "", role: "user" as "user" | "admin", account_type: "public" as "public" | "resident_teacher" | "admin", account_status: "active" as "active" | "inactive" });
+  const [editForm, setEditForm] = useState({ id: 0, name: "", email: "", role: "user" as "user" | "admin", account_type: "public" as "public" | "resident_teacher" | "admin", account_status: "active" as "active" | "inactive" });
+  const [search, setSearch] = useState("");
+  const [filterRole, setFilterRole] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterType, setFilterType] = useState("all");
   const [saving, setSaving] = useState(false);
+
+  const filteredRows = useMemo(() => {
+    return rows.filter((row: any) => {
+      const matchesSearch = search === "" ||
+        (row.name || "").toLowerCase().includes(search.toLowerCase()) ||
+        (row.email || "").toLowerCase().includes(search.toLowerCase());
+      const matchesRole = filterRole === "all" || row.role === filterRole;
+      const matchesStatus = filterStatus === "all" || row.account_status === filterStatus;
+      const matchesType = filterType === "all" || row.account_type === filterType;
+      return matchesSearch && matchesRole && matchesStatus && matchesType;
+    });
+  }, [rows, search, filterRole, filterStatus, filterType]);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!addForm.name || !addForm.email || !addForm.password) {
-      toast.error("All fields are required.");
+      toast.error("Name, email, and password are required.");
       return;
     }
     setSaving(true);
     try {
-      await apiRequest("admin/users", { method: "POST", body: addForm });
-      toast.success("User created successfully");
+      await onCreate(addForm);
       setShowAdd(false);
-      setAddForm({ name: "", email: "", password: "", role: "admin" });
+      setAddForm({ name: "", email: "", password: "", role: "user", account_type: "public", account_status: "active" });
       onRefresh();
     } catch (error: any) {
       toast.error(error.message || "Failed to create user");
@@ -472,36 +714,100 @@ function UsersManager({ rows, onRole, changing, onRefresh }: any) {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure you want to remove this user account?")) return;
+    if (!window.confirm("Are you sure you want to remove this account? This cannot be undone.")) return;
     try {
-      await apiRequest(`admin/users/${id}`, { method: "DELETE" });
-      toast.success("User removed");
+      await onDelete(id);
+      toast.success("Account removed");
       onRefresh();
     } catch (error: any) {
-      toast.error(error.message || "Failed to delete user");
+      toast.error(error.message || "Failed to delete account");
     }
   };
 
+  const handleSaveEdit = async (id: number) => {
+    setSaving(true);
+    try {
+      await onUpdate(id, { name: editForm.name, email: editForm.email, role: editForm.role, account_type: editForm.account_type, account_status: editForm.account_status });
+      setEditId(null);
+      onRefresh();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update account");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const typeLabel: Record<string, string> = { public: "Public User", resident_teacher: "Resident Teacher", admin: "Administrator" };
+  const typeColor: Record<string, string> = { public: "#6b7280", resident_teacher: "#0098d9", admin: "#168d6d" };
+  const statusLabel: Record<string, string> = { active: "Active", inactive: "Inactive" };
+  const statusColor: Record<string, string> = { active: "#168d6d", inactive: "#9ca3af" };
+
   return (
     <div className="admin-content">
+      {/* Stats Dashboard */}
+      <section className="admin-panel">
+        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Account Overview</p><h3>User Statistics</h3></div></div>
+        <div className="admin-stats">
+          <div className="admin-stat-card">
+            <div className="admin-stat-top"><span>Total Accounts</span><UsersRound className="size-4 text-[#0098d9]" /></div>
+            <strong>{stats?.totalUsers ?? 0}</strong>
+            <small>All registered accounts</small>
+          </div>
+          <div className="admin-stat-card">
+            <div className="admin-stat-top"><span>Public Users</span><UserRound className="size-4 text-[#6b7280]" /></div>
+            <strong>{stats?.publicUsers ?? 0}</strong>
+            <small>General public accounts</small>
+          </div>
+          <div className="admin-stat-card">
+            <div className="admin-stat-top"><span>Resident Teachers</span><GraduationCap className="size-4 text-[#168d6d]" /></div>
+            <strong>{stats?.residentTeacherUsers ?? 0}</strong>
+            <small>Resident teacher accounts</small>
+          </div>
+          <div className="admin-stat-card">
+            <div className="admin-stat-top"><span>Administrators</span><ShieldCheck className="size-4 text-[#0098d9]" /></div>
+            <strong>{stats?.adminUsers ?? 0}</strong>
+            <small>Full system access</small>
+          </div>
+          <div className="admin-stat-card">
+            <div className="admin-stat-top"><span>Active</span><CheckCircle2 className="size-4 text-[#168d6d]" /></div>
+            <strong>{stats?.activeUsers ?? 0}</strong>
+            <small>Can sign in</small>
+          </div>
+          <div className="admin-stat-card">
+            <div className="admin-stat-top"><span>Inactive</span><AlertCircle className="size-4 text-[#9ca3af]" /></div>
+            <strong>{stats?.inactiveUsers ?? 0}</strong>
+            <small>Cannot sign in</small>
+          </div>
+          <div className="admin-stat-card">
+            <div className="admin-stat-top"><span>Recent (7 days)</span><BarChart3 className="size-4 text-[#38bdf8]" /></div>
+            <strong>{stats?.recentUsers ?? 0}</strong>
+            <small>New registrations</small>
+          </div>
+        </div>
+      </section>
+
+      {/* Add User Form */}
       {showAdd && (
         <section className="admin-panel admin-editor">
-          <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">User Provisioning</p><h3>Create Administrator or Member Account</h3></div></div>
+          <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Create Account</p><h3>Register New User</h3></div><button className="admin-icon-button" onClick={() => setShowAdd(false)} aria-label="Close"><X className="size-4" /></button></div>
           <form onSubmit={handleAdd}>
             <div className="admin-form-grid">
               <label>Full Name<input required value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })} placeholder="Full name" /></label>
               <label>Email Address<input required type="email" value={addForm.email} onChange={(e) => setAddForm({ ...addForm, email: e.target.value })} placeholder="name@domain.rw" /></label>
               <label>Initial Password (min 8 chars)<input required type="password" minLength={8} value={addForm.password} onChange={(e) => setAddForm({ ...addForm, password: e.target.value })} placeholder="••••••••" /></label>
-              <label>Role<select value={addForm.role} onChange={(e) => setAddForm({ ...addForm, role: e.target.value as "user" | "admin" })}><option value="admin">Administrator</option><option value="user">User / Member</option></select></label>
+              <label>Role<select value={addForm.role} onChange={(e) => setAddForm({ ...addForm, role: e.target.value as "user" | "admin" })}><option value="user">User / Member</option><option value="admin">Administrator</option></select></label>
+              <label>Account Type<select value={addForm.account_type} onChange={(e) => setAddForm({ ...addForm, account_type: e.target.value as "public" | "resident_teacher" | "admin" })}><option value="public">Public User</option><option value="resident_teacher">Resident Teacher</option><option value="admin">Administrator</option></select></label>
+              <label>Account Status<select value={addForm.account_status} onChange={(e) => setAddForm({ ...addForm, account_status: e.target.value as "active" | "inactive" })}><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
             </div>
             <div className="admin-form-actions">
               <button type="button" className="button-secondary" onClick={() => setShowAdd(false)}>Cancel</button>
-              <button type="submit" className="button-primary" disabled={saving}>{saving ? "Saving…" : "Create Account"}</button>
+              <button type="submit" className="button-primary" disabled={saving}>{saving ? "Creating…" : "Create Account"}</button>
             </div>
           </form>
         </section>
       )}
 
+      {/* Reset Password Form */}
       {resetId !== null && (
         <section className="admin-panel admin-editor" style={{ borderColor: "#0098d9" }}>
           <div className="admin-panel-heading"><div><p className="eyebrow text-[#0098d9]">Security</p><h3>Reset Password for Account #{resetId}</h3></div></div>
@@ -519,15 +825,133 @@ function UsersManager({ rows, onRole, changing, onRefresh }: any) {
         </section>
       )}
 
+      {/* Edit User Form */}
+      {editId !== null && (
+        <section className="admin-panel admin-editor">
+          <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Edit Account</p><h3>Update User Details</h3></div><button className="admin-icon-button" onClick={() => setEditId(null)} aria-label="Close"><X className="size-4" /></button></div>
+          <form onSubmit={(e) => { e.preventDefault(); handleSaveEdit(editId); }}>
+            <div className="admin-form-grid">
+              <label>Full Name<input required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></label>
+              <label>Email Address<input required type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} /></label>
+              <label>Role<select value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value as "user" | "admin" })}><option value="user">User / Member</option><option value="admin">Administrator</option></select></label>
+              <label>Account Type<select value={editForm.account_type} onChange={(e) => setEditForm({ ...editForm, account_type: e.target.value as "public" | "resident_teacher" | "admin" })}><option value="public">Public User</option><option value="resident_teacher">Resident Teacher</option><option value="admin">Administrator</option></select></label>
+              <label>Account Status<select value={editForm.account_status} onChange={(e) => setEditForm({ ...editForm, account_status: e.target.value as "active" | "inactive" })}><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
+            </div>
+            <div className="admin-form-actions">
+              <button type="button" className="button-secondary" onClick={() => setEditId(null)}>Cancel</button>
+              <button type="submit" className="button-primary" disabled={saving}>{saving ? "Saving…" : "Save Changes"}</button>
+            </div>
+          </form>
+        </section>
+      )}
+
+      {/* Filters and Search */}
       <section className="admin-panel">
-        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Access control</p><h3>{rows.length} authenticated accounts</h3></div></div>
-        <p className="admin-muted">Only administrators can edit the site and manage uploads. Role changes are restricted server-side to the project owner.</p>
+        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Account Directory</p><h3>{filteredRows.length} account(s)</h3></div></div>
+        <div className="admin-search-filters" style={{ display: "grid", gap: "1rem", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", marginBottom: "1rem" }}>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-bold uppercase tracking-[0.1em] text-[#4b5563]">Search</label>
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Name or email…" className="px-3 py-2 rounded-lg border border-[#d1d5db] text-sm text-[#111] focus:ring-2 focus:ring-[#0098d9] focus:border-transparent outline-none" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-bold uppercase tracking-[0.1em] text-[#4b5563]">Role</label>
+            <select value={filterRole} onChange={(e) => setFilterRole(e.target.value)} className="px-3 py-2 rounded-lg border border-[#d1d5db] text-sm text-[#111] focus:ring-2 focus:ring-[#0098d9] focus:border-transparent outline-none">
+              <option value="all">All Roles</option>
+              <option value="admin">Administrator</option>
+              <option value="user">User / Member</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-bold uppercase tracking-[0.1em] text-[#4b5563]">Status</label>
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-3 py-2 rounded-lg border border-[#d1d5db] text-sm text-[#111] focus:ring-2 focus:ring-[#0098d9] focus:border-transparent outline-none">
+              <option value="all">All Statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-bold uppercase tracking-[0.1em] text-[#4b5563]">Account Type</label>
+            <select value={filterType} onChange={(e) => setFilterType(e.target.value)} className="px-3 py-2 rounded-lg border border-[#d1d5db] text-sm text-[#111] focus:ring-2 focus:ring-[#0098d9] focus:border-transparent outline-none">
+              <option value="all">All Types</option>
+              <option value="public">Public User</option>
+              <option value="resident_teacher">Resident Teacher</option>
+              <option value="admin">Administrator</option>
+            </select>
+          </div>
+        </div>
+
         <div className="admin-table-wrap">
-          <table className="admin-table"><thead><tr><th>Account</th><th>Role</th><th>Last sign-in</th><th /></tr></thead><tbody>
-            {rows.length ? rows.map((row: any) => (
-              <tr key={row.id}><td><strong>{row.name || "Unnamed account"}</strong><span>{row.email || "No email supplied"}</span></td><td><span className={`admin-status ${row.role === "admin" ? "admin-status-published" : "admin-status-draft"}`}>{row.role}</span></td><td>{row.lastSignedIn ? new Date(row.lastSignedIn).toLocaleDateString() : "—"}</td><td><button className="admin-table-action" disabled={changing} onClick={() => onRole(row.id, row.role === "admin" ? "user" : "admin")}>{row.role === "admin" ? "Remove admin" : "Make admin"}</button></td></tr>
-            )) : <tr><td colSpan={4} className="admin-empty">No authenticated users have signed in yet.</td></tr>}
-          </tbody></table>
+          <table className="admin-table">
+            <thead>
+              <tr><th>Account</th><th>Type</th><th>Role</th><th>Status</th><th>Last Sign-in</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+              {filteredRows.length ? filteredRows.map((row: any) => (
+                <tr key={row.id}>
+                  <td>
+                    <div>
+                      <strong>{row.name || "Unnamed account"}</strong>
+                      <span style={{ fontSize: "0.7rem", color: "#6b7280" }}>{row.email || "No email"}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", color: typeColor[row.account_type] || "#6b7280", fontWeight: 700, fontSize: "0.7rem", textTransform: "uppercase" }}>{typeLabel[row.account_type] || row.account_type}</span>
+                  </td>
+                  <td>
+                    <span className={`admin-status ${row.role === "admin" ? "admin-status-published" : "admin-status-draft"}`}>{row.role}</span>
+                  </td>
+                  <td>
+                    <span className={`admin-status ${row.account_status === "active" ? "admin-status-published" : "admin-status-draft"}`}>{statusLabel[row.account_status] || row.account_status}</span>
+                  </td>
+                  <td>{row.lastSignedIn ? new Date(row.lastSignedIn).toLocaleDateString() : "—"}</td>
+                  <td className="admin-row-actions">
+                    <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+                      <button className="admin-table-action" onClick={() => { const r = rows.find((r2: any) => r2.id === row.id); setEditForm({ id: row.id, name: r.name, email: r.email, role: r.role, account_type: r.account_type, account_status: r.account_status }); setEditId(row.id); }}>Edit</button>
+                      <button className="admin-table-action" onClick={() => onSetStatus(row.id, row.account_status === "active" ? "inactive" : "active")}>{row.account_status === "active" ? "Deactivate" : "Activate"}</button>
+                      <button className="admin-table-action" onClick={() => { setResetId(row.id); setResetPasswordVal(""); }}>Reset Password</button>
+                      <button className="admin-table-action" onClick={() => onRole(row.id, row.role === "admin" ? "user" : "admin")} disabled={changing}>{row.role === "admin" ? "Remove Admin" : "Make Admin"}</button>
+                      <button className="admin-table-action admin-danger" onClick={() => handleDelete(row.id)} disabled={changing}><Trash2 className="size-3.5" /></button>
+                    </div>
+                  </td>
+                </tr>
+              )) : (
+                <tr><td colSpan={6} className="admin-empty">No accounts match those filters.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="admin-actions" style={{ display: "flex", gap: "0.75rem", marginTop: "1rem" }}>
+          <button className="button-primary" onClick={() => { setShowAdd(true); setEditId(null); }} disabled={changing}><Plus className="size-4" /> Add Account</button>
+          <button className="button-secondary" onClick={onRefresh}>Refresh</button>
+        </div>
+      </section>
+
+      {/* Audit Logs */}
+      <section className="admin-panel">
+        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Audit Trail</p><h3>Recent Administrative Actions</h3></div></div>
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr><th>Date</th><th>Administrator</th><th>Action</th><th>Entity</th><th>ID</th></tr>
+            </thead>
+            <tbody>
+              {logs.length ? logs.slice(0, 10).map((log: any) => (
+                <tr key={log.id}>
+                  <td>{log.createdAt ? new Date(log.createdAt).toLocaleDateString() : "—"}</td>
+                  <td>{log.adminName || "Unknown"}</td>
+                  <td style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase" }}>{log.action}</td>
+                  <td>{log.entityType}</td>
+                  <td>{log.entityId ?? "—"}</td>
+                </tr>
+              )) : (
+                <tr><td colSpan={5} className="admin-empty">No audit log entries yet.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="admin-actions" style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.5rem" }}>
+          <button className="button-secondary" onClick={onRefresh}>Refresh Logs</button>
         </div>
       </section>
     </div>
@@ -765,7 +1189,7 @@ function TeamManager({ rows, role, onDelete, onRefresh }: { rows: any[]; role: "
     photoUrl: "",
     bio: "",
     responsibilities: "",
-    displayOrder: "",
+    displayOrder: 0,
     isVisible: true,
     status: role === "coordinator" ? "published" : "draft",
   }));
@@ -841,7 +1265,7 @@ function TeamManager({ rows, role, onDelete, onRefresh }: { rows: any[]; role: "
         photoUrl: "",
         bio: "",
         responsibilities: "",
-        displayOrder: "",
+        displayOrder: 0,
         isVisible: true,
         status: role === "coordinator" ? "published" : "draft",
       });
@@ -875,7 +1299,7 @@ function TeamManager({ rows, role, onDelete, onRefresh }: { rows: any[]; role: "
           )}
           <label className="admin-full">Biography<textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} rows={3} placeholder="Short biography" /></label>
           <label className="admin-full">Responsibilities<textarea value={form.responsibilities} onChange={(e) => setForm({ ...form, responsibilities: e.target.value })} rows={3} placeholder="Role responsibilities" /></label>
-          <label>Display order<input type="number" value={form.displayOrder} onChange={(e) => setForm({ ...form, displayOrder: e.target.value })} /></label>
+          <label>Display order<input type="number" value={form.displayOrder} onChange={(e) => setForm({ ...form, displayOrder: Number(e.target.value) || 0 })} /></label>
           <label>Visible<input type="checkbox" checked={form.isVisible} onChange={(e) => setForm({ ...form, isVisible: e.target.checked })} /></label>
           <label>Status<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option value="draft">Draft</option><option value="published">Published</option></select></label>
         </div>
@@ -885,7 +1309,7 @@ function TeamManager({ rows, role, onDelete, onRefresh }: { rows: any[]; role: "
         <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">{role === "coordinator" ? "Program Coordinators" : "Program Mentors"}</p><h3>{rows.length} records</h3></div></div>
         <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Name</th><th>Organization</th><th>Status</th><th>Visible</th><th /></tr></thead><tbody>
           {rows.length ? rows.map((row: any) => (
-            <tr key={row.id}><td><strong>{row.fullName}</strong><span>{row.organization}</span></td><td>{row.organization}</td><td><span className={`admin-status ${row.status === "published" ? "admin-status-published" : "admin-status-draft"}`}>{row.status}</span></td><td><span className={`admin-status ${row.isVisible ? "admin-status-published" : "admin-status-draft"}`}>{row.isVisible ? "Yes" : "No"}</span></td><td className="admin-row-actions"><button className="admin-table-action" onClick={() => setForm({ id: row.id, fullName: row.fullName, organization: row.organization, email: row.email ?? "", phone: row.phone ?? "", photoUrl: row.photoUrl ?? "", bio: row.bio ?? "", responsibilities: row.responsibilities ?? "", displayOrder: row.displayOrder ?? "", isVisible: row.isVisible, status: row.status })}>Edit</button><button className="admin-table-action admin-danger" onClick={() => onDelete(row.id)}><Trash2 className="size-3.5" /></button></td></tr>
+            <tr key={row.id}><td><strong>{row.fullName}</strong><span>{row.organization}</span></td><td>{row.organization}</td><td><span className={`admin-status ${row.status === "published" ? "admin-status-published" : "admin-status-draft"}`}>{row.status}</span></td><td><span className={`admin-status ${row.isVisible ? "admin-status-published" : "admin-status-draft"}`}>{row.isVisible ? "Yes" : "No"}</span></td><td className="admin-row-actions"><button className="admin-table-action" onClick={() => setForm({ id: row.id, fullName: row.fullName, organization: row.organization, email: row.email ?? "", phone: row.phone ?? "", photoUrl: row.photoUrl ?? "", bio: row.bio ?? "", responsibilities: row.responsibilities ?? "", displayOrder: Number(row.displayOrder) || 0, isVisible: row.isVisible, status: row.status })}>Edit</button><button className="admin-table-action admin-danger" onClick={() => onDelete(row.id)}><Trash2 className="size-3.5" /></button></td></tr>
           )) : <tr><td colSpan={5} className="admin-empty">No {role} records yet.</td></tr>}
         </tbody></table></div>
       </section>

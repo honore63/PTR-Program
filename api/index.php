@@ -68,6 +68,12 @@ function ensureDatabaseSchema(PDO $pdo): void
             $pdo->exec("ALTER TABLE users ADD COLUMN resetTokenExpires DATETIME NULL AFTER resetToken");
         }
         $pdo->exec("ALTER TABLE users MODIFY COLUMN openId VARCHAR(64) NULL");
+        if (!in_array('account_status', $columns, true)) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN account_status ENUM('active','inactive') NOT NULL DEFAULT 'active' AFTER role");
+        }
+        if (!in_array('account_type', $columns, true)) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN account_type ENUM('public','resident_teacher','admin') NOT NULL DEFAULT 'public' AFTER account_status");
+        }
 
     } catch (Throwable $e) {
         error_log('Database schema migration notice: ' . $e->getMessage());
@@ -449,6 +455,19 @@ function routeRequest(): void
         $statement->execute([$matches[1]]);
         respond($statement->fetch() ?: null);
     }
+    if ($route === '/content' && $method === 'GET') {
+        respond(database()->query("SELECT id, slug, title, summary, body, status, createdAt, updatedAt FROM siteContent WHERE status = 'published' ORDER BY updatedAt DESC")->fetchAll());
+    }
+    if ($route === '/settings' && $method === 'GET') {
+        $settings = [];
+        foreach (database()->query('SELECT settingKey, settingValue FROM websiteSettings')->fetchAll() as $row) {
+            $settings[$row['settingKey']] = $row['settingValue'];
+        }
+        respond($settings);
+    }
+    if ($route === '/navigation' && $method === 'GET') {
+        respond(database()->query("SELECT id, label, href, parentId, sortOrder FROM navigationItems WHERE status = 'published' AND isVisible = 1 ORDER BY sortOrder ASC, id ASC")->fetchAll());
+    }
     if ($route === '/schools' && $method === 'GET') {
         respond(database()->query("SELECT * FROM schools WHERE status = 'published' ORDER BY name ASC")->fetchAll());
     }
@@ -488,8 +507,38 @@ function routeRequest(): void
 
     if ($route === '/admin/overview' && $method === 'GET') {
         $row = database()->query("SELECT
-            (SELECT COUNT(*) FROM siteContent) AS contentCount,
-            (SELECT COUNT(*) FROM siteContent WHERE status = 'published') AS publishedCount,
+            13 AS publicPageCount,
+            ((SELECT COUNT(*) FROM siteContent) +
+             (SELECT COUNT(*) FROM newsArticles) +
+             (SELECT COUNT(*) FROM galleryItems) +
+             (SELECT COUNT(*) FROM schools) +
+             (SELECT COUNT(*) FROM teachers) +
+             (SELECT COUNT(*) FROM alumni) +
+             (SELECT COUNT(*) FROM bestPractices) +
+             (SELECT COUNT(*) FROM coordinators) +
+             (SELECT COUNT(*) FROM mentors) +
+             (SELECT COUNT(*) FROM resident_teachers) +
+             (SELECT COUNT(*) FROM resident_best_practices)) AS contentCount,
+            ((SELECT COUNT(*) FROM siteContent WHERE status = 'published') +
+             (SELECT COUNT(*) FROM newsArticles WHERE status = 'published') +
+             (SELECT COUNT(*) FROM galleryItems WHERE status = 'approved') +
+             (SELECT COUNT(*) FROM schools WHERE status = 'published') +
+             (SELECT COUNT(*) FROM teachers WHERE status = 'approved') +
+             (SELECT COUNT(*) FROM alumni WHERE status = 'approved') +
+             (SELECT COUNT(*) FROM bestPractices WHERE status = 'published') +
+             (SELECT COUNT(*) FROM coordinators WHERE status = 'published' AND isVisible = 1) +
+             (SELECT COUNT(*) FROM mentors WHERE status = 'published' AND isVisible = 1) +
+             (SELECT COUNT(*) FROM resident_teachers WHERE status IN ('approved','published'))) AS publishedCount,
+            ((SELECT COUNT(*) FROM siteContent WHERE status = 'draft') +
+             (SELECT COUNT(*) FROM newsArticles WHERE status = 'draft') +
+             (SELECT COUNT(*) FROM galleryItems WHERE status = 'pending') +
+             (SELECT COUNT(*) FROM schools WHERE status = 'draft') +
+             (SELECT COUNT(*) FROM teachers WHERE status = 'pending') +
+             (SELECT COUNT(*) FROM alumni WHERE status = 'pending') +
+             (SELECT COUNT(*) FROM bestPractices WHERE status = 'draft') +
+             (SELECT COUNT(*) FROM coordinators WHERE status = 'draft' OR isVisible = 0) +
+             (SELECT COUNT(*) FROM mentors WHERE status = 'draft' OR isVisible = 0) +
+             (SELECT COUNT(*) FROM resident_teachers WHERE status IN ('pending','unpublished'))) AS draftCount,
             (SELECT COUNT(*) FROM mediaAssets) AS mediaCount,
             (SELECT COUNT(*) FROM users) AS userCount,
             (SELECT COUNT(*) FROM users WHERE role = 'admin') AS adminCount,
@@ -500,9 +549,25 @@ function routeRequest(): void
             (SELECT COUNT(*) FROM galleryItems) AS galleryCount,
             (SELECT COUNT(*) FROM bestPractices) AS practiceCount,
             (SELECT COUNT(*) FROM teachers WHERE status = 'pending') AS pendingTeachers,
-            (SELECT COUNT(*) FROM alumni WHERE status = 'pending') AS pendingAlumni
+            (SELECT COUNT(*) FROM alumni WHERE status = 'pending') AS pendingAlumni,
+            ((SELECT COUNT(*) FROM teachers WHERE status = 'pending') +
+             (SELECT COUNT(*) FROM alumni WHERE status = 'pending') +
+             (SELECT COUNT(*) FROM resident_teachers WHERE status = 'pending') +
+             (SELECT COUNT(*) FROM social_posts WHERE status = 'pending')) AS attentionCount
         ")->fetch();
         respond(array_map('intval', $row));
+    }
+    if ($route === '/admin/recent-updates' && $method === 'GET') {
+        $updates = database()->query("SELECT id, title, contentType, updatedAt FROM (
+            SELECT id, title, 'Page' AS contentType, updatedAt FROM siteContent
+            UNION ALL SELECT id, title, 'News', updatedAt FROM newsArticles
+            UNION ALL SELECT id, title, 'Gallery', createdAt FROM galleryItems
+            UNION ALL SELECT id, name, 'School', updatedAt FROM schools
+            UNION ALL SELECT id, fullName, 'Coordinator', updatedAt FROM coordinators
+            UNION ALL SELECT id, fullName, 'Mentor', updatedAt FROM mentors
+            UNION ALL SELECT id, fullName, 'Resident teacher', updatedAt FROM resident_teachers
+        ) recent ORDER BY updatedAt DESC LIMIT 10")->fetchAll();
+        respond($updates);
     }
 
     // ---------- Content ----------
@@ -515,9 +580,27 @@ function routeRequest(): void
         $slug = inputString($data, 'slug', 120, true);
         $title = inputString($data, 'title', 255, true);
         $summary = inputString($data, 'summary', 500);
-        $body = inputString($data, 'body', 100000, true);
+        $body = inputString($data, 'body', 1000000, true);
         $status = $data['status'] ?? '';
         if (!in_array($status, ['draft', 'published'], true)) throw new ApiError(400, 'Invalid content status.');
+        $cmsPageSlugs = ['home', 'about', 'network', 'impact', 'news', 'gallery', 'alumni', 'resources', 'partners', 'contact', 'team', 'residents', 'register-resident'];
+        if (in_array($slug, $cmsPageSlugs, true)) {
+            $layout = json_decode($body, true);
+            if (!is_array($layout) || !isset($layout['sections']) || !is_array($layout['sections']) || count($layout['sections']) > 100) {
+                throw new ApiError(400, 'Page content must be a JSON layout with a sections array.');
+            }
+            foreach ($layout['sections'] as $section) {
+                if (!is_array($section) || !in_array($section['type'] ?? '', ['text', 'image', 'cards', 'callout'], true)) {
+                    throw new ApiError(400, 'Page content contains an unsupported section type.');
+                }
+                foreach (['imageUrl', 'buttonHref'] as $urlField) {
+                    $url = $section[$urlField] ?? '';
+                    if ($url !== '' && (!is_string($url) || (!str_starts_with($url, '/') && !preg_match('#^https?://#i', $url)))) {
+                        throw new ApiError(400, 'Page image and button links must use a local path or http/https URL.');
+                    }
+                }
+            }
+        }
         $statement = database()->prepare('INSERT INTO siteContent (slug, title, summary, body, status, updatedBy) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE title = VALUES(title), summary = VALUES(summary), body = VALUES(body), status = VALUES(status), updatedBy = VALUES(updatedBy)');
         $statement->execute([$slug, $title, $summary, $body, $status, $user['id']]);
         $fetch = database()->prepare('SELECT * FROM siteContent WHERE slug = ? LIMIT 1'); $fetch->execute([$slug]);
@@ -526,6 +609,71 @@ function routeRequest(): void
     if (preg_match('#^/admin/content/(\d+)$#', $route, $matches) && $method === 'DELETE') {
         requireSameOrigin();
         $statement = database()->prepare('DELETE FROM siteContent WHERE id = ?'); $statement->execute([(int) $matches[1]]);
+        respond(['success' => true]);
+    }
+
+    // ---------- Website settings ----------
+    if ($route === '/admin/settings' && $method === 'GET') {
+        respond(database()->query('SELECT settingKey, settingValue, updatedBy, updatedAt FROM websiteSettings ORDER BY settingKey ASC')->fetchAll());
+    }
+    if ($route === '/admin/settings' && $method === 'POST') {
+        requireSameOrigin();
+        $user = currentUser();
+        $data = jsonBody();
+        $settingKey = inputString($data, 'settingKey', 100, true);
+        $settingValue = inputString($data, 'settingValue', 50000, true);
+        if (!preg_match('/^[a-z][a-z0-9._-]{0,99}$/', $settingKey)) throw new ApiError(400, 'Invalid setting key.');
+        $statement = database()->prepare('INSERT INTO websiteSettings (settingKey, settingValue, updatedBy) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE settingValue = VALUES(settingValue), updatedBy = VALUES(updatedBy)');
+        $statement->execute([$settingKey, $settingValue, $user['id']]);
+        $fetch = database()->prepare('SELECT settingKey, settingValue, updatedBy, updatedAt FROM websiteSettings WHERE settingKey = ?');
+        $fetch->execute([$settingKey]);
+        respond($fetch->fetch());
+    }
+    if (preg_match('#^/admin/settings/([a-z][a-z0-9._-]{0,99})$#', $route, $matches) && $method === 'DELETE') {
+        requireSameOrigin();
+        database()->prepare('DELETE FROM websiteSettings WHERE settingKey = ?')->execute([$matches[1]]);
+        respond(['success' => true]);
+    }
+
+    // ---------- Website navigation ----------
+    if ($route === '/admin/navigation' && $method === 'GET') {
+        respond(database()->query('SELECT * FROM navigationItems ORDER BY sortOrder ASC, id ASC')->fetchAll());
+    }
+    if ($route === '/admin/navigation' && $method === 'POST') {
+        requireSameOrigin();
+        $user = currentUser();
+        $data = jsonBody();
+        $label = inputString($data, 'label', 120, true);
+        $href = inputString($data, 'href', 500, true);
+        $parentId = isset($data['parentId']) && $data['parentId'] !== '' ? (int) $data['parentId'] : null;
+        $sortOrder = filter_var($data['sortOrder'] ?? 0, FILTER_VALIDATE_INT);
+        $isVisible = !empty($data['isVisible']);
+        $status = $data['status'] ?? '';
+        $id = isset($data['id']) ? (int) $data['id'] : 0;
+        if (!preg_match('/^(\/(?!\/)[a-zA-Z0-9_\/-]*|https?:\/\/[^\s]+)$/', $href)) throw new ApiError(400, 'Navigation links must be local paths or use http/https.');
+        if ($sortOrder === false || $sortOrder < 0 || $sortOrder > 9999) throw new ApiError(400, 'Invalid navigation order.');
+        if (!in_array($status, ['draft', 'published'], true)) throw new ApiError(400, 'Invalid navigation status.');
+        if ($parentId !== null) {
+            $parent = database()->prepare('SELECT id, parentId FROM navigationItems WHERE id = ?');
+            $parent->execute([$parentId]);
+            $parentRow = $parent->fetch();
+            if (!$parentRow || $parentRow['parentId'] !== null || $parentId === $id) throw new ApiError(400, 'Dropdown items must reference an existing top-level navigation item.');
+        }
+        if ($id > 0) {
+            $statement = database()->prepare('UPDATE navigationItems SET label=?, href=?, parentId=?, sortOrder=?, isVisible=?, status=?, updatedBy=? WHERE id=?');
+            $statement->execute([$label, $href, $parentId, $sortOrder, $isVisible ? 1 : 0, $status, $user['id'], $id]);
+        } else {
+            $statement = database()->prepare('INSERT INTO navigationItems (label, href, parentId, sortOrder, isVisible, status, updatedBy) VALUES (?,?,?,?,?,?,?)');
+            $statement->execute([$label, $href, $parentId, $sortOrder, $isVisible ? 1 : 0, $status, $user['id']]);
+            $id = (int) database()->lastInsertId();
+        }
+        $fetch = database()->prepare('SELECT * FROM navigationItems WHERE id = ?');
+        $fetch->execute([$id]);
+        respond($fetch->fetch());
+    }
+    if (preg_match('#^/admin/navigation/(\d+)$#', $route, $matches) && $method === 'DELETE') {
+        requireSameOrigin();
+        database()->prepare('DELETE FROM navigationItems WHERE id = ?')->execute([(int) $matches[1]]);
         respond(['success' => true]);
     }
 
@@ -572,56 +720,236 @@ function routeRequest(): void
 
     // ---------- Users & Roles ----------
     if ($route === '/admin/users' && $method === 'GET') {
-        respond(database()->query('SELECT id, name, email, role, loginMethod, createdAt, lastSignedIn FROM users ORDER BY lastSignedIn DESC')->fetchAll());
+        requireAdmin();
+        $actor = currentUser();
+        $search = $_GET['search'] ?? null;
+        $role = $_GET['role'] ?? null;
+        $status = $_GET['status'] ?? null;
+        $type = $_GET['type'] ?? null;
+        $limit = (int) (($_GET['limit'] ?? 50) > 0 ? $_GET['limit'] : 50);
+        $limit = min($limit, 200);
+        $offset = (int) max(0, $_GET['offset'] ?? 0);
+
+        $sql = "SELECT u.id, u.name, u.email, u.role, u.account_status, u.account_type, u.loginMethod, u.createdAt, u.lastSignedIn,
+                       u.openId,
+                       (SELECT COUNT(*) FROM resident_teachers rt WHERE LOWER(rt.email) = LOWER(u.email) LIMIT 1) AS is_resident_teacher
+                FROM users u WHERE 1=1";
+        $params = [];
+        if ($search) {
+            $sql .= " AND (u.name LIKE ? OR u.email LIKE ?)";
+            $like = "%$search%";
+            $params[] = $like; $params[] = $like;
+        }
+        if ($role) { $sql .= " AND u.role = ?"; $params[] = $role; }
+        if ($status) { $sql .= " AND u.account_status = ?"; $params[] = $status; }
+        if ($type) { $sql .= " AND u.account_type = ?"; $params[] = $type; }
+        $sql .= " ORDER BY u.createdAt DESC LIMIT ? OFFSET ?";
+        $params[] = $limit; $params[] = $offset;
+
+        $statement = database()->prepare($sql);
+        $statement->execute($params);
+        $rows = $statement->fetchAll();
+
+        // Determine account_type for users without explicit type based on resident_teachers match
+        foreach ($rows as &$row) {
+            if ($row['account_type'] === 'public' && $row['is_resident_teacher']) {
+                $row['account_type'] = 'resident_teacher';
+            }
+            unset($row['is_resident_teacher']);
+            unset($row['openId']);
+        }
+        unset($row);
+
+        respond($rows);
     }
+
+    if ($route === '/admin/users/stats' && $method === 'GET') {
+        requireAdmin();
+        $stats = database()->query("SELECT
+            (SELECT COUNT(*) FROM users) AS totalUsers,
+            (SELECT COUNT(*) FROM users WHERE account_status = 'active') AS activeUsers,
+            (SELECT COUNT(*) FROM users WHERE account_status = 'inactive') AS inactiveUsers,
+            (SELECT COUNT(*) FROM users WHERE role = 'admin') AS adminUsers,
+            (SELECT COUNT(*) FROM users WHERE role = 'user') AS publicUsers,
+            (SELECT COUNT(*) FROM users WHERE account_type = 'resident_teacher') AS residentTeacherUsers,
+            (SELECT COUNT(*) FROM users WHERE createdAt >= DATE_SUB(NOW(), INTERVAL 7 DAY)) AS recentUsers
+        ")->fetch();
+        respond(array_map('intval', $stats));
+    }
+
     if ($route === '/admin/users' && $method === 'POST') {
         requireSameOrigin();
+        $actor = currentUser();
         $data = jsonBody();
         $name = inputString($data, 'name', 255, true);
         $email = strtolower((string) inputString($data, 'email', 320, true));
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) throw new ApiError(400, 'Valid email required.');
         $password = (string) ($data['password'] ?? '');
-        if (strlen($password) < 12) throw new ApiError(400, 'Password must be at least 12 characters.');
+        if (strlen($password) < 8) throw new ApiError(400, 'Password must be at least 8 characters.');
         $role = $data['role'] ?? 'user';
         if (!in_array($role, ['user', 'admin'], true)) throw new ApiError(400, 'Invalid role.');
+        $accountType = $data['account_type'] ?? 'public';
+        if (!in_array($accountType, ['public', 'resident_teacher', 'admin'], true)) throw new ApiError(400, 'Invalid account type.');
+        $accountStatus = $data['account_status'] ?? 'active';
+        if (!in_array($accountStatus, ['active', 'inactive'], true)) throw new ApiError(400, 'Invalid account status.');
 
         $check = database()->prepare('SELECT id FROM users WHERE LOWER(email) = ? LIMIT 1');
         $check->execute([$email]);
         if ($check->fetch()) throw new ApiError(409, 'User with this email already exists.');
 
         $passwordHash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
-        $stmt = database()->prepare('INSERT INTO users (name, email, passwordHash, role, loginMethod) VALUES (?, ?, ?, ?, \'local\')');
-        $stmt->execute([$name, $email, $passwordHash, $role]);
+        $stmt = database()->prepare('INSERT INTO users (name, email, passwordHash, role, account_type, account_status, loginMethod) VALUES (?, ?, ?, ?, ?, ?, \'local\')');
+        $stmt->execute([$name, $email, $passwordHash, $role, $accountType, $accountStatus]);
         $id = (int) database()->lastInsertId();
-        $fetch = database()->prepare('SELECT id, name, email, role, loginMethod, createdAt, lastSignedIn FROM users WHERE id = ?');
+
+        // Log activity
+        $logStmt = database()->prepare('INSERT INTO admin_activity_logs (adminId, action, entityType, entityId, details) VALUES (?, ?, ?, ?, ?)');
+        $logStmt->execute([$actor['id'], 'created_user', 'user', $id, json_encode(['name' => $name, 'email' => $email, 'role' => $role, 'account_type' => $accountType])]);
+
+        $fetch = database()->prepare('SELECT id, name, email, role, account_status, account_type, loginMethod, createdAt, lastSignedIn FROM users WHERE id = ?');
         $fetch->execute([$id]);
         respond($fetch->fetch(), 201);
     }
+
+    if (preg_match('#^/admin/users/(\d+)$#', $route, $matches) && $method === 'PATCH') {
+        requireSameOrigin();
+        $actor = currentUser();
+        $targetId = (int) $matches[1];
+        if ($targetId === (int) $actor['id']) throw new ApiError(400, 'Cannot modify your own account from this endpoint.');
+        $data = jsonBody();
+        $updates = [];
+        $values = [];
+
+        if (array_key_exists('name', $data)) {
+            $updates[] = 'name = ?';
+            $values[] = inputString($data, 'name', 255, true);
+        }
+        if (array_key_exists('email', $data)) {
+            $email = strtolower((string) inputString($data, 'email', 320, true));
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) throw new ApiError(400, 'Valid email required.');
+            $dup = database()->prepare('SELECT id FROM users WHERE LOWER(email) = ? AND id != ? LIMIT 1');
+            $dup->execute([$email, $targetId]);
+            if ($dup->fetch()) throw new ApiError(409, 'Email already in use by another account.');
+            $updates[] = 'email = ?';
+            $values[] = $email;
+        }
+        if (array_key_exists('role', $data)) {
+            $role = $data['role'];
+            if (!in_array($role, ['user', 'admin'], true)) throw new ApiError(400, 'Invalid role.');
+            if ($role === 'user') {
+                $adminCount = (int) database()->query("SELECT COUNT(*) FROM users WHERE role = 'admin' AND account_status = 'active'")->fetchColumn();
+                $currentRole = database()->query("SELECT role FROM users WHERE id = ?")->execute([$targetId])->fetchColumn();
+                if ($currentRole === 'admin' && $adminCount <= 1) {
+                    throw new ApiError(400, 'You are the only active administrator. Grant another administrator role before demoting yourself.');
+                }
+            }
+            $updates[] = 'role = ?';
+            $values[] = $role;
+        }
+        if (array_key_exists('account_status', $data)) {
+            $status = $data['account_status'];
+            if (!in_array($status, ['active', 'inactive'], true)) throw new ApiError(400, 'Invalid account status.');
+            $updates[] = 'account_status = ?';
+            $values[] = $status;
+        }
+        if (array_key_exists('account_type', $data)) {
+            $type = $data['account_type'];
+            if (!in_array($type, ['public', 'resident_teacher', 'admin'], true)) throw new ApiError(400, 'Invalid account type.');
+            $updates[] = 'account_type = ?';
+            $values[] = $type;
+        }
+
+        if (!$updates) throw new ApiError(400, 'No fields to update.');
+        $values[] = $targetId;
+        $statement = database()->prepare('UPDATE users SET ' . implode(', ', $updates) . ' WHERE id = ?');
+        $statement->execute($values);
+
+        // Log activity
+        $logStmt = database()->prepare('INSERT INTO admin_activity_logs (adminId, action, entityType, entityId, details) VALUES (?, ?, ?, ?, ?)');
+        $logStmt->execute([$actor['id'], 'updated_user', 'user', $targetId, json_encode($data)]);
+
+        $fetch = database()->prepare('SELECT id, name, email, role, account_status, account_type, loginMethod, createdAt, lastSignedIn FROM users WHERE id = ?');
+        $fetch->execute([$targetId]);
+        respond($fetch->fetch());
+    }
+
+    if (preg_match('#^/admin/users/(\d+)/status$#', $route, $matches) && $method === 'PATCH') {
+        requireSameOrigin();
+        $actor = currentUser();
+        $targetId = (int) $matches[1];
+        if ($targetId === (int) $actor['id']) throw new ApiError(400, 'Cannot deactivate your own account.');
+        $data = jsonBody();
+        $status = $data['account_status'] ?? '';
+        if (!in_array($status, ['active', 'inactive'], true)) throw new ApiError(400, 'Invalid account status.');
+
+        // Prevent deactivating the last active admin
+        if ($status === 'inactive') {
+            $user = database()->prepare('SELECT role, account_status FROM users WHERE id = ?')->execute([$targetId])->fetch();
+            if (!$user) throw new ApiError(404, 'User not found.');
+            if ($user['role'] === 'admin' && $user['account_status'] === 'active') {
+                $adminCount = (int) database()->query("SELECT COUNT(*) FROM users WHERE role = 'admin' AND account_status = 'active'")->fetchColumn();
+                if ($adminCount <= 1) {
+                    throw new ApiError(400, 'You are the only active administrator. Cannot deactivate your own admin account.');
+                }
+            }
+        }
+
+        $statement = database()->prepare('UPDATE users SET account_status = ? WHERE id = ?');
+        $statement->execute([$status, $targetId]);
+
+        // Log activity
+        $logStmt = database()->prepare('INSERT INTO admin_activity_logs (adminId, action, entityType, entityId, details) VALUES (?, ?, ?, ?, ?)');
+        $logStmt->execute([$actor['id'], 'status_changed_user', 'user', $targetId, json_encode(['account_status' => $status])]);
+
+        respond(['success' => true, 'message' => 'Account status updated to ' . $status . '.']);
+    }
+
     if (preg_match('#^/admin/users/(\d+)/role$#', $route, $matches) && $method === 'PATCH') {
         requireSameOrigin();
         $actor = currentUser();
         $data = jsonBody();
         $role = $data['role'] ?? '';
         $targetId = (int) $matches[1];
-        if (!in_array($role, ['user', 'admin'], true)) throw new ApiError(400, 'Invalid role.');
         if ($targetId === (int) $actor['id'] && $role === 'user') {
-            $adminCount = (int) database()->query("SELECT COUNT(*) FROM users WHERE role = 'admin'")->fetchColumn();
+            $adminCount = (int) database()->query("SELECT COUNT(*) FROM users WHERE role = 'admin' AND account_status = 'active'")->fetchColumn();
             if ($adminCount <= 1) {
-                throw new ApiError(400, 'You are the only administrator. Grant another administrator role before demoting yourself.');
+                throw new ApiError(400, 'You are the only active administrator. Grant another administrator role before demoting yourself.');
             }
         }
+        if (!in_array($role, ['user', 'admin'], true)) throw new ApiError(400, 'Invalid role.');
         $statement = database()->prepare('UPDATE users SET role = ? WHERE id = ?');
         $statement->execute([$role, $targetId]);
+
+        // Log activity
+        $logStmt = database()->prepare('INSERT INTO admin_activity_logs (adminId, action, entityType, entityId, details) VALUES (?, ?, ?, ?, ?)');
+        $logStmt->execute([$actor['id'], 'role_changed_user', 'user', $targetId, json_encode(['role' => $role])]);
+
         respond(['success' => true]);
     }
+
     if (preg_match('#^/admin/users/(\d+)$#', $route, $matches) && $method === 'DELETE') {
         requireSameOrigin();
         $actor = currentUser();
         $targetId = (int) $matches[1];
         if ($targetId === (int) $actor['id']) throw new ApiError(400, 'Cannot delete your own account.');
+        // Protect the last active admin
+        $user = database()->prepare('SELECT role, account_status FROM users WHERE id = ?')->execute([$targetId])->fetch();
+        if (!$user) throw new ApiError(404, 'User not found.');
+        if ($user['role'] === 'admin' && $user['account_status'] === 'active') {
+            $adminCount = (int) database()->query("SELECT COUNT(*) FROM users WHERE role = 'admin' AND account_status = 'active'")->fetchColumn();
+            if ($adminCount <= 1) {
+                throw new ApiError(400, 'You are the only active administrator. Cannot delete your own admin account.');
+            }
+        }
         database()->prepare('DELETE FROM users WHERE id = ?')->execute([$targetId]);
+
+        // Log activity
+        $logStmt = database()->prepare('INSERT INTO admin_activity_logs (adminId, action, entityType, entityId, details) VALUES (?, ?, ?, ?, ?)');
+        $logStmt->execute([$actor['id'], 'deleted_user', 'user', $targetId, json_encode(['email' => $user['email'] ?? 'unknown'])]);
+
         respond(['success' => true]);
     }
+
     if (preg_match('#^/admin/users/(\d+)/reset-password$#', $route, $matches) && $method === 'POST') {
         requireSameOrigin();
         $targetId = (int) $matches[1];
@@ -630,7 +958,27 @@ function routeRequest(): void
         if (strlen($password) < 8) throw new ApiError(400, 'Password must be at least 8 characters.');
         $hash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
         database()->prepare('UPDATE users SET passwordHash = ?, resetToken = NULL, resetTokenExpires = NULL WHERE id = ?')->execute([$hash, $targetId]);
+
+        // Log activity
+        $actor = currentUser();
+        $logStmt = database()->prepare('INSERT INTO admin_activity_logs (adminId, action, entityType, entityId, details) VALUES (?, ?, ?, ?, ?)');
+        $logStmt->execute([$actor['id'], 'reset_password_user', 'user', $targetId, json_encode([])]);
+
         respond(['success' => true, 'message' => 'User password updated successfully.']);
+    }
+
+    // ---------- Admin Activity Logs ----------
+    if ($route === '/admin/activity-logs' && $method === 'GET') {
+        requireAdmin();
+        $limit = (int) (($_GET['limit'] ?? 50) > 0 ? $_GET['limit'] : 50);
+        $limit = min($limit, 200);
+        $rows = database()->query(
+            "SELECT al.*, u.name AS adminName, u.email AS adminEmail
+             FROM admin_activity_logs al
+             JOIN users u ON al.adminId = u.id
+             ORDER BY al.createdAt DESC LIMIT $limit"
+        )->fetchAll();
+        respond($rows);
     }
 
     // ---------- Schools ----------

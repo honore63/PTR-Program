@@ -1,13 +1,13 @@
 import { GraduationCap } from "lucide-react";
 import { Link } from "wouter";
 
-type BrandMarkProps = { compact?: boolean; light?: boolean };
+type BrandMarkProps = { compact?: boolean; light?: boolean; logoUrl?: string };
 
-export function BrandMark({ compact = false, light = false }: BrandMarkProps) {
+export function BrandMark({ compact = false, light = false, logoUrl }: BrandMarkProps) {
   return (
     <Link href="/" className="group inline-flex items-center gap-3" aria-label="PTR Alumni Network home">
       <span className={`brand-mark ${light ? "brand-mark-light" : ""}`} aria-hidden="true">
-        <GraduationCap className="w-7 h-7" />
+        {logoUrl ? <img src={logoUrl} alt="" className="h-full w-full object-contain p-1" /> : <GraduationCap className="w-7 h-7" />}
       </span>
       <span className="leading-none">
         <span className={`block text-[1.35rem] font-extrabold tracking-[-0.02em] ${light ? "text-white" : "text-[#111]"}`}>PTR</span>

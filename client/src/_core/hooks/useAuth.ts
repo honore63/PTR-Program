@@ -30,10 +30,7 @@ export function useAuth(options?: UseAuthOptions) {
 
   const loginMutation = useMutation({
     mutationFn: (credentials: { username: string; password: string }) =>
-      apiRequest<AuthUser>("auth/login", {
-        method: "POST",
-        body: { ...credentials, email: credentials.username },
-      }),
+      apiRequest<AuthUser>("auth/login", { method: "POST", body: credentials }),
     onSuccess: (data) => {
       queryClient.setQueryData(queryKeys.authMe, data);
     },

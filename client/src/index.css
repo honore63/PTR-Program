@@ -3,7 +3,7 @@
 @import "tw-animate-css";
 @custom-variant dark (&:is(.dark *));
 @theme inline { --font-sans: 'Open Sans', sans-serif; --font-display: 'Open Sans', sans-serif; --color-background: var(--background); --color-foreground: var(--foreground); --color-primary: var(--primary); --color-primary-foreground: var(--primary-foreground); --color-border: var(--border); --radius: 0.25rem; }
-:root { --background: #fff; --foreground: #1a1a1a; --primary: #0098d9; --primary-foreground: #fff; --border: #e0e0e0; --pt-touareg: #0098d9; }
+:root { --background: #fff; --foreground: #1a1a1a; --primary: #0098d9; --primary-foreground: #fff; --border: #e0e0e0; --pt-touareg: #0098d9; --ptr-primary: #0b2347; --ptr-accent: #0098d9; }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body { margin: 0; background: #fff; color: #1a1a1a; font-family: 'Open Sans', Arial, sans-serif; -webkit-font-smoothing: antialiased; }
@@ -57,9 +57,9 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid 
 .nav-login-mobile { display: inline-flex; align-items: center; gap: .35rem; background: #0098d9; border-radius: 8px; padding: .42rem .85rem; color: #fff; font-size: .76rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; transition: background .2s ease; }
 .nav-login-mobile:hover { background: #0086c0; }
 .language-switcher-mobile { display: inline-flex; align-items: center; gap: 0; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; padding: 2px; }
-.brand-mark { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; border: 2px solid #0098d9; background: #fff; overflow: hidden; flex-shrink: 0; }
+.brand-mark { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--ptr-accent, #0098d9); background: #fff; overflow: hidden; flex-shrink: 0; }
 .brand-mark-light { border-color: #fff; background: rgba(255,255,255,.1); }
-.brand-mark svg { width: 28px; height: 28px; color: #0098d9; }
+.brand-mark svg { width: 28px; height: 28px; color: var(--ptr-accent, #0098d9); }
 .brand-mark-light svg { color: #fff; }
 /* Keep legacy node/line classes inert */
 .brand-node, .brand-line { display: none; }

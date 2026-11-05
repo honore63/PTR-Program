@@ -3,23 +3,33 @@ import { ChevronDown, Menu, ShieldCheck, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { copy, languages, navItems, type Language } from "@/data/ptrp";
+import { queryKeys, useApiQuery } from "@/lib/api";
 import { BrandMark } from "./BrandMark";
 
 const PRIMARY_COUNT = 5;
 
-export function SiteNav({ language, onLanguageChange }: { language: Language; onLanguageChange: (language: Language) => void }) {
+type NavigationRecord = { id: number; label: string; href: string; parentId: number | null };
+
+export function SiteNav({ language, onLanguageChange, settings = {} }: { language: Language; onLanguageChange: (language: Language) => void; settings?: Record<string, string> }) {
   const [open, setOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [location] = useLocation();
   const moreRef = useRef<HTMLDivElement>(null);
   const t = copy[language];
+  const navigationQuery = useApiQuery<NavigationRecord[]>(queryKeys.publicNavigation, "navigation");
 
   const normalizePath = (path: string) => (path === "/" ? "/" : path.replace(/\/$/, ""));
   const isActive = (href: string) => normalizePath(location) === normalizePath(href);
 
-  const primaryItems = navItems.slice(0, PRIMARY_COUNT);
-  const moreItems = navItems.slice(PRIMARY_COUNT);
+  const managedItems = navigationQuery.data?.filter((item) => item.parentId === null || navigationQuery.data?.some((parent) => parent.id === Number(item.parentId)));
+  const sourceItems = managedItems?.length ? managedItems : navItems;
+  const rootItems = sourceItems.filter((item) => !("parentId" in item) || item.parentId === null);
+  const childItems = sourceItems.filter((item) => "parentId" in item && item.parentId !== null);
+  const primaryItems = rootItems.slice(0, PRIMARY_COUNT);
+  const moreItems = managedItems?.length
+    ? [...rootItems.slice(PRIMARY_COUNT), ...childItems]
+    : navItems.slice(PRIMARY_COUNT);
   const moreActive = moreItems.some((item) => isActive(item.href));
 
   useEffect(() => {
@@ -47,11 +57,11 @@ export function SiteNav({ language, onLanguageChange }: { language: Language; on
   }, []);
 
   return (
-    <header className={`site-nav ${scrolled ? "site-nav-scrolled" : ""}`}>
+    <header className={`site-nav ${scrolled ? "site-nav-scrolled" : ""}`} aria-label={settings.siteName || "PTR Alumni Network"}>
       <div className="mx-auto flex h-[72px] max-w-[1400px] items-center justify-between px-5 md:px-8">
         {/* Brand */}
         <Link href="/" className="flex items-center gap-3 shrink-0" aria-label="PTR Alumni Network home">
-          <BrandMark compact light={false} />
+          <BrandMark compact light={false} logoUrl={settings.logoUrl} />
         </Link>
 
         {/* Primary navigation (desktop) */}
@@ -96,7 +106,7 @@ export function SiteNav({ language, onLanguageChange }: { language: Language; on
                     key={item.href}
                     href={item.href}
                     aria-current={isActive(item.href) ? "page" : undefined}
-                    className="nav-more-item block px-3 py-2.5 text-sm font-bold uppercase tracking-wide text-[#4b5563] hover:bg-[#f0f9fe] hover:text-[#0098d9] transition-colors"
+                    className={`nav-more-item block px-3 py-2.5 text-sm font-bold uppercase tracking-wide text-[#4b5563] hover:bg-[#f0f9fe] hover:text-[#0098d9] transition-colors ${"parentId" in item && item.parentId ? "pl-7 text-xs" : ""}`}
                     onClick={() => setMoreOpen(false)}
                     onMouseEnter={() => setMoreOpen(true)}
                     onMouseLeave={() => setMoreOpen(false)}
@@ -153,13 +163,13 @@ export function SiteNav({ language, onLanguageChange }: { language: Language; on
             className="border-t border-[#e5e7eb] bg-white min-[1280px]:hidden"
           >
             <nav className="mx-auto flex max-w-[1400px] flex-col gap-0 px-5 py-5" aria-label="Mobile navigation">
-              {navItems.map((item) => (
+              {sourceItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
                   onClick={() => setOpen(false)}
                   aria-current={isActive(item.href) ? "page" : undefined}
-                  className="mobile-nav-link flex items-center justify-between gap-3 border-b border-[#eef2f5] pb-3.5 pt-3.5 transition-colors"
+                  className={`mobile-nav-link flex items-center justify-between gap-3 border-b border-[#eef2f5] pb-3.5 pt-3.5 transition-colors ${"parentId" in item && item.parentId ? "pl-7" : ""}`}
                 >
                   <span>{item.label}</span>
                   <ChevronDown className="size-4 opacity-0 group-hover:opacity-100 ml-1 transition-opacity" />

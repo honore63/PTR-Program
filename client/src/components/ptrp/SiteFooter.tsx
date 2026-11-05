@@ -17,6 +17,7 @@ import { Link } from "wouter";
 import { brand, copy, navItems, socialLinks, type Language } from "@/data/ptrp";
 import { BrandMark } from "./BrandMark";
 import { toast } from "sonner";
+import { queryKeys, useApiQuery } from "@/lib/api";
 
 const footerQuickLinks = [
   { label: "Home", href: "/" },
@@ -45,8 +46,14 @@ const currentYear = new Date().getFullYear();
 
 export function SiteFooter({ language }: { language: Language }) {
   const t = copy[language];
+  const { data: settings = {} } = useApiQuery<Record<string, string>>(queryKeys.publicSettings, "settings");
+  const { data: managedNavigation } = useApiQuery<Array<{ id: number; label: string; href: string; parentId: number | null }>>(queryKeys.publicNavigation, "navigation");
   const [newsletterEmail, setNewsletterEmail] = useState("");
   const [newsletterStatus, setNewsletterStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const quickLinks = managedNavigation?.length
+    ? managedNavigation.filter((item) => item.parentId === null)
+    : footerQuickLinks;
+  const managedSocialLinks = socialLinks.map((item) => ({ ...item, href: settings[`social.${item.key}`] || item.href }));
 
   const handleNewsletterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,16 +78,16 @@ export function SiteFooter({ language }: { language: Language }) {
           {/* Column 1: Brand & About */}
           <div className="lg:col-span-1">
             <div className="flex items-center gap-3 mb-6">
-              <BrandMark light />
+              <BrandMark light logoUrl={settings.logoUrl} />
             </div>
             <p className="mt-2 max-w-sm text-sm leading-[1.7] text-[#cbd5e1]">
-              {t.footer.description}
+              {settings.footerText || t.footer.description}
             </p>
             <p className="mt-6 text-[0.72rem] font-extrabold uppercase tracking-[0.16em] text-[#38bdf8]">
-              {brand.tagline}
+              {settings.tagline || brand.tagline}
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              {socialLinks.map((social) => {
+              {managedSocialLinks.map((social) => {
                 const Icon = socialIcons[social.key as keyof typeof socialIcons];
                 return (
                   <a
@@ -103,7 +110,7 @@ export function SiteFooter({ language }: { language: Language }) {
           <div>
             <h3 className="mb-6 text-xs font-extrabold uppercase tracking-[0.2em] text-[#38bdf8]">Quick Links</h3>
             <div className="grid gap-3">
-              {footerQuickLinks.map((item) => (
+              {quickLinks.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
@@ -123,21 +130,21 @@ export function SiteFooter({ language }: { language: Language }) {
                 <Mail className="size-5 shrink-0 mt-0.5 text-[#38bdf8]" />
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#94a3b8]">Email</p>
-                  <a href="mailto:info@ptr.rw" className="text-sm text-white hover:text-[#38bdf8] transition-colors">info@ptr.rw</a>
+                  <a href={`mailto:${settings.contactEmail || "info@ptr.rw"}`} className="text-sm text-white hover:text-[#38bdf8] transition-colors">{settings.contactEmail || "info@ptr.rw"}</a>
                 </div>
               </div>
               <div className="flex items-start gap-4">
                 <Phone className="size-5 shrink-0 mt-0.5 text-[#38bdf8]" />
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#94a3b8]">Phone</p>
-                  <p className="text-sm text-[#94a3b8]">To be confirmed</p>
+                  {settings.contactPhone ? <a href={`tel:${settings.contactPhone.replace(/[^\d+]/g, "")}`} className="text-sm text-white hover:text-[#38bdf8]">{settings.contactPhone}</a> : <p className="text-sm text-[#94a3b8]">To be confirmed</p>}
                 </div>
               </div>
               <div className="flex items-start gap-4">
                 <MapPinned className="size-5 shrink-0 mt-0.5 text-[#38bdf8]" />
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#94a3b8]">Location</p>
-                  <p className="text-sm text-[#94a3b8]">Kigali, Rwanda · Office location to be confirmed</p>
+                  <p className="text-sm text-[#94a3b8]">{settings.contactAddress || "Kigali, Rwanda · Office location to be confirmed"}</p>
                 </div>
               </div>
             </div>
@@ -148,7 +155,7 @@ export function SiteFooter({ language }: { language: Language }) {
             <div className="mb-6">
               <h3 className="mb-4 text-xs font-extrabold uppercase tracking-[0.2em] text-[#38bdf8]">Follow Us</h3>
               <div className="flex gap-3">
-                {socialLinks.map((social) => {
+                {managedSocialLinks.map((social) => {
                   const Icon = socialIcons[social.key as keyof typeof socialIcons];
                   return (
                     <a
@@ -199,7 +206,7 @@ export function SiteFooter({ language }: { language: Language }) {
         <div className="mt-12 border-t border-white/10 pt-8 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-xs text-[#64748b] leading-[1.6]">
             <p>
-              © {currentYear} {brand.name} · All rights reserved.
+              © {currentYear} {settings.siteName || brand.name} · All rights reserved.
             </p>
             <p className="mt-1">
               Official digital community of the Primary Teacher Residency Program (PTRP) · Rwanda.

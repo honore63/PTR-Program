@@ -244,6 +244,30 @@ INSERT IGNORE INTO `coordinators` (fullName, organization, email, phone, photoUr
   ('Br. Biziyaremye Ferdinand', 'De La Salle', NULL, NULL, NULL, 'Program Coordinator for PTRP at De La Salle. Coordinates residency activities, mentorship pairing, and school placement for resident teachers.', 'Coordination of resident teachers, mentorship, and school partnerships at De La Salle.', 1, 1, 'published'),
   ('Br. Elias Nshimiyimana', 'SAVE', NULL, NULL, NULL, 'Program Coordinator for PTRP at SAVE. Coordinates residency activities, mentorship pairing, and school placement for resident teachers.', 'Coordination of resident teachers, mentorship, and school partnerships at SAVE.', 2, 1, 'published');
 
+UPDATE `coordinators`
+SET fullName = 'Br. BIZIYAREMYE Ferdinand',
+    organization = 'TTC De La Salle Byumba',
+    email = NULL,
+    phone = '+250 789 139 618',
+    bio = NULL,
+    responsibilities = 'Coordinator of PTRP',
+    displayOrder = 1,
+    isVisible = 1,
+    status = 'published'
+WHERE fullName IN ('Br. Biziyaremye Ferdinand', 'Br. BIZIYAREMYE Ferdinand')
+  AND organization IN ('De La Salle', 'TTC De La Salle Byumba');
+
+UPDATE `coordinators`
+SET email = 'nshimiyimanaelias52@gmail.com',
+    phone = '+250 781 418 869',
+    bio = NULL,
+    responsibilities = 'Coordinator of PTRP',
+    displayOrder = 2,
+    isVisible = 1,
+    status = 'published'
+WHERE fullName = 'Br. Elias Nshimiyimana'
+  AND organization = 'SAVE';
+
 -- Mentors (placeholder names — administrators complete details later)
 INSERT IGNORE INTO `mentors` (fullName, organization, email, phone, photoUrl, bio, responsibilities, displayOrder, isVisible, status) VALUES
   ('[Mentor Name - De La Salle]', 'De La Salle', NULL, NULL, NULL, 'Program mentor for resident teachers at De La Salle. Contact details and biography to be completed by the program administrator.', 'Mentor resident teachers during guided classroom practice.', 1, 1, 'draft'),

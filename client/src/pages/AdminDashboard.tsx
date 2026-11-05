@@ -514,7 +514,9 @@ function SchoolsManager({ rows, onDelete, onRefresh }: any) {
     try {
       await apiRequest("admin/schools", { method: "POST", body: { ...form, id: form.id || undefined, latitude: form.latitude || null, longitude: form.longitude || null } });
       toast.success("School saved"); setForm({ id: 0, name: "", district: "", description: "", imageUrl: "", latitude: "", longitude: "", status: "published" }); onRefresh();
-    } catch (error: any) { toast.error(error.message); } finally { setSaving(false); }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : `Could not save this ${role} profile.`);
+    } finally { setSaving(false); }
   };
   return (
     <div className="admin-content">
@@ -727,11 +729,70 @@ function PracticesManager({ rows, onDelete, onRefresh }: any) {
   );
 }
 
-function TeamManager({ rows, role, onDelete, onRefresh }: any) {
-  const [form, setForm] = useState({ id: 0, fullName: "", organization: "", email: "", phone: "", photoUrl: "", bio: "", responsibilities: "", displayOrder: "", isVisible: true, status: role === "coordinator" ? "published" : "draft" });
+function TeamManager({ rows, role, onDelete, onRefresh }: { rows: any[]; role: "coordinator" | "mentor"; onDelete: (id: number) => void; onRefresh: () => void }) {
+  const [form, setForm] = useState(() => ({
+    id: 0,
+    fullName: "",
+    organization: role === "coordinator" ? "TTC De La Salle Byumba" : "De La Salle",
+    email: "",
+    phone: "",
+    photoUrl: "",
+    bio: "",
+    responsibilities: "",
+    displayOrder: "",
+    isVisible: true,
+    status: role === "coordinator" ? "published" : "draft",
+  }));
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
-  const organizations = ["De La Salle", "SAVE"];
+  const organizations = role === "coordinator"
+    ? ["TTC De La Salle Byumba", "SAVE"]
+    : ["De La Salle", "SAVE"];
+
+  const uploadPhoto = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Choose an image file for the profile photo.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Profile photos are limited to 10 MB.");
+      return;
+    }
+
+    setUploadingPhoto(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+        reader.onerror = () => reject(reader.error ?? new Error("Could not read the selected image."));
+        reader.readAsDataURL(file);
+      });
+      const uploaded = await apiRequest<{ url: string }>("admin/media/upload", {
+        method: "POST",
+        body: {
+          filename: file.name,
+          mimeType: file.type,
+          size: file.size,
+          base64,
+          altText: form.fullName ? `Portrait of ${form.fullName}` : "Program team profile photo",
+        },
+      });
+      setForm((current) => ({ ...current, photoUrl: uploaded.url }));
+      toast.success("Profile photo uploaded. Save the profile to apply it.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Profile photo upload failed.");
+    } finally {
+      setUploadingPhoto(false);
+      if (photoInputRef.current) photoInputRef.current.value = "";
+    }
+  };
+
   const submit = async () => {
+    if (!form.fullName.trim()) {
+      toast.error("Enter a name before saving this profile.");
+      return;
+    }
     setSaving(true);
     try {
       await apiRequest(role === "coordinator" ? "admin/coordinators" : "admin/mentors", {
@@ -745,7 +806,19 @@ function TeamManager({ rows, role, onDelete, onRefresh }: any) {
         },
       });
       toast.success(`${role.charAt(0).toUpperCase() + role.slice(1)} saved`);
-      setForm({ id: 0, fullName: "", organization: "", email: "", phone: "", photoUrl: "", bio: "", responsibilities: "", displayOrder: "", isVisible: true, status: role === "coordinator" ? "published" : "draft" });
+      setForm({
+        id: 0,
+        fullName: "",
+        organization: role === "coordinator" ? "TTC De La Salle Byumba" : "De La Salle",
+        email: "",
+        phone: "",
+        photoUrl: "",
+        bio: "",
+        responsibilities: "",
+        displayOrder: "",
+        isVisible: true,
+        status: role === "coordinator" ? "published" : "draft",
+      });
       onRefresh();
     } catch (error: any) { toast.error(error.message); } finally { setSaving(false); }
   };
@@ -755,17 +828,30 @@ function TeamManager({ rows, role, onDelete, onRefresh }: any) {
         <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">{role}</p><h3>{form.id ? `Edit ${role}` : `Add ${role}`}</h3></div></div>
         <div className="admin-form-grid">
           <label>Full name<input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} placeholder="Full name" /></label>
-          <label>Organization<select value={form.organization} onChange={(e) => setForm({ ...form, organization: e.target.value })}><option value="De La Salle">De La Salle</option><option value="SAVE">SAVE</option></select></label>
+          <label>Position<input value={role === "coordinator" ? "Coordinator of PTRP" : "Program Mentor"} readOnly /></label>
+          <label>Organization<select value={form.organization} onChange={(e) => setForm({ ...form, organization: e.target.value })}>{organizations.map((organization) => <option key={organization} value={organization}>{organization}</option>)}</select></label>
           <label>Email<input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="name@domain.rw" /></label>
           <label>Phone<input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Phone number" /></label>
           <label>Photo URL<input value={form.photoUrl} onChange={(e) => setForm({ ...form, photoUrl: e.target.value })} placeholder="Image URL" /></label>
+          <label className="upload-drop">
+            <UploadCloud className="size-6 text-[#16a878]" />
+            <strong>{uploadingPhoto ? "Uploading photo…" : "Upload profile photo"}</strong>
+            <small>JPG, PNG, GIF or WebP · Up to 10 MB</small>
+            <input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" disabled={uploadingPhoto} onChange={(event) => event.target.files?.[0] && uploadPhoto(event.target.files[0])} />
+          </label>
+          {form.photoUrl && (
+            <div className="flex items-center gap-3">
+              <img src={form.photoUrl} alt={`Profile photo preview for ${form.fullName || "team member"}`} className="size-16 rounded-lg object-cover" />
+              <span className="text-xs font-semibold text-[#4e677f]">Current profile photo</span>
+            </div>
+          )}
           <label className="admin-full">Biography<textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} rows={3} placeholder="Short biography" /></label>
           <label className="admin-full">Responsibilities<textarea value={form.responsibilities} onChange={(e) => setForm({ ...form, responsibilities: e.target.value })} rows={3} placeholder="Role responsibilities" /></label>
           <label>Display order<input type="number" value={form.displayOrder} onChange={(e) => setForm({ ...form, displayOrder: e.target.value })} /></label>
           <label>Visible<input type="checkbox" checked={form.isVisible} onChange={(e) => setForm({ ...form, isVisible: e.target.checked })} /></label>
           <label>Status<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}><option value="draft">Draft</option><option value="published">Published</option></select></label>
         </div>
-        <div className="admin-form-actions"><button className="button-primary" onClick={submit} disabled={saving}>{saving ? "Saving…" : `Save ${role}`}</button></div>
+        <div className="admin-form-actions"><button className="button-primary" onClick={submit} disabled={saving || uploadingPhoto}>{saving ? "Saving…" : `Save ${role}`}</button></div>
       </section>
       <section className="admin-panel">
         <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">{role === "coordinator" ? "Program Coordinators" : "Program Mentors"}</p><h3>{rows.length} records</h3></div></div>

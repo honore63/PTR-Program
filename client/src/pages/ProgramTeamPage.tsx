@@ -2,8 +2,8 @@ import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import {
   ArrowUpRight,
-  BadgeCheck,
   Building2,
+  Camera,
   Mail,
   Phone,
   ShieldCheck,
@@ -17,48 +17,41 @@ import {
   coordinatorsPlaceholder,
   mentorsPlaceholder,
   ProgramTeamMember,
-  sectionMeta,
 } from "@/data/ptrp";
+import { queryKeys, useApiQuery } from "@/lib/api";
 
-const organizations = ["All organizations", "De La Salle", "SAVE"];
-
-const memberInitials = (name: string) => {
-  return name
-    .split(/\s+/)
-    .map((part) => part.charAt(0).toUpperCase())
-    .slice(0, 2)
-    .join("");
-};
+const organizations = ["All organizations", "TTC De La Salle Byumba", "De La Salle", "SAVE"];
+const coordinatorOrganizations = ["TTC De La Salle Byumba", "SAVE"];
 
 const roleBadge = (role: ProgramTeamMember["role"]) =>
   role === "coordinator"
-    ? { label: "Program Coordinator", color: "bg-[#0098d9]/10 text-[#0098d9]" }
+    ? { label: "Coordinator of PTRP", color: "bg-[#0098d9]/10 text-[#0098d9]" }
     : { label: "Program Mentor", color: "bg-[#168d6d]/10 text-[#168d6d]" };
-
-const statusBadge = (status: ProgramTeamMember["status"]) =>
-  status === "published"
-    ? { label: "Published", color: "bg-[#168d6d]/10 text-[#168d6d]" }
-    : { label: "Draft", color: "bg-[#9ca3af]/10 text-[#6b7280]" };
 
 export default function ProgramTeamPage() {
   const [query, setQuery] = useState("");
   const [orgFilter, setOrgFilter] = useState("All organizations");
   const [roleFilter, setRoleFilter] = useState("All");
 
-  const allMembers = [...coordinatorsPlaceholder, ...mentorsPlaceholder];
+  const coordinatorQuery = useApiQuery<ProgramTeamMember[]>(queryKeys.publicCoordinators, "coordinators");
+  const mentorQuery = useApiQuery<ProgramTeamMember[]>(queryKeys.publicMentors, "mentors");
+  const coordinators = coordinatorQuery.data ?? coordinatorsPlaceholder;
+  const mentors = mentorQuery.data ?? mentorsPlaceholder;
+  const allMembers = [...coordinators, ...mentors];
 
   const filtered = useMemo(() => {
     return allMembers.filter((member) => {
-      const matchesQuery = `${member.fullName} ${member.organization} ${member.bio ?? ""}`
+      const matchesQuery = `${member.fullName} ${member.organization} ${member.responsibilities ?? ""}`
         .toLowerCase()
         .includes(query.trim().toLowerCase());
       const matchesOrg = orgFilter === "All organizations" || member.organization === orgFilter;
       const matchesRole = roleFilter === "All" || member.role === roleFilter.toLowerCase();
       return matchesQuery && matchesOrg && matchesRole;
     });
-  }, [query, orgFilter, roleFilter]);
+  }, [allMembers, query, orgFilter, roleFilter]);
 
-  const visible = filtered.filter((m) => m.isVisible && m.status === "published");
+  const visibleCoordinators = filtered.filter((member) => member.role === "coordinator" && member.isVisible && member.status === "published");
+  const visibleMentors = filtered.filter((member) => member.role === "mentor" && member.isVisible && member.status === "published");
 
   return <main>
     <PageHero
@@ -77,11 +70,11 @@ export default function ProgramTeamPage() {
           <div>
             <SectionHeading eyebrow="Program leadership" title="Who guides the residency." />
             <p className="mt-6 text-[1.02rem] leading-[1.9] text-[#4b5563]">
-              Program coordinators at De La Salle and SAVE oversee resident teacher placement, mentorship pairing, and school partnerships. Program mentors work directly with residents during guided classroom practice.
+              Program coordinators at TTC De La Salle Byumba and SAVE guide the residency. Program mentors work directly with residents during guided classroom practice.
             </p>
             <div className="mt-8 grid gap-3 sm:grid-cols-2">
-              {organizations.slice(1).map((org) => {
-                const count = allMembers.filter((m) => m.organization === org).length;
+              {coordinatorOrganizations.map((org) => {
+                const count = coordinators.filter((member) => member.organization === org).length;
                 return (
                   <div key={org} className="border border-[#e2eef0] bg-[#f8fbfc] p-5">
                     <p className="text-[0.62rem] font-extrabold uppercase tracking-[0.12em] text-[#0098d9]">{org}</p>
@@ -169,98 +162,54 @@ export default function ProgramTeamPage() {
           </label>
         </div>
 
+        {(coordinatorQuery.isError || mentorQuery.isError) && (
+          <p role="status" className="mt-5 border border-[#f0d9a8] bg-[#fffaf0] px-4 py-3 text-sm text-[#7a5a1f]">
+            The live team directory could not be refreshed. Showing the verified coordinator details and available profile information.
+          </p>
+        )}
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
           <p className="text-[0.66rem] font-extrabold uppercase tracking-[0.1em] text-[#7b8da2]">
-            {visible.length} of {filtered.length} team member(s) shown
+            {visibleCoordinators.length} coordinators · {visibleMentors.length} published mentors
           </p>
         </div>
 
-        <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {visible.length > 0 ? (
-            visible.map((member) => {
-              const roleInfo = roleBadge(member.role);
-              const statusInfo = statusBadge(member.status);
-              const hasContact = Boolean(member.email || member.phone);
-              return (
-                <article
-                  key={member.id}
-                  className="flex h-full flex-col border border-[#e2eef0] bg-white rounded-xl p-6 transition-colors hover:border-[#0098d9] hover:shadow-md"
-                >
-                  <div className="relative mb-4">
-                    {member.photoUrl ? (
-                      <img
-                        src={member.photoUrl}
-                        alt={`${member.fullName} photo`}
-                        className="w-full h-48 object-cover rounded-lg bg-[#f0f4f8]"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-48 flex items-center justify-center rounded-lg bg-[#e8f2f6] text-[#0098d9] border border-[#dce8ed]">
-                        <UserRound className="size-12" strokeWidth={1.5} />
-                      </div>
-                    )}
-                    {member.status === "draft" && (
-                      <span className="absolute top-3 right-3 inline-flex items-center gap-1 px-2 py-1 rounded text-[0.6rem] font-bold uppercase tracking-[0.08em] text-white bg-[#6b7280]">
-                        Draft
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[0.6rem] font-extrabold uppercase tracking-[0.08em] ${roleInfo.color}`}
-                    >
-                      {roleInfo.label}
-                    </span>
-                    <span
-                      className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[0.58rem] font-bold uppercase tracking-[0.08em] ${statusInfo.color}`}
-                    >
-                      {statusInfo.label}
-                    </span>
-                  </div>
-                  <h3 className="mt-1 text-lg font-extrabold leading-tight tracking-[-0.03em] text-[#0b2347]">{member.fullName}</h3>
-                  <p className="mt-1 text-[0.66rem] font-extrabold uppercase tracking-[0.1em] text-[#0098d9]">{member.organization}</p>
-                  {member.responsibilities && (
-                    <p className="mt-3 text-sm leading-6 text-[#4b5563]">{member.responsibilities}</p>
-                  )}
-                  {hasContact && (
-                    <dl className="mt-4 grid gap-2 border-t border-[#eef2f5] pt-4 text-[0.72rem]">
-                      {member.email && (
-                        <div className="flex items-center justify-between gap-3">
-                          <dt className="font-bold uppercase tracking-[0.06em] text-[#9aabba]">Email</dt>
-                          <dd className="text-right font-semibold text-[#264665]">{member.email}</dd>
-                        </div>
-                      )}
-                      {member.phone && (
-                        <div className="flex items-center justify-between gap-3">
-                          <dt className="font-bold uppercase tracking-[0.06em] text-[#9aabba]">Phone</dt>
-                          <dd className="text-right font-semibold text-[#264665]">{member.phone}</dd>
-                        </div>
-                      )}
-                    </dl>
-                  )}
-                  {!hasContact && (
-                    <p className="mt-4 text-[0.68rem] text-[#9aabba] italic">Contact details to be published by an administrator.</p>
-                  )}
-                  {member.bio && (
-                    <p className="mt-4 text-[0.7rem] leading-6 text-[#4b5563]">{member.bio}</p>
-                  )}
-                </article>
-              );
-            })
-          ) : (
-            <div className="sm:col-span-3 border border-dashed border-[#d1d5db] bg-white rounded-xl p-12 text-center">
-              <UserRound className="mx-auto size-10 text-[#0098d9]" />
-              <p className="mt-4 text-sm font-bold text-[#0b2347]">No published team members match those filters.</p>
-              <button
-                type="button"
-                onClick={() => { setQuery(""); setOrgFilter("All organizations"); setRoleFilter("All"); }}
-                className="mt-3 text-[0.7rem] font-extrabold uppercase tracking-[0.1em] text-[#0098d9]"
-              >
-                Clear filters
-              </button>
+        <section className="mt-7" aria-labelledby="coordinators-heading">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="eyebrow text-[#0098d9]">Program leadership</p>
+              <h3 id="coordinators-heading" className="mt-2 text-2xl font-extrabold tracking-[-0.04em] text-[#0b2347]">PTRP Program Coordinators</h3>
             </div>
+            <span className="text-xs font-semibold text-[#7b8da2]">{visibleCoordinators.length} profiles</span>
+          </div>
+          <div className="mt-5 grid gap-5 md:grid-cols-2">
+            {visibleCoordinators.length ? visibleCoordinators.map((member) => (
+              <TeamMemberCard key={member.id} member={member} />
+            )) : (
+              <p className="md:col-span-2 rounded-xl border border-dashed border-[#d1d5db] bg-white p-8 text-center text-sm text-[#7b8da2]">
+                No published coordinator profiles match those filters.
+              </p>
+            )}
+          </div>
+        </section>
+
+        <section className="mt-12 border-t border-[#e2eef0] pt-8" aria-labelledby="mentors-heading">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="eyebrow text-[#168d6d]">Separate directory</p>
+              <h3 id="mentors-heading" className="mt-2 text-2xl font-extrabold tracking-[-0.04em] text-[#0b2347]">PTRP Program Mentors</h3>
+            </div>
+            <span className="text-xs font-semibold text-[#7b8da2]">{visibleMentors.length} published profiles</span>
+          </div>
+          {visibleMentors.length ? (
+            <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {visibleMentors.map((member) => <TeamMemberCard key={member.id} member={member} />)}
+            </div>
+          ) : (
+            <p className="mt-5 rounded-xl border border-dashed border-[#d1d5db] bg-white p-6 text-sm leading-6 text-[#7b8da2]">
+              Mentor profiles remain in their separate administrator-managed section and will appear here when published.
+            </p>
           )}
-        </div>
+        </section>
       </div>
     </section>
 
@@ -296,4 +245,73 @@ export default function ProgramTeamPage() {
       </div>
     </section>
   </main>;
+}
+
+function TeamMemberCard({ member }: { member: ProgramTeamMember }) {
+  const isCoordinator = member.role === "coordinator";
+  const roleInfo = roleBadge(member.role);
+  const phoneDigits = member.phone?.replace(/\D/g, "");
+
+  return (
+    <article className="overflow-hidden rounded-xl border border-[#dce8ed] bg-white shadow-sm transition-shadow hover:shadow-lg">
+      <div className="relative aspect-[16/9] overflow-hidden bg-[#e8f2f6]">
+        {member.photoUrl ? (
+          <img
+            src={member.photoUrl}
+            alt={`Portrait of ${member.fullName}`}
+            className="h-full w-full object-cover object-center"
+            loading="lazy"
+          />
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-[#0098d9]">
+            <Camera className="size-9" strokeWidth={1.5} />
+            <span className="text-xs font-bold">Profile photo not yet provided</span>
+          </div>
+        )}
+        <span className={`absolute left-4 top-4 rounded-full px-3 py-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.08em] ${roleInfo.color}`}>
+          {roleInfo.label}
+        </span>
+      </div>
+      <div className="p-5 sm:p-6">
+        <h4 className="text-xl font-extrabold leading-tight tracking-[-0.035em] text-[#0b2347]">{member.fullName}</h4>
+        <p className="mt-2 text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-[#0098d9]">{member.organization}</p>
+        {!isCoordinator && member.responsibilities && (
+          <p className="mt-3 text-sm leading-6 text-[#4b5563]">{member.responsibilities}</p>
+        )}
+        <div className="mt-5 grid gap-3 border-t border-[#eef2f5] pt-4 text-sm">
+          {member.email ? (
+            <a href={`mailto:${member.email}`} className="flex min-w-0 items-center gap-2.5 font-semibold text-[#264665] hover:text-[#0098d9]">
+              <Mail className="size-4 shrink-0 text-[#0098d9]" />
+              <span className="break-all">{member.email}</span>
+            </a>
+          ) : isCoordinator ? (
+            <div className="flex items-center gap-2.5 text-[#7b8da2]">
+              <Mail className="size-4 shrink-0 text-[#9aabba]" />
+              <span>Email: Not yet provided</span>
+            </div>
+          ) : null}
+          {member.phone && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <a href={`tel:${member.phone.replace(/[^\d+]/g, "")}`} className="inline-flex items-center gap-2.5 font-semibold text-[#264665] hover:text-[#0098d9]">
+                <Phone className="size-4 shrink-0 text-[#0098d9]" />
+                <span>{member.phone}</span>
+              </a>
+              {phoneDigits && (
+                <a
+                  href={`https://wa.me/${phoneDigits}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs font-bold text-[#168d6d] hover:underline"
+                  aria-label={`Message ${member.fullName} on WhatsApp`}
+                >
+                  WhatsApp
+                  <ArrowUpRight className="ml-1 inline size-3.5" />
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </article>
+  );
 }

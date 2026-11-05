@@ -234,27 +234,25 @@ export default function SectionPage({ path, language }: SectionPageProps) {
               <p className="eyebrow text-[#0098d9] mb-4">Participating Schools</p>
               <h2 className="text-2xl font-extrabold tracking-[-0.02em] text-[#111] mb-8">17 Model Schools Across Rwanda</h2>
               <div className="grid gap-6 md:grid-cols-3 lg:grid-cols-4">
-                {participatingSchools.map((school, index) => {
-                  const verified = !school.name.startsWith("School ");
-                  return (
-                  <div key={index} className="border rounded-xl bg-white p-6 shadow-sm hover:shadow-md transition-shadow group">
-                    <div className="h-32 rounded-lg bg-[#f8fbfc] flex items-center justify-center mb-4 overflow-hidden">
-                      <span className="text-xs font-bold uppercase tracking-[0.1em] text-[#0098d9] leading-none">
-                        {school.name}
+                {participatingSchools.map((school) => (
+                  <div key={school.id} className="border rounded-xl bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex items-start gap-4">
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[#f8fbfc] text-xs font-bold text-[#0098d9]">
+                        {String(school.id).padStart(2, "0")}
                       </span>
-                    </div>
-                    <p className="text-xs font-semibold text-[#0098d9] mb-2">{verified ? school.location : "Location pending verification"}</p>
-                    <p className="text-sm font-medium text-[#111] mb-3">{verified ? school.focus : "School profile pending administrator approval"}</p>
-                    <div className="flex items-center justify-between pt-4 border-t border-[#e2eef0]">
-                      <span className="text-xs font-bold text-[#6b7280]">{verified ? `${school.intake} residents` : "Profile under review"}</span>
-                      <ArrowUpRight className="size-4 text-[#0098d9] opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <div>
+                        <h3 className="font-bold text-[#111]">{school.name}</h3>
+                        <p className="mt-2 text-xs font-semibold text-[#0098d9]">
+                          {school.district === "District to be confirmed" ? school.district : `${school.district} District`}
+                        </p>
+                        {school.note && <p className="mt-2 text-xs text-[#6b7280]">{school.note}</p>}
+                      </div>
                     </div>
                   </div>
-                  );
-                })}
+                ))}
               </div>
               <p className="mt-6 text-xs text-[#6b7280] italic">
-                All 17 model schools are part of the PTR Alumni Network. TTC Save and TTC Gicumbi are named in official launch sources; remaining school names and placement details are placeholders pending administrator verification.
+                School names and districts are shown as provided. Two location details still need confirmation.
               </p>
             </div>
 

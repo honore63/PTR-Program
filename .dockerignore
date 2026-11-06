@@ -3,4 +3,6 @@ dist
 .git
 .env
 .env.*
-uploads
+uploads/*
+!uploads/
+!uploads/.htaccess

@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { ArrowUpRight, FileText } from "lucide-react";
+import { resolveMediaUrl } from "@/lib/api";
 import { PageHero } from "./PageHero";
 
 export type CmsPageSection = {
@@ -118,7 +119,7 @@ export function CmsPageRenderer({ title, summary, layout }: { title: string; sum
             )}
             {section.type === "image" && section.imageUrl && (
               <figure className="mt-5 max-w-4xl">
-                <img src={section.imageUrl} alt={section.imageAlt || section.title || ""} className="max-h-[560px] w-full rounded-xl object-cover" loading="lazy" />
+                <img src={resolveMediaUrl(section.imageUrl) ?? section.imageUrl} alt={section.imageAlt || section.title || ""} className="max-h-[560px] w-full rounded-xl object-cover" loading="lazy" />
                 {section.body && <figcaption className="mt-2 text-sm text-[#64748b]">{section.body}</figcaption>}
               </figure>
             )}
@@ -126,7 +127,7 @@ export function CmsPageRenderer({ title, summary, layout }: { title: string; sum
               <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {section.items.map((item, itemIndex) => (
                   <article key={`${item.title}-${itemIndex}`} className="overflow-hidden rounded-xl border border-[#e2eef0] bg-white">
-                    {item.imageUrl && <img src={item.imageUrl} alt="" className="aspect-[16/9] w-full object-cover" loading="lazy" />}
+                    {item.imageUrl && <img src={resolveMediaUrl(item.imageUrl) ?? item.imageUrl} alt="" className="aspect-[16/9] w-full object-cover" loading="lazy" />}
                     <div className="p-5">
                       <h3 className="font-extrabold text-[#0b2347]">{item.title}</h3>
                       {item.body && <p className="mt-2 text-sm leading-6 text-[#4b5563]">{item.body}</p>}

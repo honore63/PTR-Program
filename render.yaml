@@ -1,0 +1,79 @@
+envVarGroups:
+  - name: ptrp-database
+    envVars:
+      - key: MYSQL_DATABASE
+        value: ptrp
+      - key: MYSQL_USER
+        value: ptrp_app
+      - key: MYSQL_PASSWORD
+        generateValue: true
+
+services:
+  - type: pserv
+    name: ptrp-mysql
+    runtime: docker
+    plan: standard
+    dockerfilePath: ./database/render-mysql/Dockerfile
+    dockerContext: .
+    autoDeploy: false
+    disk:
+      name: ptrp-mysql-data
+      mountPath: /var/lib/mysql
+      sizeGB: 10
+    envVars:
+      - fromGroup: ptrp-database
+      - key: MYSQL_ROOT_PASSWORD
+        generateValue: true
+
+  - type: web
+    name: ptrp-api
+    runtime: docker
+    plan: standard
+    dockerfilePath: ./Dockerfile.api
+    dockerContext: .
+    healthCheckPath: /api/health
+    disk:
+      name: ptrp-api-uploads
+      mountPath: /var/data
+      sizeGB: 5
+    envVars:
+      - fromGroup: ptrp-database
+      - key: DB_HOST
+        fromService:
+          type: pserv
+          name: ptrp-mysql
+          property: host
+      - key: DB_PORT
+        value: "3306"
+      - key: ALLOWED_ORIGINS
+        value: https://ptrp-frontend.onrender.com
+      - key: BASE_PATH
+        value: /
+      - key: UPLOAD_DIR
+        value: /var/data/uploads
+      - key: APP_ENV
+        value: production
+      - key: MANUS_JWT_SECRET
+        generateValue: true
+      - key: COOKIE_SAMESITE
+        value: Lax
+  - type: web
+    name: ptrp-frontend
+    runtime: static
+    buildCommand: >-
+      corepack enable &&
+      corepack prepare pnpm@10.18.0 --activate &&
+      pnpm install --frozen-lockfile &&
+      export VITE_API_BASE_URL="${VITE_API_BASE_URL:-https://${PTRP_API_HOST}/api/}" &&
+      pnpm exec vite build --base=/ --outDir dist/public --emptyOutDir
+    staticPublishPath: ./dist/public
+    envVars:
+      - key: PTRP_API_HOST
+        fromService:
+          type: web
+          name: ptrp-api
+          property: host
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

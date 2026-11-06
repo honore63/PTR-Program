@@ -20,6 +20,7 @@ import {
   Target,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { resolveMediaUrl } from "@/lib/api";
 
 export type Language = "en";
 
@@ -615,8 +616,9 @@ export const featuredHonoreTuyishime: ResidentTeacher = {
 
 export function residentTeacherPhotoUrl(photoUrl: string | null | undefined): string | null {
   if (!photoUrl) return null;
-  if (/^(?:[a-z][a-z\d+.-]*:|\/|#)/i.test(photoUrl)) return photoUrl;
-  return `${import.meta.env.BASE_URL}${photoUrl.replace(/^\.\/+/, "")}`;
+  const resolvedUrl = resolveMediaUrl(photoUrl) ?? photoUrl;
+  if (/^(?:[a-z][a-z\d+.-]*:|\/|#)/i.test(resolvedUrl)) return resolvedUrl;
+  return `${import.meta.env.BASE_URL}${resolvedUrl.replace(/^\.\/+/, "")}`;
 }
 
 export type ResidentBestPractice = {

@@ -1,55 +1,45 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
-# Generate config.php from environment variables when it is not mounted.
-CONFIG="/var/www/html/config.php"
-if [ ! -f "$CONFIG" ]; then
-  DB_HOST="${DB_HOST:-127.0.0.1}"
-  DB_PORT="${DB_PORT:-3306}"
-  DB_NAME="${DB_NAME:-ptrp}"
-  DB_USER="${DB_USER:-ptrp}"
-  DB_PASSWORD="${DB_PASSWORD:-}"
+PORT="${PORT:-80}"
+if ! [[ "$PORT" =~ ^[0-9]+$ ]] || [ "$PORT" -lt 1 ] || [ "$PORT" -gt 65535 ]; then
+  echo "PORT must be a valid TCP port." >&2
+  exit 1
+fi
+export PORT
+
+if [ "${APP_ENV:-}" = "production" ]; then
+  if [ -z "${DB_HOST:-}" ] || [ -z "${DB_PASSWORD:-${MYSQL_PASSWORD:-}}" ]; then
+    echo "DB_HOST and a database password must be configured in production." >&2
+    exit 1
+  fi
+  JWT_SECRET="${MANUS_JWT_SECRET:-}"
+  if [ "${#JWT_SECRET}" -lt 32 ]; then
+    echo "MANUS_JWT_SECRET must contain at least 32 characters." >&2
+    exit 1
+  fi
+fi
+
+cp /usr/local/share/ptrp/runtime-config.php /var/www/html/config.php
+chown www-data:www-data /var/www/html/config.php
+chmod 640 /var/www/html/config.php
+
+UPLOAD_DIR="${UPLOAD_DIR:-/var/www/html/uploads}"
+mkdir -p "$UPLOAD_DIR"
+chown -R www-data:www-data "$UPLOAD_DIR"
+chmod 750 "$UPLOAD_DIR"
+
+if [ -f /var/www/html/.htaccess ]; then
   BASE_PATH="${BASE_PATH:-/}"
-  SMTP_HOST_B64="$(printf '%s' "${SMTP_HOST:-smtp.gmail.com}" | base64 | tr -d '\n')"
-  SMTP_PORT_B64="$(printf '%s' "${SMTP_PORT:-587}" | base64 | tr -d '\n')"
-  SMTP_ENCRYPTION_B64="$(printf '%s' "${SMTP_ENCRYPTION:-tls}" | base64 | tr -d '\n')"
-  SMTP_USERNAME_B64="$(printf '%s' "${SMTP_USERNAME:-}" | base64 | tr -d '\n')"
-  SMTP_PASSWORD_B64="$(printf '%s' "${SMTP_PASSWORD:-}" | base64 | tr -d '\n')"
-  SMTP_FROM_EMAIL_B64="$(printf '%s' "${SMTP_FROM_EMAIL:-}" | base64 | tr -d '\n')"
-  SMTP_FROM_NAME_B64="$(printf '%s' "${SMTP_FROM_NAME:-PTR Alumni Network}" | base64 | tr -d '\n')"
-  cat > "$CONFIG" <<PHP
-<?php
-return [
-    'db_host' => '${DB_HOST}',
-    'db_port' => ${DB_PORT},
-    'db_name' => '${DB_NAME}',
-    'db_user' => '${DB_USER}',
-    'db_password' => '${DB_PASSWORD}',
-    'base_path' => '${BASE_PATH}',
-    'smtp_host' => base64_decode('${SMTP_HOST_B64}', true) ?: '',
-    'smtp_port' => (int) (base64_decode('${SMTP_PORT_B64}', true) ?: '587'),
-    'smtp_encryption' => base64_decode('${SMTP_ENCRYPTION_B64}', true) ?: 'tls',
-    'smtp_username' => base64_decode('${SMTP_USERNAME_B64}', true) ?: '',
-    'smtp_password' => base64_decode('${SMTP_PASSWORD_B64}', true) ?: '',
-    'smtp_from_email' => base64_decode('${SMTP_FROM_EMAIL_B64}', true) ?: '',
-    'smtp_from_name' => base64_decode('${SMTP_FROM_NAME_B64}', true) ?: 'PTR Alumni Network',
-    'manus_project_id' => '${MANUS_PROJECT_ID:-}',
-    'manus_oauth_portal_url' => '${MANUS_OAUTH_PORTAL_URL:-}',
-    'manus_oauth_api_url' => '${MANUS_OAUTH_API_URL:-}',
-    'manus_jwt_secret' => '${MANUS_JWT_SECRET:-}',
-    'manus_api_url' => '${MANUS_API_URL:-}',
-    'manus_api_key' => '${MANUS_API_KEY:-}',
-    'owner_open_id' => '${OWNER_OPEN_ID:-}',
-];
-PHP
-  chown www-data:www-data "$CONFIG"
-  chmod 640 "$CONFIG"
+  sed -i "s#RewriteBase .*#RewriteBase ${BASE_PATH}#" /var/www/html/.htaccess
 fi
 
-# Adjust RewriteBase to match the configured base path.
-HTACCESS="/var/www/html/.htaccess"
-if [ -f "$HTACCESS" ]; then
-  sed -i "s#RewriteBase .*#RewriteBase ${BASE_PATH}#" "$HTACCESS"
+if [ -f /etc/apache2/ports.conf ]; then
+  sed -i 's/^Listen 80$/Listen ${PORT}/' /etc/apache2/ports.conf
+fi
+if [ -f /etc/apache2/sites-available/000-default.conf ]; then
+  sed -i 's/<VirtualHost \*:80>/<VirtualHost *:${PORT}>/' /etc/apache2/sites-available/000-default.conf
 fi
 
+apache2ctl -t
 exec "$@"

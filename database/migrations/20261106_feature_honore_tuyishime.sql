@@ -1,4 +1,5 @@
--- Publish Honore Tuyishime as the first featured resident teacher.
+-- Publish Honore Tuyishime as the first featured resident teacher without
+-- replacing profile details already edited by an administrator.
 
 INSERT INTO `resident_teachers`
   (`fullName`, `email`, `phone`, `modelSchool`, `position`, `bestPractice`, `bestPracticeDescription`, `subjects`, `skills`, `contributions`, `bio`, `photoUrl`, `status`, `isFeatured`, `displayOrder`, `publishedAt`)
@@ -22,17 +23,6 @@ VALUES
     NOW()
   )
 ON DUPLICATE KEY UPDATE
-  `fullName` = VALUES(`fullName`),
-  `phone` = VALUES(`phone`),
-  `modelSchool` = VALUES(`modelSchool`),
-  `position` = VALUES(`position`),
-  `bestPractice` = VALUES(`bestPractice`),
-  `bestPracticeDescription` = VALUES(`bestPracticeDescription`),
-  `subjects` = VALUES(`subjects`),
-  `skills` = VALUES(`skills`),
-  `contributions` = VALUES(`contributions`),
-  `bio` = VALUES(`bio`),
-  `photoUrl` = VALUES(`photoUrl`),
   `status` = 'published',
   `isFeatured` = 1,
   `displayOrder` = -10000,

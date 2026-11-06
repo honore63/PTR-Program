@@ -223,14 +223,6 @@ CREATE TABLE IF NOT EXISTS `bestPractices` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================================
--- Seed default admin user
--- ============================================================
--- Default admin: email = "Residents teachers", password = "Ptrp100"
--- Password hash for "Ptrp100" using PASSWORD_BCRYPT cost 12
-INSERT IGNORE INTO `users` (email, passwordHash, name, role, loginMethod, lastSignedIn)
-VALUES ('Residents teachers', '$2y$12$qzy0UYcQIDtMAKIa0QN0/ezs/U8aJxs3qAPkZfyiiwhVBZUPWrEOa', 'Resident Teachers', 'admin', 'local', NOW());
-
 -- Seed the verified PTRP model schools, news, and gallery photos. No sample profiles are created.
 INSERT IGNORE INTO `schools` (`name`, `district`, `description`, `latitude`, `longitude`, `status`) VALUES
   ('GS Matimba', 'Nyagatare', NULL, -1.1192116, 30.4293638, 'published'),

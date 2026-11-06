@@ -3,15 +3,16 @@ import { ArrowUpRight, Camera, CheckCircle2, PlayCircle, ShieldCheck, X } from "
 import { Link } from "wouter";
 import { PageHero } from "@/components/ptrp/PageHero";
 import { SectionHeading } from "@/components/ptrp/SectionHeading";
-import { apiRequest } from "@/lib/api";
+import { apiRequest, resolveMediaUrl } from "@/lib/api";
 import { galleryAlbums, galleryPhotos, galleryRules } from "@/data/ptrp";
 
 type Album = typeof galleryAlbums[number];
 type GalleryPhoto = { src: string; alt: string };
 
 const publicImageUrl = (image: string) => {
-  if (/^https?:\/\//i.test(image) || image.startsWith(import.meta.env.BASE_URL)) return image;
-  return `${import.meta.env.BASE_URL}${image.replace(/^\/+/, "")}`;
+  const resolvedUrl = resolveMediaUrl(image) ?? image;
+  if (/^https?:\/\//i.test(resolvedUrl) || resolvedUrl.startsWith(import.meta.env.BASE_URL)) return resolvedUrl;
+  return `${import.meta.env.BASE_URL}${resolvedUrl.replace(/^\/+/, "")}`;
 };
 
 export default function GalleryPage() {

@@ -163,7 +163,7 @@ The browser client calls the PHP REST API at `<base-path>/api/`. This is the run
 
 ### Optional Node.js scaffold
 
-The `server/` directory is a Manus/Express scaffold retained for development, tRPC experiments, and the included Docker image. It is **not** the REST API consumed by the current browser client.
+The `server/` directory is an optional Manus/Express scaffold retained for development and tRPC experiments. It is **not** the REST API consumed by the current browser client; both the split Render API image and the single-container image serve `api/index.php`.
 
 | Technology | Version | Role |
 | --- | --- | --- |
@@ -271,7 +271,10 @@ PTR-Program/
 ├── package.json
 ├── pnpm-lock.yaml
 ├── Dockerfile                    # Single-container Apache + PHP + built frontend
+├── Dockerfile.api                # PHP API image for split Render deployment
 ├── docker-compose.yml            # App + MySQL for local testing
+├── database/render-mysql/        # MySQL 8 initialization image for Render
+├── render.yaml                   # Render frontend, API, and MySQL Blueprint
 ├── deploy/
 │   └── entrypoint.sh            # Generates config.php from environment variables
 └── README.md
@@ -716,11 +719,11 @@ Existing databases may contain accounts created by an earlier schema that seeded
 | --- | --- | --- |
 | Apache + PHP + MySQL (XAMPP, cPanel, VPS) | **Recommended** | Matches the shipped REST API and `.htaccess` |
 | Shared PHP hosting | Supported | Needs PHP 8.1+, MySQL, `mod_rewrite`, and `.htaccess` overrides |
-| Docker (Render, Fly.io, Railway) | Supported | Use the repository `Dockerfile` + `docker-compose.yml` |
+| Render Blueprint | **Supported** | Separate static frontend, PHP Docker API, and MySQL Docker services; see `DEPLOYMENT.md` |
+| Docker Compose / other Docker hosts | Supported | Use the repository `Dockerfile` + `docker-compose.yml` |
 | Vercel | Static UI only | Vercel cannot execute the PHP API; not a complete deployment |
-| Render (Node buildpack) | Node scaffold only | Builds Express/tRPC, not the PHP REST API |
 
-Full step-by-step instructions, including database import, environment configuration, Docker usage, and a production testing checklist, are in [`DEPLOYMENT.md`](./DEPLOYMENT.md).
+Render does not offer a managed MySQL database. The Blueprint uses a self-managed MySQL 8 Docker service with a persistent disk; an external managed MySQL provider can be used instead. Do not substitute PostgreSQL. Full setup, migration, backup, environment, and production verification instructions are in [`DEPLOYMENT.md`](./DEPLOYMENT.md).
 
 ### Production checklist (Apache + PHP)
 
@@ -776,9 +779,19 @@ For a complete production site, host the PHP API and MySQL/MariaDB on a PHP-capa
 
 Verify the static UI after deployment at `/`, `/about`, `/network`, `/impact`, `/news`, `/gallery`, `/alumni`, `/resources`, `/partners`, and `/contact`. Do not treat successful static deployment as verification of sign-in, admin, database, or upload functionality.
 
-### Render / Fly.io / Railway (Docker)
+### Render
 
-The repository now ships a single-container image that builds the React frontend and serves it together with the PHP REST API on Apache:
+The repository includes [`render.yaml`](./render.yaml) for a split deployment:
+
+1. `ptrp-mysql` — private MySQL 8 Docker service with a persistent database disk.
+2. `ptrp-api` — PHP 8.3 + Apache Docker web service with a persistent upload disk.
+3. `ptrp-frontend` — Vite static site with SPA fallback and an API URL wired at build time.
+
+Create a Render Blueprint from the repository's `main` branch to provision the services. The MySQL service is self-managed; use an external managed MySQL service if managed database operations are required. No service is live until it has been deployed and tested. Follow [`DEPLOYMENT.md`](./DEPLOYMENT.md) for environment variables, secure administrator setup, database migrations, backup procedures, and the complete verification checklist.
+
+### Single-container Docker (local / other hosts)
+
+The repository also retains a single-container image that builds the React frontend and serves it together with the PHP REST API on Apache:
 
 ```bash
 docker build -t ptr-alumni-network .
@@ -791,7 +804,7 @@ Or with the bundled database:
 docker compose up --build
 ```
 
-Set the environment variables listed in [`DEPLOYMENT.md`](./DEPLOYMENT.md) (section 6). The container generates `config.php` from those variables on startup.
+Set the environment variables listed in [`DEPLOYMENT.md`](./DEPLOYMENT.md) under Docker deployment. The container generates `config.php` from those variables on startup.
 
 ### Existing deployment artifacts
 

@@ -42,11 +42,19 @@ function database(): PDO
     if (!$pdo) {
         $settings = config();
         $dsn = sprintf('mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4', $settings['db_host'], $settings['db_port'], $settings['db_name']);
-        $pdo = new PDO($dsn, $settings['db_user'], $settings['db_password'], [
+        $options = [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES => false,
-        ]);
+        ];
+        if (!empty($settings['db_ssl_ca'])) {
+            if (!is_file($settings['db_ssl_ca'])) {
+                throw new RuntimeException('The configured MySQL TLS CA file does not exist.');
+            }
+            $options[PDO::MYSQL_ATTR_SSL_CA] = $settings['db_ssl_ca'];
+            $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = true;
+        }
+        $pdo = new PDO($dsn, $settings['db_user'], $settings['db_password'], $options);
         ensureDatabaseSchema($pdo);
     }
     return $pdo;
@@ -89,7 +97,53 @@ function ensureDatabaseSchema(PDO $pdo): void
 
 function basePath(): string
 {
-    return '/' . trim((string) (config()['base_path'] ?? '/PTRP'), '/');
+    $path = trim((string) (config()['base_path'] ?? '/PTRP'), '/');
+    return $path === '' ? '' : '/' . $path;
+}
+
+function isSecureRequest(): bool
+{
+    if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') return true;
+    if (getenv('RENDER') === 'true') {
+        $forwardedProto = strtolower(trim(explode(',', (string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''))[0]));
+        return $forwardedProto === 'https';
+    }
+    return false;
+}
+
+function normalizeOrigin(string $origin): ?string
+{
+    $parts = parse_url($origin);
+    if (!is_array($parts)
+        || !in_array(strtolower((string) ($parts['scheme'] ?? '')), ['http', 'https'], true)
+        || empty($parts['host'])
+        || isset($parts['user'])
+        || isset($parts['pass'])
+        || !in_array($parts['path'] ?? '', ['', '/'], true)
+        || isset($parts['query'])
+        || isset($parts['fragment'])) {
+        return null;
+    }
+
+    $normalized = strtolower((string) $parts['scheme']) . '://' . strtolower((string) $parts['host']);
+    if (isset($parts['port'])) $normalized .= ':' . (int) $parts['port'];
+    return $normalized;
+}
+
+function uploadDirectory(): string
+{
+    return rtrim((string) (config()['upload_dir'] ?? dirname(__DIR__) . '/uploads'), '/\\');
+}
+
+function publicApiUrl(string $path): string
+{
+    $settings = config();
+    $origin = rtrim((string) ($settings['public_api_url'] ?? ''), '/');
+    if ($origin === '') {
+        $scheme = isSecureRequest() ? 'https' : 'http';
+        $origin = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+    }
+    return $origin . '/' . ltrim($path, '/');
 }
 
 function cmsTextIsValid(array $record, string $key, int $maxLength, bool $required = false): bool
@@ -157,9 +211,16 @@ function requireMethod(string $method): void
 
 function isTrustedOrigin(string $origin): bool
 {
-    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $expected = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
-    if (hash_equals($expected, $origin)) return true;
+    $scheme = isSecureRequest() ? 'https' : 'http';
+    $expected = normalizeOrigin($scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost'));
+    $normalizedOrigin = normalizeOrigin($origin);
+    if ($normalizedOrigin === null) return false;
+    if ($expected !== null && hash_equals($expected, $normalizedOrigin)) return true;
+
+    foreach (config()['allowed_origins'] ?? [] as $allowedOrigin) {
+        $normalizedAllowedOrigin = normalizeOrigin((string) $allowedOrigin);
+        if ($normalizedAllowedOrigin !== null && hash_equals($normalizedAllowedOrigin, $normalizedOrigin)) return true;
+    }
 
     $parts = parse_url($origin);
     $requestHost = strtolower(preg_replace('/:\\d+$/', '', (string) ($_SERVER['HTTP_HOST'] ?? 'localhost')));
@@ -321,13 +382,14 @@ function notifyAdmins(string $type, string $title, string $message, ?string $lin
 
 function cookieOptions(int $expires): array
 {
-    $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+    $sameSite = (string) (config()['cookie_samesite'] ?? 'Lax');
+    if (!in_array($sameSite, ['Lax', 'Strict', 'None'], true)) $sameSite = 'Lax';
     return [
         'expires' => $expires,
         'path' => basePath() . '/',
-        'secure' => $secure,
+        'secure' => isSecureRequest(),
         'httponly' => true,
-        'samesite' => 'Lax'
+        'samesite' => $sameSite
     ];
 }
 
@@ -443,7 +505,7 @@ function routeRequest(): void
 
             // Look in client/public/storage, client/public/manus-storage, or uploads/
             $candidates = [
-                dirname(__DIR__) . '/uploads/' . $rel,
+                uploadDirectory() . '/' . $rel,
                 dirname(__DIR__) . '/client/public/storage/' . $rel,
                 dirname(__DIR__) . '/client/public/manus-storage/' . $rel,
                 dirname(__DIR__) . '/client/public/' . $rel,
@@ -457,6 +519,11 @@ function routeRequest(): void
 
     $prefix = basePath() . '/api';
     $route = str_starts_with($path, $prefix) ? substr($path, strlen($prefix)) : '';
+
+    if ($route === '/health' && $method === 'GET') {
+        database()->query('SELECT 1')->fetchColumn();
+        respond(['status' => 'ok', 'database' => 'ok']);
+    }
 
     if ($route === '/contact-messages') {
         requireMethod('POST');
@@ -524,10 +591,10 @@ function routeRequest(): void
     if ($route === '/platform/config.js' && $method === 'GET') {
         header('Content-Type: application/javascript; charset=utf-8');
         header('Cache-Control: no-store');
-        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $scheme = isSecureRequest() ? 'https' : 'http';
         $origin = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
         $public = [
-            'apiBaseUrl' => $origin . basePath() . '/api/',
+            'apiBaseUrl' => publicApiUrl(basePath() . '/api/'),
             'appName' => 'PTR Alumni Network',
             'version' => '1.0.0',
         ];
@@ -1044,12 +1111,12 @@ function routeRequest(): void
         $finfo = new finfo(FILEINFO_MIME_TYPE); $detected = $finfo->buffer($bytes) ?: '';
         $allowed = ['image/png','image/jpeg','image/webp','image/gif','image/svg+xml','video/mp4','video/webm','application/pdf','application/vnd.ms-powerpoint','application/vnd.openxmlformats-officedocument.presentationml.presentation','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','text/plain'];
         if (!in_array($mimeType, $allowed, true) || ($detected !== $mimeType && !($mimeType === 'image/svg+xml' && $detected === 'text/plain'))) throw new ApiError(400, 'Unsupported or mismatched upload type.');
-        $directory = dirname(__DIR__) . '/uploads';
+        $directory = uploadDirectory();
         if (!is_dir($directory) && !mkdir($directory, 0750, true) && !is_dir($directory)) throw new ApiError(500, 'Upload directory is unavailable.');
         $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
         $key = bin2hex(random_bytes(16)) . ($extension !== '' ? '.' . preg_replace('/[^a-z0-9]/', '', $extension) : '');
         if (file_put_contents($directory . '/' . $key, $bytes, LOCK_EX) === false) throw new ApiError(500, 'Could not save uploaded file.');
-        $url = basePath() . '/uploads/' . rawurlencode($key);
+        $url = publicApiUrl(basePath() . '/uploads/' . rawurlencode($key));
         $statement = database()->prepare('INSERT INTO mediaAssets (filename, storageKey, url, mimeType, size, altText, status, uploadedBy) VALUES (?, ?, ?, ?, ?, ?, \'approved\', ?)');
         $statement->execute([basename($filename), $key, $url, $mimeType, strlen($bytes), $altText, $user['id']]);
         $fetch = database()->prepare('SELECT * FROM mediaAssets WHERE id = ?'); $fetch->execute([(int) database()->lastInsertId()]);
@@ -2193,11 +2260,11 @@ function routeRequest(): void
         $error = $_GET['error'] ?? '';
 
         if ($error) {
-            header('Location: /PTRP/admin#social?error=' . urlencode($error));
+            header('Location: ' . basePath() . '/admin#social?error=' . urlencode($error));
             exit;
         }
         if (!$platform || !$code) {
-            header('Location: /PTRP/admin#social?error=missing_params');
+            header('Location: ' . basePath() . '/admin#social?error=missing_params');
             exit;
         }
 
@@ -2219,10 +2286,10 @@ function routeRequest(): void
                 $accountData['refreshToken'] ?? null,
                 $accountData['tokenExpiresAt'] ?? null,
             ]);
-            header('Location: /PTRP/admin#social?connected=1');
+            header('Location: ' . basePath() . '/admin#social?connected=1');
             exit;
         } catch (Throwable $e) {
-            header('Location: /PTRP/admin#social?error=' . urlencode($e->getMessage()));
+            header('Location: ' . basePath() . '/admin#social?error=' . urlencode($e->getMessage()));
             exit;
         }
     }
@@ -2236,7 +2303,10 @@ try {
     respond(['error' => $error->getMessage()], $error->status);
 } catch (Throwable $error) {
     error_log('PTRP API error: ' . $error->getMessage());
-    respond(['error' => 'The request could not be completed: ' . $error->getMessage()], 500);
+    $message = getenv('APP_ENV') === 'production'
+        ? 'The request could not be completed.'
+        : 'The request could not be completed: ' . $error->getMessage();
+    respond(['error' => $message], 500);
 }
 
 /* ============================================================================

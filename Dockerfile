@@ -18,8 +18,11 @@ RUN pnpm exec vite build --base=${BASE_PATH} --outDir /app/dist/public --emptyOu
 # ---------- Stage 2: Apache + PHP runtime ----------
 FROM php:8.2-apache
 RUN a2enmod rewrite headers
-RUN docker-php-ext-install pdo pdo_mysql fileinfo
-# mbstring is bundled in the base image on 8.2
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libonig-dev libonig5 \
+    && docker-php-ext-install pdo pdo_mysql fileinfo mbstring \
+    && apt-get purge -y --auto-remove libonig-dev \
+    && rm -rf /var/lib/apt/lists/*
 RUN docker-php-ext-enable opcache 2>/dev/null || true
 
 WORKDIR /var/www/html
@@ -33,7 +36,9 @@ COPY .htaccess /var/www/html/.htaccess
 COPY uploads/.htaccess /var/www/html/uploads/.htaccess
 RUN mkdir -p /var/www/html/uploads && chown -R www-data:www-data /var/www/html/uploads
 
-# Generate config.php from environment variables at startup.
+# Load configuration only from environment variables at startup.
+RUN mkdir -p /usr/local/share/ptrp
+COPY deploy/runtime-config.php /usr/local/share/ptrp/runtime-config.php
 COPY deploy/entrypoint.sh /usr/local/bin/ptrp-entrypoint.sh
 RUN chmod +x /usr/local/bin/ptrp-entrypoint.sh
 ENTRYPOINT ["/usr/local/bin/ptrp-entrypoint.sh"]

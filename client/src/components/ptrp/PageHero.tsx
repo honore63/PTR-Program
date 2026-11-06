@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { GraduationCap } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useLocation } from "wouter";
-import { queryKeys, useApiQuery } from "@/lib/api";
+import { queryKeys, resolveMediaUrl, useApiQuery } from "@/lib/api";
 import { RotatingBannerHeading } from "./RotatingBannerHeading";
 import { getBannerHeadings } from "./bannerHeadings";
 
@@ -46,8 +46,9 @@ const defaultBannerImages: Record<string, string> = {
 };
 
 function publicImageUrl(image: string) {
-  if (/^https?:\/\//i.test(image) || image.startsWith(import.meta.env.BASE_URL)) return image;
-  return `${import.meta.env.BASE_URL}${image.replace(/^\/+/, "")}`;
+  const resolvedUrl = resolveMediaUrl(image) ?? image;
+  if (/^https?:\/\//i.test(resolvedUrl) || resolvedUrl.startsWith(import.meta.env.BASE_URL)) return resolvedUrl;
+  return `${import.meta.env.BASE_URL}${resolvedUrl.replace(/^\/+/, "")}`;
 }
 
 export function PageHero({ eyebrow, title, description, meta, icon: Icon = GraduationCap, image, imageAlt = "", imageCredit, children }: PageHeroProps) {

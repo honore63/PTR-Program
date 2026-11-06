@@ -1,0 +1,13 @@
+Options -Indexes
+RewriteEngine On
+
+<Files "config.php">
+  Require all denied
+</Files>
+
+RewriteRule ^api(?:/.*)?$ api/index.php [QSA,L,NC]
+RewriteRule ^uploads(?:/.*)?$ api/index.php [QSA,L,NC]
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+</IfModule>

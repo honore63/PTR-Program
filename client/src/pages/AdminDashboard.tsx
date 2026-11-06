@@ -1,5 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { apiRequest, queryKeys, useApiQuery } from "@/lib/api";
+import { apiRequest, queryKeys, resolveMediaUrl, useApiQuery } from "@/lib/api";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -1063,7 +1063,7 @@ function UploadManager({ rows, altText, setAltText, fileRef, onFile, uploading, 
         <div className="admin-media-grid">
           {rows.length ? rows.map((row: any) => (
             <article className="admin-media-card" key={row.id}>
-              {row.mimeType?.startsWith("image/") ? <img src={row.url} alt={row.altText || row.filename} /> : <div className="admin-media-file"><FileText className="size-7" /><span>{row.mimeType?.split("/").pop()}</span></div>}
+              {row.mimeType?.startsWith("image/") ? <img src={resolveMediaUrl(row.url) ?? row.url} alt={row.altText || row.filename} /> : <div className="admin-media-file"><FileText className="size-7" /><span>{row.mimeType?.split("/").pop()}</span></div>}
               <div className="admin-media-meta"><strong title={row.filename}>{row.filename}</strong><span>{Math.round(row.size / 1024)} KB · {row.status}</span><div className="admin-media-actions"><a href={row.url} target="_blank" rel="noreferrer">Open</a><button onClick={() => onArchive(row.id)}>Archive</button></div></div>
             </article>
           )) : <p className="admin-empty">No uploads yet.</p>}
@@ -1717,7 +1717,7 @@ function TeamManager({ rows, role, onDelete, onRefresh }: { rows: any[]; role: "
           </label>
           {form.photoUrl && (
             <div className="flex items-center gap-3">
-              <img src={form.photoUrl} alt={`Profile photo preview for ${form.fullName || "team member"}`} className="size-16 rounded-lg object-cover" />
+              <img src={resolveMediaUrl(form.photoUrl) ?? form.photoUrl} alt={`Profile photo preview for ${form.fullName || "team member"}`} className="size-16 rounded-lg object-cover" />
               <span className="text-xs font-semibold text-[#4e677f]">Current profile photo</span>
             </div>
           )}

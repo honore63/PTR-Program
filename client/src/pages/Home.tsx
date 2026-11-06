@@ -32,7 +32,7 @@ import { StatCard } from "@/components/ptrp/ContentCards";
 import { RotatingBannerHeading } from "@/components/ptrp/RotatingBannerHeading";
 import { getBannerHeadings } from "@/components/ptrp/bannerHeadings";
 import { SectionHeading } from "@/components/ptrp/SectionHeading";
-import { queryKeys, useApiQuery } from "@/lib/api";
+import { queryKeys, resolveMediaUrl, useApiQuery } from "@/lib/api";
 
 type HomeProps = { language: Language };
 
@@ -62,8 +62,9 @@ export default function Home({ language }: HomeProps) {
     [t.hero.title, managedBanner?.title],
   );
   const heroImageUrl = (src: string) => {
-    if (/^https?:\/\//i.test(src) || src.startsWith(import.meta.env.BASE_URL)) return src;
-    return `${import.meta.env.BASE_URL}${src.replace(/^\/+/, "")}`;
+    const resolvedUrl = resolveMediaUrl(src) ?? src;
+    if (/^https?:\/\//i.test(resolvedUrl) || resolvedUrl.startsWith(import.meta.env.BASE_URL)) return resolvedUrl;
+    return `${import.meta.env.BASE_URL}${resolvedUrl.replace(/^\/+/, "")}`;
   };
   useEffect(() => {
     if (managedBanner || paused || heroImages.length < 2) return;

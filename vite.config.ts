@@ -29,7 +29,7 @@ function vitePluginXamppAssetPaths(): Plugin {
     name: "xampp-asset-paths",
     enforce: "pre",
     transform(code) {
-      if (process.env.VERCEL === "1") return null;
+      if (process.env.VERCEL === "1" || process.env.RENDER === "true") return null;
       if (!code.includes("/storage/") && !code.includes("/manus-storage/") && !code.includes('window.location.href = "/"') && !code.includes('<a href="/" className="admin-back-link"')) return null;
       return code
         .replaceAll("/storage/", "/PTRP/storage/")
@@ -130,6 +130,18 @@ export default defineConfig({
     ],
     proxy: {
       "/PTRP/api": {
+        target: process.env.VITE_API_PROXY_TARGET ?? "http://localhost",
+        changeOrigin: false,
+      },
+      "/PTRP/uploads": {
+        target: process.env.VITE_API_PROXY_TARGET ?? "http://localhost",
+        changeOrigin: false,
+      },
+      "/PTRP/storage": {
+        target: process.env.VITE_API_PROXY_TARGET ?? "http://localhost",
+        changeOrigin: false,
+      },
+      "/PTRP/manus-storage": {
         target: process.env.VITE_API_PROXY_TARGET ?? "http://localhost",
         changeOrigin: false,
       },

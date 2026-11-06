@@ -1,0 +1,41 @@
+FROM php:8.3-apache
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libonig-dev libonig5 \
+    && a2enmod rewrite headers \
+    && docker-php-ext-install pdo_mysql mbstring fileinfo opcache \
+    && apt-get purge -y --auto-remove libonig-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /var/www/html
+
+COPY deploy/api.htaccess /var/www/html/.htaccess
+COPY api /var/www/html/api
+RUN mkdir -p /usr/local/share/ptrp
+COPY deploy/runtime-config.php /usr/local/share/ptrp/runtime-config.php
+COPY database/migrations /var/www/html/database/migrations
+COPY deploy/apply-migration.php /usr/local/bin/ptrp-migrate
+
+RUN printf '%s\n' \
+      'post_max_size=18M' \
+      'memory_limit=128M' \
+      'max_execution_time=60' \
+      'opcache.enable=1' \
+      'opcache.validate_timestamps=0' \
+      > /usr/local/etc/php/conf.d/ptrp.ini \
+    && mkdir -p /var/data/uploads /var/www/html/uploads \
+    && chown -R www-data:www-data /var/data/uploads /var/www/html/uploads \
+    && chmod +x /usr/local/bin/ptrp-migrate
+
+ENV PORT=10000 \
+    APP_ENV=production \
+    UPLOAD_DIR=/var/data/uploads \
+    MIGRATIONS_DIR=/var/www/html/database/migrations \
+    PTRP_CONFIG_PATH=/var/www/html/config.php
+
+COPY deploy/entrypoint.sh /usr/local/bin/ptrp-entrypoint.sh
+RUN chmod +x /usr/local/bin/ptrp-entrypoint.sh
+
+EXPOSE 10000
+ENTRYPOINT ["/usr/local/bin/ptrp-entrypoint.sh"]
+CMD ["apache2-foreground"]

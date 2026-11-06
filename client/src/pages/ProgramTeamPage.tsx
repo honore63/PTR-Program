@@ -18,7 +18,7 @@ import {
   mentorsPlaceholder,
   ProgramTeamMember,
 } from "@/data/ptrp";
-import { queryKeys, useApiQuery } from "@/lib/api";
+import { queryKeys, resolveMediaUrl, useApiQuery } from "@/lib/api";
 
 const organizations = ["All organizations", "TTC De La Salle Byumba", "De La Salle", "SAVE"];
 const coordinatorOrganizations = ["TTC De La Salle Byumba", "SAVE"];
@@ -258,7 +258,7 @@ function TeamMemberCard({ member }: { member: ProgramTeamMember }) {
       <div className="relative aspect-[16/9] overflow-hidden bg-[#e8f2f6]">
         {member.photoUrl ? (
           <img
-            src={member.photoUrl}
+            src={resolveMediaUrl(member.photoUrl) ?? member.photoUrl}
             alt={`Portrait of ${member.fullName}`}
             className="h-full w-full object-cover object-center"
             loading="lazy"

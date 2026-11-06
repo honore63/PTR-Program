@@ -48,16 +48,30 @@ export const queryKeys = {
   adminAnalytics: ["api", "admin", "analytics"] as const,
 };
 
+function getApiBaseUrl(): string {
+  const envApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+  return envApiBaseUrl
+    ? (envApiBaseUrl.endsWith("/") ? envApiBaseUrl : `${envApiBaseUrl}/`)
+    : (window.__PTRP_CONFIG__?.apiBaseUrl ?? window.__MANUS_CONFIG__?.apiBaseUrl ?? `${import.meta.env.BASE_URL}api/`);
+}
+
+export function resolveMediaUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  if (/\/uploads\//i.test(url)) {
+    const apiOrigin = new URL(getApiBaseUrl(), window.location.href).origin;
+    return new URL(url.startsWith("/") ? url : `/${url}`, apiOrigin).href;
+  }
+  return url;
+}
+
 export async function apiRequest<T>(
   path: string,
   options: Omit<RequestInit, "body"> & { body?: unknown } = {},
 ): Promise<T> {
   const { body, headers, ...requestOptions } = options;
   const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
-  const envApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
-  const apiBaseUrl = envApiBaseUrl
-    ? (envApiBaseUrl.endsWith("/") ? envApiBaseUrl : `${envApiBaseUrl}/`)
-    : (window.__PTRP_CONFIG__?.apiBaseUrl ?? window.__MANUS_CONFIG__?.apiBaseUrl ?? `${import.meta.env.BASE_URL}api/`);
+  const apiBaseUrl = getApiBaseUrl();
   const response = await fetch(`${apiBaseUrl}${path}`, {
     ...requestOptions,
     credentials: "include",

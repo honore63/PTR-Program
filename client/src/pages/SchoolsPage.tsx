@@ -46,7 +46,7 @@ export default function SchoolsPage() {
 
     <section id="school-map" className="scroll-mt-24 bg-white py-20 md:py-28">
       <div className="mx-auto max-w-[1400px] px-5 md:px-8 lg:px-12">
-        <SectionHeading eyebrow="School locations" title="Explore the model school network." body="All 17 model schools are marked on this interactive map. Pan and zoom, select a numbered marker for school details, or choose a district and school below. Google Maps directions are available for each school." />
+        <SectionHeading eyebrow="School locations" title="Explore the model school network." body="All 17 model schools are marked on this interactive map. Pan and zoom, select a numbered marker for school details, or choose a district and school below." />
         <div className="mt-12 grid gap-6 lg:grid-cols-[1.08fr_0.92fr]">
           <div className="overflow-hidden border border-[#dce8ed] bg-white">
             <ModelSchoolsMap schools={filtered} selectedSchool={selected} onSelectSchool={setSelectedId} />

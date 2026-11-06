@@ -9,8 +9,9 @@ fi
 export PORT
 
 if [ "${APP_ENV:-}" = "production" ]; then
-  if [ -z "${DB_HOST:-}" ] || [ -z "${DB_PASSWORD:-${MYSQL_PASSWORD:-}}" ]; then
-    echo "DB_HOST and a database password must be configured in production." >&2
+  if [ -z "${DB_HOST:-}" ] || [ -z "${DB_NAME:-${MYSQL_DATABASE:-}}" ] \
+    || [ -z "${DB_USER:-${MYSQL_USER:-}}" ] || [ -z "${DB_PASSWORD:-${MYSQL_PASSWORD:-}}" ]; then
+    echo "DB_HOST, DB_NAME, DB_USER, and a database password must be configured in production." >&2
     exit 1
   fi
   JWT_SECRET="${MANUS_JWT_SECRET:-}"

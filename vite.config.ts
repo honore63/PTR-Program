@@ -95,7 +95,7 @@ const plugins = [
 ];
 
 export default defineConfig({
-  base: process.env.VERCEL === "1" ? "/" : "/PTRP/",
+  base: process.env.VERCEL === "1" || process.env.RENDER === "true" ? "/" : "/PTRP/",
   plugins,
   resolve: {
     alias: {

@@ -1,7 +1,20 @@
 -- Apply after 20261106_feature_honore_tuyishime.sql.
 -- Adds a managed alumni flag and imports existing verified site content.
-ALTER TABLE `resident_teachers`
-  ADD COLUMN IF NOT EXISTS `isAlumni` tinyint(1) NOT NULL DEFAULT 0 AFTER `isFeatured`;
+SET @ptrp_has_is_alumni := (
+  SELECT COUNT(*)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'resident_teachers'
+    AND COLUMN_NAME = 'isAlumni'
+);
+SET @ptrp_add_is_alumni_sql := IF(
+  @ptrp_has_is_alumni = 0,
+  'ALTER TABLE `resident_teachers` ADD COLUMN `isAlumni` tinyint(1) NOT NULL DEFAULT 0 AFTER `isFeatured`',
+  'SELECT 1'
+);
+PREPARE ptrp_add_is_alumni FROM @ptrp_add_is_alumni_sql;
+EXECUTE ptrp_add_is_alumni;
+DEALLOCATE PREPARE ptrp_add_is_alumni;
 
 UPDATE `resident_teachers`
 SET `isAlumni` = 1

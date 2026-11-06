@@ -2,7 +2,8 @@ import { useMemo } from "react";
 import { GraduationCap } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useLocation } from "wouter";
-import { queryKeys, resolveMediaUrl, useApiQuery } from "@/lib/api";
+import { queryKeys, useApiQuery } from "@/lib/api";
+import { BannerImage } from "./BannerImage";
 import { RotatingBannerHeading } from "./RotatingBannerHeading";
 import { getBannerHeadings } from "./bannerHeadings";
 
@@ -43,41 +44,37 @@ const defaultBannerImages: Record<string, string> = {
   team: "gallery/gallery-05.jpg",
   residents: "gallery/gallery-08.jpg",
   "register-resident": "gallery/gallery-03.jpg",
+  "resident-teacher": "manus-storage/ptrp-residents-2.jpg",
 };
-
-function publicImageUrl(image: string) {
-  const resolvedUrl = resolveMediaUrl(image) ?? image;
-  if (/^https?:\/\//i.test(resolvedUrl) || resolvedUrl.startsWith(import.meta.env.BASE_URL)) return resolvedUrl;
-  return `${import.meta.env.BASE_URL}${resolvedUrl.replace(/^\/+/, "")}`;
-}
 
 export function PageHero({ eyebrow, title, description, meta, icon: Icon = GraduationCap, image, imageAlt = "", imageCredit, children }: PageHeroProps) {
   const [location] = useLocation();
   const slug = location === "/" ? "home" : location.replace(/^\/+|\/+$/g, "");
+  const bannerSlug = slug.startsWith("resident-teacher/") ? "resident-teacher" : slug;
   const bannerQuery = useApiQuery<PageBanner | null>(
-    queryKeys.publicPageBanner(slug),
-    `banners/${slug}`,
-    Object.hasOwn(defaultBannerImages, slug),
+    queryKeys.publicPageBanner(bannerSlug),
+    `banners/${bannerSlug}`,
+    Object.hasOwn(defaultBannerImages, bannerSlug),
   );
   const banner = bannerQuery.data;
-  const bannerImage = banner
-    ? banner.imageUrl
-    : image || defaultBannerImages[slug] || "";
-  const showImage = Boolean(bannerImage) && (banner ? Boolean(Number(banner.isVisible)) : true);
+  const fallbackImage = image || defaultBannerImages[bannerSlug] || defaultBannerImages.about;
+  const bannerImage = banner?.imageUrl || fallbackImage;
+  const showImage = banner ? Boolean(Number(banner.isVisible)) : Boolean(bannerImage);
   const headings = useMemo(
-    () => getBannerHeadings(slug, title, banner?.title),
-    [slug, title, banner?.title],
+    () => getBannerHeadings(bannerSlug, title, banner?.title),
+    [bannerSlug, title, banner?.title],
   );
 
   return (
     <>
       <section className={`page-banner relative isolate flex min-h-[300px] items-center overflow-hidden bg-[#071935] text-white sm:min-h-[360px] lg:min-h-[410px] ${showImage ? "page-banner-photo" : ""}`}>
         {showImage && (
-          <img
-            src={publicImageUrl(bannerImage)}
-            alt={banner?.imageAlt || imageAlt}
+          <BannerImage
+            src={bannerImage}
+            fallbackSrc={[fallbackImage, defaultBannerImages.about]}
+            alt={banner?.imageAlt || imageAlt || `${title} banner`}
             className="page-banner-image absolute inset-0 -z-10 h-full w-full object-cover"
-            style={{ objectPosition: banner?.imagePosition || "center" }}
+            objectPosition={banner?.imagePosition || "center"}
             fetchPriority="high"
           />
         )}

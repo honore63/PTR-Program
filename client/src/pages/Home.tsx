@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowDown,
   ArrowUpRight,
@@ -30,9 +30,10 @@ import {
 } from "@/data/ptrp";
 import { StatCard } from "@/components/ptrp/ContentCards";
 import { RotatingBannerHeading } from "@/components/ptrp/RotatingBannerHeading";
+import { BannerImage, resolvePublicImageUrl } from "@/components/ptrp/BannerImage";
 import { getBannerHeadings } from "@/components/ptrp/bannerHeadings";
 import { SectionHeading } from "@/components/ptrp/SectionHeading";
-import { queryKeys, resolveMediaUrl, useApiQuery } from "@/lib/api";
+import { queryKeys, useApiQuery } from "@/lib/api";
 
 type HomeProps = { language: Language };
 
@@ -42,6 +43,7 @@ export default function Home({ language }: HomeProps) {
   const latestStories = [leadStory, ...otherStories].slice(0, 3);
   const [slide, setSlide] = useState(0);
   const [paused, setPaused] = useState(false);
+  const reduceMotion = useReducedMotion();
   const heroImages = galleryPhotos.slice(0, 8);
   const { data: managedBanner } = useApiQuery<{
     title: string;
@@ -54,35 +56,41 @@ export default function Home({ language }: HomeProps) {
   } | null>(queryKeys.publicPageBanner("home"), "banners/home");
   const managedImageVisible = Boolean(managedBanner && Number(managedBanner.isVisible));
   const slides = managedBanner
-    ? managedImageVisible && managedBanner.imageUrl ? [{ src: managedBanner.imageUrl, alt: managedBanner.imageAlt }] : []
+    ? managedImageVisible ? [{ src: managedBanner.imageUrl || "gallery/gallery-07.jpg", alt: managedBanner.imageAlt }] : []
     : heroImages;
   const activeSlide = slides.length ? slides[managedBanner ? 0 : slide] : undefined;
   const bannerHeadings = useMemo(
     () => getBannerHeadings("home", t.hero.title, managedBanner?.title),
     [t.hero.title, managedBanner?.title],
   );
-  const heroImageUrl = (src: string) => {
-    const resolvedUrl = resolveMediaUrl(src) ?? src;
-    if (/^https?:\/\//i.test(resolvedUrl) || resolvedUrl.startsWith(import.meta.env.BASE_URL)) return resolvedUrl;
-    return `${import.meta.env.BASE_URL}${resolvedUrl.replace(/^\/+/, "")}`;
-  };
   useEffect(() => {
-    if (managedBanner || paused || heroImages.length < 2) return;
+    if (managedBanner || paused || reduceMotion || heroImages.length < 2) return;
     const id = window.setInterval(() => setSlide((s) => (s + 1) % heroImages.length), 5000);
     return () => window.clearInterval(id);
-  }, [managedBanner, paused, heroImages.length]);
+  }, [managedBanner, paused, reduceMotion, heroImages.length]);
 
   return <main>
-    <section className="relative isolate overflow-hidden bg-[#071935] text-white" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+    <section
+      aria-label="PTRP featured stories"
+      className="relative isolate overflow-hidden bg-[#071935] text-white"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setPaused(false);
+      }}
+    >
       {activeSlide && (
         <div className="absolute inset-0 -z-10" aria-hidden="true">
           {slides.map((photo, index) => (
-            <img
+            <BannerImage
               key={photo.src}
-              src={heroImageUrl(photo.src)}
+              src={photo.src}
+              fallbackSrc={["gallery/gallery-07.jpg", "gallery/gallery-01.jpg"]}
               alt=""
-              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ${index === (managedBanner ? 0 : slide) ? "opacity-100" : "opacity-0"}`}
-              style={{ objectPosition: managedBanner?.imagePosition || "center" }}
+              className={`absolute inset-0 h-full w-full object-cover transition-opacity ${reduceMotion ? "duration-0" : "duration-1000"} ${index === (managedBanner ? 0 : slide) ? "opacity-100" : "opacity-0"}`}
+              objectPosition={managedBanner?.imagePosition || "center"}
+              fetchPriority={index === (managedBanner ? 0 : slide) ? "high" : "auto"}
               loading={index === 0 ? "eager" : "lazy"}
             />
           ))}
@@ -93,7 +101,7 @@ export default function Home({ language }: HomeProps) {
       <div className="relative mx-auto flex min-h-[370px] max-w-[1400px] items-center px-5 py-14 sm:min-h-[440px] md:px-8 md:py-16 lg:min-h-[500px] lg:px-12">
         <RotatingBannerHeading headings={bannerHeadings} className="max-w-4xl text-[2.6rem] font-extrabold leading-[1.02] tracking-[-0.045em] text-white sm:text-[3.4rem] lg:text-[4.4rem]" />
         {!managedBanner && slides.length > 1 && (
-          <div className="absolute bottom-5 right-5 flex items-center gap-2 rounded-full border border-white/20 bg-[#071935]/55 px-3 py-2 backdrop-blur-md md:bottom-8 md:right-8 lg:right-12">
+          <div role="group" aria-label="Homepage banner navigation" className="absolute bottom-5 right-5 flex items-center gap-2 rounded-full border border-white/20 bg-[#071935]/55 px-3 py-2 backdrop-blur-md md:bottom-8 md:right-8 lg:right-12">
             <button type="button" onClick={() => setSlide((s) => (s - 1 + slides.length) % slides.length)} aria-label="Previous slide" className="flex size-7 items-center justify-center rounded-full border border-white/25 text-white/80 transition hover:border-[#38bdf8] hover:text-white">‹</button>
             {slides.map((_, index) => (
               <button key={index} type="button" onClick={() => setSlide(index)} aria-label={`Show slide ${index + 1}`} aria-pressed={index === slide} className={`h-1.5 rounded-full transition-all ${index === slide ? "w-6 bg-[#38bdf8]" : "w-1.5 bg-white/45 hover:bg-white/80"}`} />
@@ -174,7 +182,7 @@ export default function Home({ language }: HomeProps) {
           </div>
           <div className="relative">
             <div className="overflow-hidden border border-[#dce8ed] bg-[#eef7fa] shadow-[0_24px_70px_rgba(11,35,71,0.12)]">
-              <img src={heroImageUrl(officialPilot.image)} alt="Teacher residents and education leaders at the PTRP pilot launch" className="aspect-[4/3] w-full object-contain" loading="lazy" />
+              <img src={resolvePublicImageUrl(officialPilot.image)} alt="Teacher residents and education leaders at the PTRP pilot launch" className="aspect-[4/3] w-full object-contain" loading="lazy" />
               <div className="flex flex-col gap-2 border-t border-[#dce8ed] bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-[0.7rem] font-extrabold uppercase tracking-[0.1em] text-[#0b2347]">Pilot launch · Kigali, 4 October 2023</p>
                 <a href={officialPilot.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[0.66rem] font-bold uppercase tracking-[0.08em] text-[#0098d9] hover:text-[#007ab0]">MINEDUC source <ArrowUpRight className="size-3.5" /></a>

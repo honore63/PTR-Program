@@ -14,6 +14,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SocialManager } from "./SocialManager";
 import { CmsPageRenderer, parseCmsPageLayout, type CmsPageSection } from "@/components/ptrp/CmsPageRenderer";
+import { BannerImage } from "@/components/ptrp/BannerImage";
 import { residentTeacherPhotoUrl } from "@/data/ptrp";
 
 type AdminTab =
@@ -848,19 +849,20 @@ function BannerManager({ rows, onSave, onDelete, saving, deleting }: { rows: any
   const selectedPage = bannerCatalog.find((page) => page.slug === selectedSlug) ?? bannerCatalog[0];
   const existing = rows.find((row) => row.slug === selectedSlug);
 
-  const selectPage = (slug: string) => {
-    const page = bannerCatalog.find((item) => item.slug === slug) ?? bannerCatalog[0];
-    const record = rows.find((row) => row.slug === slug);
-    setSelectedSlug(slug);
+  useEffect(() => {
     setForm({
-      eyebrow: record?.eyebrow ?? "",
-      title: record?.title ?? "",
-      description: record?.description ?? "",
-      imageUrl: record ? record.imageUrl : page.imageUrl,
-      imageAlt: record?.imageAlt ?? "",
-      imagePosition: record?.imagePosition ?? "center",
-      isVisible: record ? Boolean(Number(record.isVisible)) : true,
+      eyebrow: existing?.eyebrow ?? "",
+      title: existing?.title ?? "",
+      description: existing?.description ?? "",
+      imageUrl: existing ? existing.imageUrl : selectedPage.imageUrl,
+      imageAlt: existing?.imageAlt ?? "",
+      imagePosition: existing?.imagePosition ?? "center",
+      isVisible: existing ? Boolean(Number(existing.isVisible)) : true,
     });
+  }, [existing, selectedPage]);
+
+  const selectPage = (slug: string) => {
+    setSelectedSlug(slug);
   };
 
   const uploadBanner = async (file: File) => {
@@ -901,12 +903,6 @@ function BannerManager({ rows, onSave, onDelete, saving, deleting }: { rows: any
     onSave({ slug: selectedSlug, ...form });
   };
 
-  const previewImage = form.imageUrl
-    ? /^https?:\/\//i.test(form.imageUrl) || form.imageUrl.startsWith(import.meta.env.BASE_URL)
-      ? form.imageUrl
-      : `${import.meta.env.BASE_URL}${form.imageUrl.replace(/^\/+/, "")}`
-    : "";
-
   return (
     <div className="admin-content">
       <section className="admin-panel admin-editor">
@@ -945,7 +941,7 @@ function BannerManager({ rows, onSave, onDelete, saving, deleting }: { rows: any
       <section className="admin-panel">
         <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Live preview</p><h3>{selectedPage.label} banner</h3></div></div>
         <div className="relative flex min-h-64 items-center overflow-hidden bg-[#071935] px-6 py-10 sm:px-10" aria-label="Banner preview">
-          {form.isVisible && previewImage && <img src={previewImage} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: form.imagePosition }} />}
+          {form.isVisible && <BannerImage src={form.imageUrl || selectedPage.imageUrl} fallbackSrc={[selectedPage.imageUrl, "gallery/gallery-01.jpg"]} alt="" className="absolute inset-0 h-full w-full object-cover" objectPosition={form.imagePosition} />}
           <div className="absolute inset-0 bg-gradient-to-r from-[#071935]/95 via-[#071935]/70 to-[#071935]/25" />
           <div className="relative max-w-2xl text-white">
             <p className="text-[0.62rem] font-extrabold uppercase tracking-[0.16em] text-[#7dd3fc]">PTR Alumni Network · {form.eyebrow || selectedPage.label}</p>

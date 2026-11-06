@@ -21,10 +21,9 @@ CREATE TABLE IF NOT EXISTS `users` (
   UNIQUE KEY `users_openId_unique` (`openId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Migration helpers for upgrading existing installations without data loss
-ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `passwordHash` varchar(255) DEFAULT NULL AFTER `email`;
-ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `resetToken` varchar(128) DEFAULT NULL AFTER `role`;
-ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `resetTokenExpires` datetime DEFAULT NULL AFTER `resetToken`;
+-- The following columns are included in the table definition above. Keep this
+-- bootstrap script compatible with MySQL 8, which does not support
+-- ALTER TABLE ... ADD COLUMN IF NOT EXISTS.
 ALTER TABLE `users` MODIFY COLUMN `openId` varchar(64) NULL;
 ALTER TABLE `users` MODIFY COLUMN `role` enum('user','editor','admin') NOT NULL DEFAULT 'user';
 

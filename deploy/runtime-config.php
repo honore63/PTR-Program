@@ -18,7 +18,7 @@ $allowedOrigins = array_values(array_filter(array_map(
 )));
 
 return [
-    'db_host' => $env('DB_HOST', '127.0.0.1'),
+    'db_host' => $env('DB_HOST'),
     'db_port' => (int) $env('DB_PORT', '3306'),
     'db_name' => $env('DB_NAME', $env('MYSQL_DATABASE', 'ptrp')),
     'db_user' => $env('DB_USER', $env('MYSQL_USER', 'ptrp')),

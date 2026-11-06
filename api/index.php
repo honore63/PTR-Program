@@ -521,7 +521,12 @@ function routeRequest(): void
     $route = str_starts_with($path, $prefix) ? substr($path, strlen($prefix)) : '';
 
     if ($route === '/health' && $method === 'GET') {
-        database()->query('SELECT 1')->fetchColumn();
+        try {
+            database()->query('SELECT 1')->fetchColumn();
+        } catch (PDOException $error) {
+            error_log('PTRP API health check database failure: ' . $error->getMessage());
+            throw new ApiError(503, 'Database service unavailable.');
+        }
         respond(['status' => 'ok', 'database' => 'ok']);
     }
 
@@ -735,7 +740,12 @@ function routeRequest(): void
         respond(database()->query("SELECT id, slug, title, summary, body, status, createdAt, updatedAt FROM siteContent WHERE status = 'published' ORDER BY updatedAt DESC")->fetchAll());
     }
     if ($route === '/settings' && $method === 'GET') {
-        $settings = [];
+        $settings = [
+            'siteName' => 'PTR Alumni Network',
+            'tagline' => 'Inspire, Educate and Empower.',
+            'primaryColor' => '#0b2347',
+            'accentColor' => '#0098d9',
+        ];
         foreach (database()->query('SELECT settingKey, settingValue FROM websiteSettings')->fetchAll() as $row) {
             if (isPublicWebsiteSetting((string) $row['settingKey'])) {
                 $settings[$row['settingKey']] = $row['settingValue'];
@@ -2303,9 +2313,9 @@ try {
     respond(['error' => $error->getMessage()], $error->status);
 } catch (Throwable $error) {
     error_log('PTRP API error: ' . $error->getMessage());
-    $message = getenv('APP_ENV') === 'production'
-        ? 'The request could not be completed.'
-        : 'The request could not be completed: ' . $error->getMessage();
+    $message = strtolower((string) getenv('APP_ENV')) === 'development'
+        ? 'The request could not be completed: ' . $error->getMessage()
+        : 'The request could not be completed.';
     respond(['error' => $message], 500);
 }
 

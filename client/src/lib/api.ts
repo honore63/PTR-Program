@@ -58,9 +58,10 @@ function getApiBaseUrl(): string {
 export function resolveMediaUrl(url: string | null | undefined): string | null {
   if (!url) return null;
   if (/^https?:\/\//i.test(url)) return url;
-  if (/\/uploads\//i.test(url)) {
+  const uploadPath = url.match(/(?:^|\/)uploads\/([^?#]*)([?#].*)?$/i);
+  if (uploadPath) {
     const apiOrigin = new URL(getApiBaseUrl(), window.location.href).origin;
-    return new URL(url.startsWith("/") ? url : `/${url}`, apiOrigin).href;
+    return new URL(`/uploads/${uploadPath[1]}${uploadPath[2] ?? ""}`, apiOrigin).href;
   }
   return url;
 }

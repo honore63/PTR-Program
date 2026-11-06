@@ -64,8 +64,9 @@ services:
       corepack enable &&
       corepack prepare pnpm@10.18.0 --activate &&
       pnpm install --frozen-lockfile &&
+      export RENDER=true &&
       export VITE_API_BASE_URL="${VITE_API_BASE_URL:-https://${PTRP_API_HOST}/api/}" &&
-      pnpm exec vite build --base=/ --outDir dist/public --emptyOutDir
+      pnpm exec vite build --base=/
     staticPublishPath: ./dist/public
     envVars:
       - key: PTRP_API_HOST

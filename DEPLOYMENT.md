@@ -331,3 +331,7 @@ Store backups outside the web root.
 ## 10. Troubleshooting
 
 See the **Troubleshooting** section of `README.md`.
+
+If `/api/health` or database-backed endpoints return an error, open the API service's Render **Events** and **Logs**, then check the MySQL service is live and listening on port `3306`. Verify the API's `DB_HOST` is the MySQL service's internal hostname (not `localhost`), `DB_PORT` is `3306`, and `DB_NAME`, `DB_USER`, and `DB_PASSWORD` match the database service. Keep the existing persistent disk; do not delete or recreate it to retry initialization. If the MySQL logs report an initialization SQL error, fix the reported migration/bootstrap issue and apply only the missing schema changes after taking a backup.
+
+The health endpoint returns HTTP `503` with a safe JSON error when MySQL is unavailable. Detailed connection errors belong in the API service logs, not in public responses. An empty `websiteSettings` table is supported: `/api/settings` returns the built-in public branding defaults until administrators configure overrides.

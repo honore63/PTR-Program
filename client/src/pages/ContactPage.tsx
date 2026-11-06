@@ -12,6 +12,7 @@ import {
   Music2,
   Phone,
   Send,
+  Loader2,
   UsersRound,
   Youtube,
 } from "lucide-react";
@@ -19,6 +20,9 @@ import { Link } from "wouter";
 import { PageHero } from "@/components/ptrp/PageHero";
 import { SectionHeading } from "@/components/ptrp/SectionHeading";
 import { hostColleges, joinContent, socialLinks } from "@/data/ptrp";
+import { apiRequest } from "@/lib/api";
+
+const PTRP_CONTACT_EMAIL = "ptrpresidenteachers100@gmail.com";
 
 const socialIcons: Record<string, typeof AtSign> = {
   youtube: Youtube,
@@ -48,6 +52,10 @@ export default function ContactPage() {
   const [form, setForm] = useState<FormState>(initialForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [sent, setSent] = useState(false);
+  const [contactForm, setContactForm] = useState({ name: "", email: "", subject: "", message: "", website: "" });
+  const [submissionKey, setSubmissionKey] = useState(() => window.crypto.randomUUID());
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const [contactFeedback, setContactFeedback] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
 
   const mailtoHref = useMemo(() => {
     const subject = `PTR Alumni Network membership — ${form.name || "New member"}`;
@@ -67,7 +75,7 @@ export default function ContactPage() {
       "",
       `Consent to appear in the alumni directory: ${form.consent ? "Yes" : "No"}`,
     ].join("\n");
-    return `mailto:${joinContent.contact.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    return `mailto:${PTRP_CONTACT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   }, [form]);
 
   const update = (field: keyof FormState, value: string | boolean) => {
@@ -93,6 +101,32 @@ export default function ContactPage() {
     window.location.href = mailtoHref;
   };
 
+  const handleContactSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (sendingMessage) return;
+    setSendingMessage(true);
+    setContactFeedback(null);
+    try {
+      const result = await apiRequest<{ deliveryStatus: "sent" | "failed" | "pending" | "sending"; message: string }>(
+        "contact-messages",
+        { method: "POST", body: { ...contactForm, submissionKey } },
+      );
+      setContactFeedback({
+        type: result.deliveryStatus === "sent" ? "success" : result.deliveryStatus === "failed" ? "error" : "info",
+        text: result.message,
+      });
+      setSubmissionKey(window.crypto.randomUUID());
+      setContactForm({ name: "", email: "", subject: "", message: "", website: "" });
+    } catch (error) {
+      setContactFeedback({
+        type: "error",
+        text: error instanceof Error ? error.message : "The message could not be submitted. Please try again.",
+      });
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
   return <main>
     <PageHero
       eyebrow="Join & Contact"
@@ -103,6 +137,7 @@ export default function ContactPage() {
       imageCredit="Photo: MINEDUC · PTR Alumni Network"
     >
       <Link href="#join" className="button-primary">Start your membership <ArrowUpRight className="size-4" /></Link>
+      <Link href="#send-message" className="button-ghost-light">Send a message</Link>
       <Link href="#contact-details" className="button-ghost-light">Contact details</Link>
     </PageHero>
 
@@ -126,7 +161,7 @@ export default function ContactPage() {
               <Mail className="mt-0.5 size-5 shrink-0 text-[#0098d9]" />
               <div>
                 <p className="text-[0.62rem] font-extrabold uppercase tracking-[0.12em] text-[#7b8da2]">How this form works</p>
-                <p className="mt-2 text-sm leading-6 text-[#4b5563]">Submitting opens your email app with your details already filled in. Send the message to <a href={`mailto:${joinContent.contact.email}`} className="font-bold text-[#0098d9] hover:underline">{joinContent.contact.email}</a>. No data is stored on this website.</p>
+                <p className="mt-2 text-sm leading-6 text-[#4b5563]">Submitting opens your email app with your details already filled in. Send the message to <a href={`mailto:${PTRP_CONTACT_EMAIL}`} className="font-bold text-[#0098d9] hover:underline">{PTRP_CONTACT_EMAIL}</a>. This membership request is separate from the contact-message form.</p>
               </div>
             </div>
           </div>
@@ -200,10 +235,59 @@ export default function ContactPage() {
 
             {sent && <div role="status" className="mt-5 flex items-start gap-3 border border-[#b7e4cd] bg-[#f0fbf5] p-4">
               <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-[#168d6d]" />
-              <p className="text-sm leading-6 text-[#256b52]">Your email app should open with your details. If it does not, email <a href={mailtoHref} className="font-bold underline">{joinContent.contact.email}</a> directly.</p>
+              <p className="text-sm leading-6 text-[#256b52]">Your email app should open with your details. If it does not, email <a href={mailtoHref} className="font-bold underline">{PTRP_CONTACT_EMAIL}</a> directly.</p>
             </div>}
 
             <p className="mt-5 text-[0.68rem] leading-6 text-[#9aabba]">Fields marked * are required. This site does not store form submissions. Photo uploads and profile publishing are managed by administrators after verification.</p>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section id="send-message" className="scroll-mt-24 bg-white py-16 md:py-20">
+      <div className="mx-auto max-w-[1400px] px-5 md:px-8 lg:px-12">
+        <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-start lg:gap-16">
+          <div>
+            <SectionHeading eyebrow="Send a message" title="How can we help?" body="Send a message directly to the PTRP administration. Your message is stored securely in the admin inbox even if email delivery is temporarily unavailable." />
+            <div className="mt-6 border border-[#dce8ed] bg-[#f8fbfc] p-5">
+              <p className="text-[0.62rem] font-extrabold uppercase tracking-[0.12em] text-[#7b8da2]">Email the administration</p>
+              <a href={`mailto:${PTRP_CONTACT_EMAIL}`} className="mt-2 inline-flex items-center gap-2 break-all text-base font-extrabold text-[#0098d9] hover:underline sm:text-lg">
+                <Mail className="size-4 shrink-0" />{PTRP_CONTACT_EMAIL}
+              </a>
+            </div>
+          </div>
+          <form onSubmit={handleContactSubmit} className="border border-[#dce8ed] bg-white p-6 shadow-[0_24px_70px_rgba(11,35,71,0.08)] sm:p-8">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="text-[0.62rem] font-extrabold uppercase tracking-[0.1em] text-[#60758c]">Full name *</span>
+                <input required maxLength={255} autoComplete="name" value={contactForm.name} onChange={(event) => setContactForm({ ...contactForm, name: event.target.value })} className="mt-2 w-full border border-[#d1d5db] bg-white px-3 py-2.5 text-sm text-[#0b2347] outline-none focus:border-[#0098d9]" />
+              </label>
+              <label className="block">
+                <span className="text-[0.62rem] font-extrabold uppercase tracking-[0.1em] text-[#60758c]">Email address *</span>
+                <input required type="email" maxLength={320} autoComplete="email" value={contactForm.email} onChange={(event) => setContactForm({ ...contactForm, email: event.target.value })} className="mt-2 w-full border border-[#d1d5db] bg-white px-3 py-2.5 text-sm text-[#0b2347] outline-none focus:border-[#0098d9]" />
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="text-[0.62rem] font-extrabold uppercase tracking-[0.1em] text-[#60758c]">Subject *</span>
+                <input required maxLength={200} value={contactForm.subject} onChange={(event) => setContactForm({ ...contactForm, subject: event.target.value })} className="mt-2 w-full border border-[#d1d5db] bg-white px-3 py-2.5 text-sm text-[#0b2347] outline-none focus:border-[#0098d9]" />
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="text-[0.62rem] font-extrabold uppercase tracking-[0.1em] text-[#60758c]">Message *</span>
+                <textarea required maxLength={10000} rows={6} value={contactForm.message} onChange={(event) => setContactForm({ ...contactForm, message: event.target.value })} className="mt-2 w-full resize-y border border-[#d1d5db] bg-white px-3 py-2.5 text-sm leading-6 text-[#0b2347] outline-none focus:border-[#0098d9]" />
+              </label>
+            </div>
+            <label aria-hidden="true" className="absolute -left-[10000px] top-auto h-px w-px overflow-hidden">
+              Leave this field empty
+              <input tabIndex={-1} autoComplete="off" value={contactForm.website} onChange={(event) => setContactForm({ ...contactForm, website: event.target.value })} />
+            </label>
+            <button type="submit" disabled={sendingMessage} className="button-primary mt-5 w-full sm:w-auto">
+              {sendingMessage ? <><Loader2 className="size-4 animate-spin" /> Sending message…</> : <>Send message <Send className="size-4" /></>}
+            </button>
+            {contactFeedback && (
+              <div role={contactFeedback.type === "error" ? "alert" : "status"} className={`mt-5 border p-4 text-sm leading-6 ${contactFeedback.type === "success" ? "border-[#b7e4cd] bg-[#f0fbf5] text-[#256b52]" : contactFeedback.type === "info" ? "border-[#b9dbe9] bg-[#f2faff] text-[#315b73]" : "border-[#f2c5bd] bg-[#fff7f5] text-[#9b3425]"}`}>
+                {contactFeedback.text}
+              </div>
+            )}
+            <p className="mt-4 text-[0.68rem] leading-5 text-[#7b8da2]">Your contact details are used only to respond to this message. Messages are accessible to authorized administrators.</p>
           </form>
         </div>
       </div>
@@ -216,7 +300,7 @@ export default function ContactPage() {
           <div className="border border-[#e2eef0] bg-white p-6">
             <span className="flex size-11 items-center justify-center bg-[#e0f2fe] text-[#0098d9]"><Mail className="size-5" /></span>
             <p className="mt-6 text-[0.62rem] font-extrabold uppercase tracking-[0.12em] text-[#7b8da2]">Email</p>
-            <a href={`mailto:${joinContent.contact.email}`} className="mt-2 block text-lg font-extrabold tracking-[-0.02em] text-[#0098d9] hover:underline">{joinContent.contact.email}</a>
+            <a href={`mailto:${PTRP_CONTACT_EMAIL}`} className="mt-2 block break-all text-lg font-extrabold tracking-[-0.02em] text-[#0098d9] hover:underline">{PTRP_CONTACT_EMAIL}</a>
             <p className="mt-3 text-sm leading-6 text-[#4b5563]">Membership, partnerships, media requests, and corrections.</p>
           </div>
           <div className="border border-[#e2eef0] bg-white p-6">

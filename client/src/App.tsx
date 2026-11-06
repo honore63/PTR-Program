@@ -1,6 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Redirect, Route, Router as WouterRouter, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -8,7 +8,7 @@ import NotFound from "./pages/NotFound";
 import { SiteFooter } from "./components/ptrp/SiteFooter";
 import { SiteNav } from "./components/ptrp/SiteNav";
 import { brand, sectionMeta, type Language } from "./data/ptrp";
-import { queryKeys, useApiQuery } from "./lib/api";
+import { apiRequest, queryKeys, useApiQuery } from "./lib/api";
 import { CmsPageRenderer, parseCmsPageLayout } from "./components/ptrp/CmsPageRenderer";
 
 const AboutPage = lazy(() => import("./pages/AboutPage"));
@@ -70,7 +70,7 @@ function PageMeta({ language }: { language: Language }) {
       : meta?.description ?? "The official digital community for the Primary Teacher Residency Program (PTRP) in Rwanda.";
     const resolvedDescription = settings.metaDescription || cmsPage?.summary || description;
     document.title = title;
-    document.documentElement.lang = language === "rw" ? "rw" : language;
+    document.documentElement.lang = "en";
 
     const robots = document.querySelector('meta[name="robots"]') ?? document.createElement("meta");
     robots.setAttribute("name", "robots");
@@ -98,7 +98,7 @@ function PageMeta({ language }: { language: Language }) {
       tag.setAttribute("content", content);
       document.head.appendChild(tag);
     }
-  }, [cmsPage?.summary, cmsPage?.title, language, location, settings.metaDescription, settings.metaTitle, settings.siteName]);
+  }, [cmsPage?.summary, cmsPage?.title, location, settings.metaDescription, settings.metaTitle, settings.siteName]);
   return null;
 }
 
@@ -143,10 +143,7 @@ function AppFrame() {
   const [location] = useLocation();
   const { data: settingsData } = useApiQuery<Record<string, string> | null>(queryKeys.publicSettings, "settings");
   const settings = settingsData ?? {};
-  const [language, setLanguage] = useState<Language>(() => {
-    try { return (localStorage.getItem("ptrp-language") as Language) || "en"; } catch { return "en"; }
-  });
-  const updateLanguage = (next: Language) => { setLanguage(next); try { localStorage.setItem("ptrp-language", next); } catch { /* storage is optional */ } };
+  const language: Language = "en";
   const isStandaloneRoute = location.startsWith("/admin") || location.startsWith("/portal");
   useEffect(() => {
     const primaryColor = settings.primaryColor;
@@ -154,7 +151,14 @@ function AppFrame() {
     if (primaryColor && /^#[\da-f]{6}$/i.test(primaryColor)) document.documentElement.style.setProperty("--ptr-primary", primaryColor);
     if (accentColor && /^#[\da-f]{6}$/i.test(accentColor)) document.documentElement.style.setProperty("--ptr-accent", accentColor);
   }, [settings.accentColor, settings.primaryColor]);
-  return <><PageMeta language={language} />{!isStandaloneRoute && <SiteNav language={language} onLanguageChange={updateLanguage} settings={settings} />}<Router language={language} />{!isStandaloneRoute && <SiteFooter language={language} settings={settings} />}</>;
+
+  const trackedPath = location === "/" ? "/" : location.replace(/\/$/, "") || "/";
+
+  useEffect(() => {
+    apiRequest("analytics/page-views", { method: "POST", body: { path: trackedPath } }).catch(() => undefined);
+  }, [trackedPath]);
+
+  return <><PageMeta language={language} />{!isStandaloneRoute && <SiteNav language={language} settings={settings} />}<Router language={language} />{!isStandaloneRoute && <SiteFooter language={language} settings={settings} />}</>;
 }
 
 function App() {

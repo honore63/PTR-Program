@@ -3,23 +3,23 @@ import { apiRequest, queryKeys, useApiQuery } from "@/lib/api";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  Archive, BarChart3, BookOpen, Building2, CheckCircle2, FileText, GraduationCap,
+  Archive, ArrowDown, ArrowUp, BarChart3, Bell, BookOpen, Building2, CheckCircle2, Copy, FileText, GraduationCap, Mail, MailOpen,
   ImagePlus, LayoutDashboard, Loader2, LogOut, Pencil, Plus, School, ShieldCheck,
-  Trash2, UploadCloud, UserCog, UsersRound, X, KeyRound, AlertCircle,
+  Trash2, UploadCloud, UserCog, UsersRound, X, KeyRound, AlertCircle, GripVertical,
   RefreshCw,
   Smartphone,
   UserRound,
   Briefcase,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SocialManager } from "./SocialManager";
-import { CmsPageRenderer, parseCmsPageLayout } from "@/components/ptrp/CmsPageRenderer";
+import { CmsPageRenderer, parseCmsPageLayout, type CmsPageSection } from "@/components/ptrp/CmsPageRenderer";
 
 type AdminTab =
   | "overview" | "content" | "banners" | "uploads" | "users"
   | "schools" | "teachers" | "alumni" | "news" | "gallery" | "practices"
   | "social" | "coordinators" | "mentors" | "resident-teachers" | "resident-best-practices"
-  | "navigation" | "settings";
+  | "navigation" | "settings" | "notifications" | "contact-messages" | "analytics";
 
 const starterPages = [
   { slug: "home", title: "PTR Alumni Network home", summary: "Hero, program snapshot, and homepage narrative", body: "Keep this record for the public homepage." },
@@ -80,16 +80,18 @@ function AdminLoginForm() {
     e.preventDefault();
     setError(null);
     if (!username || !password) {
-      setError("Please enter your administrator username and password.");
+      setError("Please enter your username or email and password.");
       return;
     }
     setLoading(true);
     try {
       const u = await login({ username, password });
-      if (u.role !== "admin") {
-        setError("Your account is authenticated, but does not have administrator privileges.");
-      } else {
+      if (u.role === "admin") {
         toast.success("Administrator session verified.");
+      } else if (u.role === "editor") {
+        toast.success("Content editor session verified.");
+      } else {
+        setError("Your account is authenticated, but does not have content editor or administrator privileges.");
       }
     } catch (err: any) {
       setError(err.message || "Failed to authenticate administrator.");
@@ -102,8 +104,8 @@ function AdminLoginForm() {
     <div className="admin-access">
       <div className="admin-access-card" style={{ maxWidth: 440 }}>
         <div className="admin-brand-mark" style={{ margin: "0 auto 1rem" }}>P</div>
-        <h1>Administrator Portal</h1>
-        <p className="admin-access-subtitle">Secure control panel for the PTR Alumni Network.</p>
+        <h1>PTRP Admin Portal</h1>
+        <p className="admin-access-subtitle">Secure workspace for PTR Alumni Network content and administration.</p>
 
         {error && (
           <div style={{ background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", padding: "0.75rem", borderRadius: "8px", fontSize: "0.8rem", marginBottom: "1rem", textAlign: "left" }}>
@@ -114,7 +116,7 @@ function AdminLoginForm() {
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.9rem", textAlign: "left" }}>
           <div>
             <label style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#4b5563", display: "block", marginBottom: "0.3rem" }}>
-              Username
+              Username or Email
             </label>
             <input
               type="text"
@@ -122,6 +124,7 @@ function AdminLoginForm() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="Residents teachers"
+              autoComplete="username"
               style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.9rem", color: "#111" }}
             />
           </div>
@@ -146,7 +149,7 @@ function AdminLoginForm() {
         </form>
 
         <p className="admin-muted" style={{ marginTop: "1.25rem", fontSize: "0.75rem" }}>
-          This workspace is strictly restricted to authorized administrators. All administrative operations are monitored and protected.
+          This workspace is restricted to authorized content editors and administrators. Administrative operations are protected.
         </p>
         <div style={{ marginTop: "1rem" }}>
           <a href="/" style={{ color: "#0098d9", fontSize: "0.8rem", fontWeight: 700, textDecoration: "none" }}>
@@ -166,13 +169,28 @@ export default function AdminDashboard() {
   const [uploadAlt, setUploadAlt] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const isAdmin = user?.role === "admin";
+  const isEditor = user?.role === "editor";
+  const canManageContent = isAdmin || isEditor;
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    setTab(isAdmin ? "overview" : "content");
+  }, [isAdmin]);
 
   const overview = useApiQuery<any>(queryKeys.adminOverview, "admin/overview", isAdmin);
   const recentUpdates = useApiQuery<any[]>(queryKeys.adminRecentUpdates, "admin/recent-updates", isAdmin);
-  const content = useApiQuery<any[]>(queryKeys.adminContent, "admin/content", isAdmin);
-  const pageBanners = useApiQuery<any[]>(queryKeys.adminPageBanners, "admin/banners", isAdmin);
-  const media = useApiQuery<any[]>(queryKeys.adminMedia, "admin/media", isAdmin);
+  const content = useApiQuery<any[]>(queryKeys.adminContent, "admin/content", canManageContent);
+  const pageBanners = useApiQuery<any[]>(queryKeys.adminPageBanners, "admin/banners", canManageContent);
+  const media = useApiQuery<any[]>(queryKeys.adminMedia, "admin/media", canManageContent);
+  const notifications = useApiQuery<any[]>(queryKeys.adminNotifications, "admin/notifications", isAdmin);
+  const contactMessages = useApiQuery<any[]>(queryKeys.adminContactMessages, "admin/contact-messages", isAdmin);
+  const analytics = useApiQuery<any>(queryKeys.adminAnalytics, "admin/analytics", isAdmin);
+
+  const markNotificationRead = useMutation({ mutationFn: (id: number) => apiRequest(`admin/notifications/${id}/read`, { method: "PATCH" }), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: queryKeys.adminNotifications }); }, onError: (error: Error) => toast.error(error.message) });
+  const markAllNotificationsRead = useMutation({ mutationFn: () => apiRequest("admin/notifications/read-all", { method: "POST" }), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: queryKeys.adminNotifications }); }, onError: (error: Error) => toast.error(error.message) });
+  const markContactMessageRead = useMutation({ mutationFn: (id: number) => apiRequest(`admin/contact-messages/${id}/read`, { method: "PATCH" }), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: queryKeys.adminContactMessages }); }, onError: (error: Error) => toast.error(error.message) });
+  const retryContactMessage = useMutation({ mutationFn: (id: number) => apiRequest<{ deliveryStatus: string; message: string }>(`admin/contact-messages/${id}/retry`, { method: "POST" }), onSuccess: async (result) => { (result.deliveryStatus === "sent" ? toast.success : toast.error)(result.message); await queryClient.invalidateQueries({ queryKey: queryKeys.adminContactMessages }); }, onError: (error: Error) => toast.error(error.message) });
+  const deleteContactMessage = useMutation({ mutationFn: (id: number) => apiRequest(`admin/contact-messages/${id}`, { method: "DELETE" }), onSuccess: async () => { toast.success("Contact message deleted"); await queryClient.invalidateQueries({ queryKey: queryKeys.adminContactMessages }); }, onError: (error: Error) => toast.error(error.message) });
   const users = useApiQuery<any[]>(queryKeys.adminUsers, "admin/users", isAdmin);
   const schools = useApiQuery<any[]>(queryKeys.adminSchools, "admin/schools", isAdmin);
   const teachers = useApiQuery<any[]>(queryKeys.adminTeachers, "admin/teachers", isAdmin);
@@ -187,7 +205,7 @@ export default function AdminDashboard() {
   const mentors = useApiQuery<any[]>(queryKeys.adminMentors, "admin/mentors", isAdmin);
   const residentTeachers = useApiQuery<any[]>(queryKeys.adminResidentTeachers, "admin/resident-teachers", isAdmin);
   const residentBestPractices = useApiQuery<any[]>(queryKeys.adminResidentBestPractices, "admin/resident-best-practices", isAdmin);
-  const navigation = useApiQuery<any[]>(queryKeys.adminNavigation, "admin/navigation", isAdmin);
+  const navigation = useApiQuery<any[]>(queryKeys.adminNavigation, "admin/navigation", canManageContent);
   const settings = useApiQuery<any[]>(queryKeys.adminSettings, "admin/settings", isAdmin);
   const userStats = useApiQuery<any>(queryKeys.adminUserStats, "admin/users/stats", isAdmin);
   const activityLogs = useApiQuery<any[]>(queryKeys.adminActivityLogs, "admin/activity-logs", isAdmin);
@@ -250,13 +268,13 @@ export default function AdminDashboard() {
 
   const updateMedia = useMutation({ mutationFn: (input: { id: number; altText?: string | null; status?: "pending" | "approved" | "archived" }) => apiRequest(`admin/media/${input.id}`, { method: "PUT", body: { altText: input.altText, status: input.status } }), onSuccess: async () => { toast.success("Media status updated"); await queryClient.invalidateQueries({ queryKey: queryKeys.adminMedia }); }, onError: (error: Error) => toast.error(error.message) });
 
-  const setRole = useMutation({ mutationFn: (input: { id: number; role: "user" | "admin" }) => apiRequest(`admin/users/${input.id}/role`, { method: "PATCH", body: { role: input.role } }), onSuccess: async () => { toast.success("Role updated"); await invalidate(queryKeys.adminUsers); await invalidate(queryKeys.adminUserStats); }, onError: (error: Error) => toast.error(error.message) });
+  const setRole = useMutation({ mutationFn: (input: { id: number; role: "user" | "editor" | "admin" }) => apiRequest(`admin/users/${input.id}/role`, { method: "PATCH", body: { role: input.role } }), onSuccess: async () => { toast.success("Role updated"); await invalidate(queryKeys.adminUsers); await invalidate(queryKeys.adminUserStats); }, onError: (error: Error) => toast.error(error.message) });
 
   const setUserStatus = useMutation({ mutationFn: (input: { id: number; account_status: "active" | "inactive" }) => apiRequest(`admin/users/${input.id}/status`, { method: "PATCH", body: { account_status: input.account_status } }), onSuccess: async () => { toast.success("Account status updated"); await invalidate(queryKeys.adminUsers); await invalidate(queryKeys.adminUserStats); }, onError: (error: Error) => toast.error(error.message) });
 
-  const updateUser = useMutation({ mutationFn: (input: { id: number; name?: string; email?: string; role?: "user" | "admin"; account_type?: "public" | "resident_teacher" | "admin"; account_status?: "active" | "inactive" }) => apiRequest(`admin/users/${input.id}`, { method: "PATCH", body: input }), onSuccess: async () => { toast.success("Account updated"); await invalidate(queryKeys.adminUsers); await invalidate(queryKeys.adminUserStats); }, onError: (error: Error) => toast.error(error.message) });
+  const updateUser = useMutation({ mutationFn: (input: { id: number; name?: string; email?: string; role?: "user" | "editor" | "admin"; account_type?: "public" | "resident_teacher" | "admin"; account_status?: "active" | "inactive" }) => apiRequest(`admin/users/${input.id}`, { method: "PATCH", body: input }), onSuccess: async () => { toast.success("Account updated"); await invalidate(queryKeys.adminUsers); await invalidate(queryKeys.adminUserStats); }, onError: (error: Error) => toast.error(error.message) });
 
-  const createUser = useMutation({ mutationFn: (input: { name: string; email: string; password: string; role: "user" | "admin"; account_type: "public" | "resident_teacher" | "admin"; account_status: "active" | "inactive" }) => apiRequest("admin/users", { method: "POST", body: input }), onSuccess: async () => { toast.success("User created successfully"); await invalidate(queryKeys.adminUsers); await invalidate(queryKeys.adminUserStats); }, onError: (error: Error) => toast.error(error.message || "Failed to create user") });
+  const createUser = useMutation({ mutationFn: (input: { name: string; email: string; password: string; role: "user" | "editor" | "admin"; account_type: "public" | "resident_teacher" | "admin"; account_status: "active" | "inactive" }) => apiRequest("admin/users", { method: "POST", body: input }), onSuccess: async () => { toast.success("User created successfully"); await invalidate(queryKeys.adminUsers); await invalidate(queryKeys.adminUserStats); }, onError: (error: Error) => toast.error(error.message || "Failed to create user") });
 
   const deleteUser = useMutation({ mutationFn: (id: number) => apiRequest(`admin/users/${id}`, { method: "DELETE" }), onSuccess: async () => { toast.success("Account deleted"); await invalidate(queryKeys.adminUsers); await invalidate(queryKeys.adminUserStats); await invalidate(queryKeys.adminActivityLogs); }, onError: (error: Error) => toast.error(error.message) });
 
@@ -370,12 +388,12 @@ export default function AdminDashboard() {
 
   if (authLoading) return <div className="admin-loading"><Loader2 className="size-6 animate-spin" /> Checking administrator access…</div>;
   if (!user) return <AdminLoginForm />;
-  if (!isAdmin) return (
+  if (!canManageContent) return (
     <div className="admin-access">
       <div className="admin-access-card" style={{ maxWidth: 440 }}>
         <ShieldCheck className="size-10 text-[#e6a24b]" style={{ margin: "0 auto 1rem" }} />
         <h1>Admin access required</h1>
-        <p className="admin-access-subtitle">Your account is signed in as <strong>{user.email}</strong>, but is not assigned the administrator role.</p>
+        <p className="admin-access-subtitle">Your account is signed in as <strong>{user.email}</strong>, but does not have administrator or editor access.</p>
         <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", marginTop: "1.5rem" }}>
           <button className="button-secondary" onClick={() => logout()}>Sign out</button>
           <button className="button-primary" onClick={() => window.location.href = "/"}><LogOut className="size-4" /> Return to site</button>
@@ -423,15 +441,44 @@ export default function AdminDashboard() {
     { id: "navigation", label: "Navigation", icon: FileText },
     { id: "settings", label: "Website settings", icon: Building2 },
     { id: "users", label: "Access and roles", icon: UserCog },
+    { id: "notifications", label: "Notifications", icon: Bell },
+    { id: "contact-messages", label: "Contact messages", icon: Mail },
+    { id: "analytics", label: "Analytics", icon: BarChart3 },
   ];
+
+  const tabAccess: Record<AdminTab, boolean> = {
+    overview: isAdmin,
+    content: canManageContent,
+    banners: canManageContent,
+    uploads: canManageContent,
+    navigation: canManageContent,
+    schools: isAdmin,
+    teachers: isAdmin,
+    alumni: isAdmin,
+    news: isAdmin,
+    gallery: isAdmin,
+    practices: isAdmin,
+    social: isAdmin,
+    coordinators: isAdmin,
+    mentors: isAdmin,
+    "resident-teachers": isAdmin,
+    "resident-best-practices": isAdmin,
+    settings: isAdmin,
+    users: isAdmin,
+    notifications: isAdmin,
+    "contact-messages": isAdmin,
+    analytics: isAdmin,
+  };
+
+  const visibleNavItems = navItems.filter((item) => tabAccess[item.id]);
 
   return (
     <main className="admin-app">
       <aside className="admin-sidebar">
         <div className="admin-brand"><div className="admin-brand-mark">P</div><div><strong>PTR Alumni Network Control</strong><span>Alumni Network</span></div></div>
-        <div className="admin-role"><ShieldCheck className="size-4" /><span>Administrator workspace</span></div>
+        <div className="admin-role"><ShieldCheck className="size-4" /><span>{isAdmin ? "Administrator workspace" : "Content editor workspace"}</span></div>
         <nav className="admin-nav" aria-label="Admin sections">
-          {navItems.map((item) => <button key={item.id} className={tab === item.id ? "admin-nav-active" : ""} onClick={() => setTab(item.id)}><item.icon className="size-4" />{item.label}</button>)}
+          {visibleNavItems.map((item) => <button key={item.id} className={tab === item.id ? "admin-nav-active" : ""} onClick={() => setTab(item.id)}><item.icon className="size-4" />{item.label}</button>)}
         </nav>
         <div className="admin-sidebar-bottom"><a href="/" className="admin-back-link">View public site ↗</a><button className="admin-signout" onClick={() => logout()}><LogOut className="size-4" /> Sign out</button></div>
       </aside>
@@ -439,17 +486,17 @@ export default function AdminDashboard() {
         <header className="admin-header">
           <div>
             <p className="eyebrow text-[#168d6d]">Protected administration</p>
-            <h1>{tab === "overview" ? "Keep every public surface trustworthy." : tab === "content" ? "Edit website content" : tab === "banners" ? "Manage page image banners" : tab === "uploads" ? "Manage media uploads" : tab === "schools" ? "Manage model schools" : tab === "teachers" ? "Manage resident teachers" : tab === "alumni" ? "Manage alumni" : tab === "news" ? "Manage news and events" : tab === "gallery" ? "Manage gallery" : tab === "practices" ? "Manage best practices" : tab === "social" ? "Social Media Integration" : tab === "coordinators" ? "Program Coordinators" : tab === "mentors" ? "Program Mentors" : tab === "resident-teachers" ? "Resident Teachers" : tab === "resident-best-practices" ? "Best Practices" : tab === "navigation" ? "Manage website navigation" : tab === "settings" ? "Website identity and contact settings" : "Access and roles"}</h1>
-            <p>Signed in as <strong>{user.name || user.email || "Administrator"}</strong>. Only approved administrators can change public content.</p>
+            <h1>{tab === "overview" ? "Keep every public surface trustworthy." : tab === "content" ? "Edit website content" : tab === "banners" ? "Manage page image banners" : tab === "uploads" ? "Manage media uploads" : tab === "schools" ? "Manage model schools" : tab === "teachers" ? "Manage resident teachers" : tab === "alumni" ? "Manage alumni" : tab === "news" ? "Manage news and events" : tab === "gallery" ? "Manage gallery" : tab === "practices" ? "Manage best practices" : tab === "social" ? "Social Media Integration" : tab === "coordinators" ? "Program Coordinators" : tab === "mentors" ? "Program Mentors" : tab === "resident-teachers" ? "Resident Teachers" : tab === "resident-best-practices" ? "Best Practices" : tab === "navigation" ? "Manage website navigation" : tab === "settings" ? "Website identity and contact settings" : tab === "notifications" ? "Admin notifications" : tab === "contact-messages" ? "Contact message inbox" : tab === "analytics" ? "Website analytics" : "Access and roles"}</h1>
+            <p>Signed in as <strong>{user.name || user.email || (isAdmin ? "Administrator" : "Content editor")}</strong>. Editors manage pages, banners, media, and navigation; administrator-only modules remain restricted.</p>
           </div>
-          <div className="admin-header-actions"><span className="admin-user-pill"><span className="admin-online-dot" /> Admin</span><button className="admin-icon-button" onClick={() => window.location.href = "/"} aria-label="Close admin workspace"><X className="size-4" /></button></div>
+          <div className="admin-header-actions"><span className="admin-user-pill"><span className="admin-online-dot" /> {isAdmin ? "Admin" : "Editor"}</span><button className="admin-icon-button" onClick={() => window.location.href = "/"} aria-label="Close admin workspace"><X className="size-4" /></button></div>
         </header>
 
         {tab === "overview" && <OverviewPanel stats={overview.data} recentUpdates={recentUpdates.data ?? []} onNavigate={setTab} onSeedHome={openEditor} />}
         {tab === "content" && <ContentManager rows={contentRows} editing={editing} form={contentForm} setForm={setContentForm} onSave={() => saveContent.mutate(contentForm)} saving={saveContent.isPending} onOpenEditor={openEditor} onCancel={() => setEditing(null)} onDelete={(row: any) => { if (window.confirm(`Delete the ${row.slug} page override? The bundled page will be shown again.`)) deleteContent.mutate({ id: row.id, slug: row.slug }); }} deleting={deleteContent.isPending} pageCatalog={cmsPageCatalog} />}
         {tab === "banners" && <BannerManager rows={pageBannerRows} onSave={saveBanner.mutate} saving={saveBanner.isPending} onDelete={(slug: string) => { if (window.confirm("Reset this page banner to its bundled PTRP image and text?")) deleteBanner.mutate(slug); }} deleting={deleteBanner.isPending} />}
         {tab === "uploads" && <UploadManager rows={mediaRows} altText={uploadAlt} setAltText={setUploadAlt} fileRef={fileRef} onFile={uploadFile} uploading={uploadMedia.isPending} onArchive={(id: number) => updateMedia.mutate({ id, status: "archived" })} />}
-        {tab === "users" && <UsersManager rows={userRows} stats={userStats.data} logs={activityLogs.data ?? []} onRole={(id: number, role: "user" | "admin") => setRole.mutate({ id, role })} onSetStatus={(id: number, status: "active" | "inactive") => setUserStatus.mutate({ id, account_status: status })} onUpdate={(id: number, data: any) => updateUser.mutate({ id, ...data })} onCreate={(data: any) => createUser.mutate(data)} onDelete={(id: number) => { if (window.confirm("Are you sure you want to remove this account?")) { deleteUser.mutate(id); } }} changing={setRole.isPending || setUserStatus.isPending || updateUser.isPending || createUser.isPending} onRefresh={() => { queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers }); queryClient.invalidateQueries({ queryKey: queryKeys.adminUserStats }); queryClient.invalidateQueries({ queryKey: queryKeys.adminActivityLogs }); }} />}
+        {tab === "users" && <UsersManager rows={userRows} stats={userStats.data} logs={activityLogs.data ?? []} onRole={(id: number, role: "user" | "editor" | "admin") => setRole.mutate({ id, role })} onSetStatus={(id: number, status: "active" | "inactive") => setUserStatus.mutate({ id, account_status: status })} onUpdate={(id: number, data: any) => updateUser.mutate({ id, ...data })} onCreate={(data: any) => createUser.mutate(data)} onDelete={(id: number) => { if (window.confirm("Are you sure you want to remove this account?")) { deleteUser.mutate(id); } }} changing={setRole.isPending || setUserStatus.isPending || updateUser.isPending || createUser.isPending} onRefresh={() => { queryClient.invalidateQueries({ queryKey: queryKeys.adminUsers }); queryClient.invalidateQueries({ queryKey: queryKeys.adminUserStats }); queryClient.invalidateQueries({ queryKey: queryKeys.adminActivityLogs }); }} />}
         {tab === "schools" && <SchoolsManager rows={schoolRows} onDelete={(id: number) => deleteSchool.mutate(id)} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminSchools })} />}
         {tab === "teachers" && <TeachersManager rows={teacherRows} schools={schoolRows} onDelete={(id: number) => deleteTeacher.mutate(id)} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminTeachers })} />}
         {tab === "alumni" && <AlumniManager rows={alumniRows} schools={schoolRows} onDelete={(id: number) => deleteAlumni.mutate(id)} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminAlumni })} />}
@@ -463,8 +510,120 @@ export default function AdminDashboard() {
         {tab === "resident-best-practices" && <ResidentBestPracticesManager rows={residentBestPracticeRows} teachers={residentTeacherRows} onSave={saveResidentBestPractice.mutate} onDelete={deleteResidentBestPractice.mutate} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminResidentBestPractices })} saving={saveResidentBestPractice.isPending} />}
         {tab === "navigation" && <NavigationManager rows={navigationRows} onSave={saveNavigation.mutate} onDelete={(id: number) => { if (window.confirm("Delete this navigation item and its dropdown items?")) deleteNavigation.mutate(id); }} saving={saveNavigation.isPending} />}
         {tab === "settings" && <WebsiteSettingsManager rows={settingRows} onSave={saveSetting.mutate} onDelete={(key: string) => { if (window.confirm(`Delete the ${key} setting?`)) deleteSetting.mutate(key); }} saving={saveSetting.isPending} />}
+        {tab === "notifications" && tabAccess.notifications && <NotificationsPanel notifications={notifications.data ?? []} onRead={(id: number) => markNotificationRead.mutate(id)} onReadAll={() => markAllNotificationsRead.mutate()} marking={markAllNotificationsRead.isPending} markingRead={markNotificationRead.isPending} />}
+        {tab === "contact-messages" && tabAccess["contact-messages"] && <ContactMessagesPanel messages={contactMessages.data ?? []} loading={contactMessages.isLoading} error={contactMessages.error} onRead={(id: number) => markContactMessageRead.mutate(id)} onRetry={(id: number) => retryContactMessage.mutate(id)} onDelete={(id: number) => { if (window.confirm("Permanently delete this contact message?")) deleteContactMessage.mutate(id); }} markingRead={markContactMessageRead.isPending} retrying={retryContactMessage.isPending} deleting={deleteContactMessage.isPending} />}
+        {tab === "analytics" && tabAccess.analytics && <AnalyticsPanel analytics={analytics.data} />}
       </section>
     </main>
+  );
+}
+
+function NotificationsPanel({ notifications, onRead, onReadAll, marking, markingRead }: any) {
+  return (
+    <div className="admin-content">
+      <section className="admin-panel admin-editor">
+        <div className="admin-panel-heading">
+          <div><p className="eyebrow text-[#168d6d]">Admin inbox</p><h3>Notifications</h3></div>
+          <button className="button-secondary" onClick={onReadAll} disabled={marking || markingRead}>{marking || markingRead ? "Marking…" : "Mark all read"}</button>
+        </div>
+        {notifications.length === 0 ? (
+          <p className="admin-muted">No notifications yet. Approval and publishing events will appear here.</p>
+        ) : (
+          notifications.map((n: any) => (
+            <div key={n.id} style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "flex-start", border: "1px solid #e5edf1", borderRadius: 14, padding: "14px 16px", background: "#fbfdfe" }}>
+              <div>
+                <strong style={{ color: "#0b2347" }}>{n.title}</strong>
+                <p style={{ margin: "6px 0 0", color: "#4b5563", fontSize: "0.85rem", lineHeight: 1.6 }}>{n.message}</p>
+                <small style={{ display: "block", marginTop: 6, color: "#70849a", fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>{n.type}{n.createdAt ? ` · ${new Date(n.createdAt).toLocaleString()}` : ""}</small>
+              </div>
+              <button className="admin-table-action" onClick={() => onRead(n.id)} disabled={markingRead}>Mark read</button>
+            </div>
+          ))
+        )}
+      </section>
+    </div>
+  );
+}
+
+function ContactMessagesPanel({ messages, loading, error, onRead, onRetry, onDelete, markingRead, retrying, deleting }: any) {
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
+  const filteredMessages = useMemo(() => messages.filter((message: any) => {
+    const matchesSearch = `${message.senderName} ${message.senderEmail} ${message.subject} ${message.message}`.toLowerCase().includes(search.toLowerCase());
+    const matchesFilter = filter === "all" || (filter === "unread" ? !message.readAt : filter === "read" ? Boolean(message.readAt) : message.deliveryStatus === filter);
+    return matchesSearch && matchesFilter;
+  }), [messages, search, filter]);
+
+  return (
+    <div className="admin-content">
+      <section className="admin-panel">
+        <div className="admin-panel-heading">
+          <div><p className="eyebrow text-[#168d6d]">Visitor inbox</p><h3>Contact messages</h3></div>
+          <span className="admin-status admin-status-published">{messages.filter((message: any) => !message.readAt).length} unread</span>
+        </div>
+        <p className="admin-muted">Messages are stored in the database. Email delivery status is shown for each message; failed messages can be retried after SMTP is configured.</p>
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+          <input aria-label="Search contact messages" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search sender, email, subject, or message" className="min-w-0 flex-1 rounded-lg border border-[#d1d5db] px-3 py-2 text-sm" />
+          <select aria-label="Filter contact messages" value={filter} onChange={(event) => setFilter(event.target.value)} className="rounded-lg border border-[#d1d5db] bg-white px-3 py-2 text-sm">
+            <option value="all">All messages</option><option value="unread">Unread</option><option value="read">Read</option><option value="sent">Email delivered</option><option value="failed">Email failed</option><option value="pending">Pending</option>
+          </select>
+        </div>
+        {loading ? <p className="admin-muted py-8">Loading messages…</p> : error ? <p role="alert" className="py-6 text-sm text-red-700">{error instanceof Error ? error.message : "Could not load messages."}</p> : filteredMessages.length === 0 ? <p className="admin-muted py-8">{messages.length ? "No messages match this search or filter." : "No contact messages have been submitted yet."}</p> : (
+          <div className="mt-4 grid gap-3">
+            {filteredMessages.map((message: any) => (
+              <article key={message.id} className={`rounded-xl border p-4 ${message.readAt ? "border-[#e5edf1] bg-white" : "border-[#b9dbe9] bg-[#f7fcff]"}`}>
+                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {message.readAt ? <MailOpen className="size-4 text-[#7b8da2]" /> : <Mail className="size-4 text-[#0098d9]" />}
+                      <h4 className="break-words font-bold text-[#0b2347]">{message.subject}</h4>
+                      {!message.readAt && <span className="admin-status admin-status-published">Unread</span>}
+                      <span className={`admin-status ${message.deliveryStatus === "sent" ? "admin-status-published" : "admin-status-draft"}`}>Email {message.deliveryStatus}</span>
+                    </div>
+                    <p className="mt-2 text-sm font-semibold text-[#334155]">{message.senderName} · <a href={`mailto:${message.senderEmail}`} className="break-all text-[#0098d9] hover:underline">{message.senderEmail}</a></p>
+                    <p className="mt-1 text-xs text-[#70849a]">Received {message.createdAt ? new Date(message.createdAt).toLocaleString() : "date unavailable"}{message.deliveredAt ? ` · Delivered ${new Date(message.deliveredAt).toLocaleString()}` : ""}</p>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    {!message.readAt && <button className="admin-table-action" disabled={markingRead} onClick={() => onRead(message.id)}>Mark read</button>}
+                    {message.deliveryStatus === "failed" && <button className="admin-table-action" disabled={retrying} onClick={() => onRetry(message.id)}>Retry email</button>}
+                    <button className="admin-table-action" disabled={deleting} onClick={() => onDelete(message.id)}>Delete</button>
+                  </div>
+                </div>
+                <p className="mt-4 whitespace-pre-wrap break-words border-t border-[#e5edf1] pt-3 text-sm leading-6 text-[#334155]">{message.message}</p>
+                {message.deliveryError && <p className="mt-2 text-xs text-[#9b3425]">{message.deliveryError}</p>}
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function AnalyticsPanel({ analytics }: any) {
+  const topPages = Array.isArray(analytics?.topPages) ? analytics.topPages : [];
+  return (
+    <div className="admin-content">
+      <section className="admin-panel admin-editor">
+        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Insights</p><h3>Website analytics</h3></div></div>
+        <div className="admin-stats">
+          <div className="admin-stat"><strong>{analytics?.totalViews ?? 0}</strong><span>Total page views</span></div>
+          <div className="admin-stat"><strong>{analytics?.viewsLast7Days ?? 0}</strong><span>Views · last 7 days</span></div>
+          <div className="admin-stat"><strong>{analytics?.trackedPaths ?? 0}</strong><span>Tracked pages</span></div>
+        </div>
+        <h3 style={{ marginTop: 18, color: "#0b2347" }}>Top pages</h3>
+        {topPages.length === 0 ? <p className="admin-muted">No page views recorded yet.</p> : (
+          <div style={{ display: "grid", gap: 8 }}>
+            {topPages.map((p: any) => (
+              <div key={p.path} style={{ display: "flex", justifyContent: "space-between", border: "1px solid #e5edf1", borderRadius: 12, padding: "10px 14px", background: "#fbfdfe" }}>
+                <span style={{ color: "#0b2347", fontWeight: 700 }}>{p.path}</span>
+                <strong>{p.views}</strong>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
   );
 }
 
@@ -532,6 +691,34 @@ function ContentManager({ rows, editing, form, setForm, onSave, saving, onOpenEd
   const pageRows = filteredRows.slice((page - 1) * pageSize, page * pageSize);
   const layout = parseCmsPageLayout(form.body);
   const canSave = /^[a-zA-Z0-9_-]{1,120}$/.test(form.slug) && form.title.trim() && form.summary.trim() && !!layout;
+  const updateLayout = (nextLayout: NonNullable<typeof layout>) => setForm((current: any) => ({ ...current, body: JSON.stringify(nextLayout, null, 2) }));
+  const updateSection = (index: number, patch: Partial<CmsPageSection>) => {
+    if (!layout) return;
+    updateLayout({ ...layout, sections: layout.sections.map((section, sectionIndex) => sectionIndex === index ? { ...section, ...patch } : section) });
+  };
+  const moveSection = (index: number, destination: number) => {
+    if (!layout || destination < 0 || destination >= layout.sections.length) return;
+    const sections = [...layout.sections];
+    const [section] = sections.splice(index, 1);
+    sections.splice(destination, 0, section);
+    updateLayout({ ...layout, sections });
+  };
+  const addSection = (type: CmsPageSection["type"]) => {
+    if (!layout) return;
+    const templates: Record<CmsPageSection["type"], CmsPageSection> = {
+      text: { type, title: "New section", body: "" },
+      image: { type, title: "Photo", body: "", imageUrl: "", imageAlt: "" },
+      cards: { type, title: "Featured items", items: [{ title: "New item", body: "" }] },
+      callout: { type, title: "Get involved", body: "", buttonLabel: "Learn more", buttonHref: "/contact" },
+    };
+    updateLayout({ ...layout, sections: [...layout.sections, templates[type]] });
+  };
+  const updateCard = (sectionIndex: number, cardIndex: number, patch: Partial<NonNullable<CmsPageSection["items"]>[number]>) => {
+    if (!layout) return;
+    const section = layout.sections[sectionIndex];
+    if (section.type !== "cards") return;
+    updateSection(sectionIndex, { items: section.items?.map((item, index) => index === cardIndex ? { ...item, ...patch } : item) });
+  };
 
   return (
     <div className="admin-content">
@@ -543,7 +730,67 @@ function ContentManager({ rows, editing, form, setForm, onSave, saving, onOpenEd
             <label>Slug<input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, "-") })} placeholder="about" disabled={!!editing} /></label>
             <label>Page title<input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Page title" /></label>
             <label className="admin-full">Page description<textarea value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} rows={2} placeholder="Short page description" /></label>
-            <label className="admin-full">Page sections (JSON)<textarea value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} rows={14} spellCheck={false} aria-invalid={!layout} /></label>
+            <label className="admin-full">Hero eyebrow<input value={layout?.eyebrow ?? ""} onChange={(event) => layout && updateLayout({ ...layout, eyebrow: event.target.value })} maxLength={120} /></label>
+            <label className="admin-full">Hero image URL<input value={layout?.heroImage ?? ""} onChange={(event) => layout && updateLayout({ ...layout, heroImage: event.target.value })} maxLength={2000} placeholder="Use a media-library URL or leave blank" /></label>
+            <label className="admin-full">Hero image description<input value={layout?.heroImageAlt ?? ""} onChange={(event) => layout && updateLayout({ ...layout, heroImageAlt: event.target.value })} maxLength={255} /></label>
+            <div className="admin-full">
+              <div className="admin-panel-heading">
+                <div><p className="eyebrow text-[#168d6d]">Visual page builder</p><h3>Page sections</h3></div>
+                <div className="flex flex-wrap gap-2">
+                  {(["text", "image", "cards", "callout"] as const).map((type) => <button key={type} type="button" className="admin-table-action" disabled={!layout || layout.sections.length >= 100} onClick={() => addSection(type)}><Plus className="size-3.5" />{type}</button>)}
+                </div>
+              </div>
+              {!layout ? <p role="alert" className="mt-3 text-sm text-red-600">This page layout is invalid. Correct its stored JSON before editing.</p> : layout.sections.length === 0 ? <p className="admin-muted mt-3">No sections yet. Add a section template above.</p> : (
+                <div className="mt-3 grid gap-3">
+                  {layout.sections.map((section, index) => (
+                    <article
+                      key={`${section.type}-${index}`}
+                      draggable
+                      onDragStart={(event) => event.dataTransfer.setData("text/plain", String(index))}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={(event) => { event.preventDefault(); const source = Number(event.dataTransfer.getData("text/plain")); if (Number.isInteger(source)) moveSection(source, index); }}
+                      className="rounded-xl border border-[#dce8ed] bg-[#fbfdfe] p-4"
+                    >
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 text-sm font-bold capitalize text-[#0b2347]"><GripVertical className="size-4 text-[#7b8da2]" />{section.type} section {index + 1}</div>
+                        <div className="flex flex-wrap gap-1">
+                          <button type="button" className="admin-table-action" aria-label={`Move section ${index + 1} up`} disabled={index === 0} onClick={() => moveSection(index, index - 1)}><ArrowUp className="size-3.5" /></button>
+                          <button type="button" className="admin-table-action" aria-label={`Move section ${index + 1} down`} disabled={index === layout.sections.length - 1} onClick={() => moveSection(index, index + 1)}><ArrowDown className="size-3.5" /></button>
+                          <button type="button" className="admin-table-action" onClick={() => updateLayout({ ...layout, sections: [...layout.sections.slice(0, index + 1), { ...section, items: section.items?.map((item) => ({ ...item })) }, ...layout.sections.slice(index + 1)] })}><Copy className="size-3.5" />Duplicate</button>
+                          <button type="button" className="admin-table-action admin-danger" aria-label={`Delete section ${index + 1}`} onClick={() => updateLayout({ ...layout, sections: layout.sections.filter((_, sectionIndex) => sectionIndex !== index) })}><Trash2 className="size-3.5" /></button>
+                        </div>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="admin-full">Section heading<input value={section.title ?? ""} onChange={(event) => updateSection(index, { title: event.target.value })} maxLength={255} /></label>
+                        {(section.type === "text" || section.type === "callout" || section.type === "image") && <label className="admin-full">{section.type === "image" ? "Caption" : "Text"}<textarea value={section.body ?? ""} onChange={(event) => updateSection(index, { body: event.target.value })} rows={3} maxLength={20000} /></label>}
+                        {section.type === "image" && <>
+                          <label className="admin-full">Image URL<input value={section.imageUrl ?? ""} onChange={(event) => updateSection(index, { imageUrl: event.target.value })} maxLength={2000} /></label>
+                          <label className="admin-full">Image description<input value={section.imageAlt ?? ""} onChange={(event) => updateSection(index, { imageAlt: event.target.value })} maxLength={255} /></label>
+                        </>}
+                        {section.type === "callout" && <>
+                          <label>Button label<input value={section.buttonLabel ?? ""} onChange={(event) => updateSection(index, { buttonLabel: event.target.value })} maxLength={120} /></label>
+                          <label>Button destination<input value={section.buttonHref ?? ""} onChange={(event) => updateSection(index, { buttonHref: event.target.value })} maxLength={2000} /></label>
+                        </>}
+                      </div>
+                      {section.type === "cards" && (
+                        <div className="mt-3 grid gap-3">
+                          {section.items?.map((item, cardIndex) => (
+                            <div key={`${item.title}-${cardIndex}`} className="grid gap-2 rounded-lg border border-[#e5edf1] bg-white p-3 sm:grid-cols-2">
+                              <label>Card title<input value={item.title} onChange={(event) => updateCard(index, cardIndex, { title: event.target.value })} maxLength={255} /></label>
+                              <label>Card description<input value={item.body ?? ""} onChange={(event) => updateCard(index, cardIndex, { body: event.target.value })} maxLength={10000} /></label>
+                              <label>Image URL<input value={item.imageUrl ?? ""} onChange={(event) => updateCard(index, cardIndex, { imageUrl: event.target.value })} maxLength={2000} /></label>
+                              <label>Link destination<input value={item.href ?? ""} onChange={(event) => updateCard(index, cardIndex, { href: event.target.value })} maxLength={2000} /></label>
+                              <button type="button" className="admin-table-action admin-danger sm:col-span-2 sm:justify-self-start" onClick={() => updateSection(index, { items: section.items?.filter((_, itemIndex) => itemIndex !== cardIndex) })}><Trash2 className="size-3.5" />Remove card</button>
+                            </div>
+                          ))}
+                          <button type="button" className="admin-table-action sm:justify-self-start" disabled={(section.items?.length ?? 0) >= 30} onClick={() => updateSection(index, { items: [...(section.items ?? []), { title: "New item", body: "" }] })}><Plus className="size-3.5" />Add card</button>
+                        </div>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className="admin-full flex flex-wrap items-center justify-between gap-3">
               <p className={`text-xs ${layout ? "text-[#168d6d]" : "text-red-600"}`}>{layout ? `${layout.sections.length} valid content section(s)` : "Invalid JSON. Fix the page layout before saving."}</p>
               <button type="button" className="button-secondary" onClick={() => setShowPreview((visible) => !visible)} disabled={!layout}>{showPreview ? "Hide preview" : "Preview page"}</button>
@@ -828,8 +1075,8 @@ function UsersManager({ rows, stats, logs, onRole, onSetStatus, onUpdate, onCrea
   const [resetId, setResetId] = useState<number | null>(null);
   const [editId, setEditId] = useState<number | null>(null);
   const [resetPasswordVal, setResetPasswordVal] = useState("");
-  const [addForm, setAddForm] = useState({ name: "", email: "", password: "", role: "user" as "user" | "admin", account_type: "public" as "public" | "resident_teacher" | "admin", account_status: "active" as "active" | "inactive" });
-  const [editForm, setEditForm] = useState({ id: 0, name: "", email: "", role: "user" as "user" | "admin", account_type: "public" as "public" | "resident_teacher" | "admin", account_status: "active" as "active" | "inactive" });
+  const [addForm, setAddForm] = useState({ name: "", email: "", password: "", role: "user" as "user" | "editor" | "admin", account_type: "public" as "public" | "resident_teacher" | "admin", account_status: "active" as "active" | "inactive" });
+  const [editForm, setEditForm] = useState({ id: 0, name: "", email: "", role: "user" as "user" | "editor" | "admin", account_type: "public" as "public" | "resident_teacher" | "admin", account_status: "active" as "active" | "inactive" });
   const [search, setSearch] = useState("");
   const [filterRole, setFilterRole] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -967,7 +1214,7 @@ function UsersManager({ rows, stats, logs, onRole, onSetStatus, onUpdate, onCrea
               <label>Full Name<input required value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })} placeholder="Full name" /></label>
               <label>Email Address<input required type="email" value={addForm.email} onChange={(e) => setAddForm({ ...addForm, email: e.target.value })} placeholder="name@domain.rw" /></label>
               <label>Initial Password (min 8 chars)<input required type="password" minLength={8} value={addForm.password} onChange={(e) => setAddForm({ ...addForm, password: e.target.value })} placeholder="••••••••" /></label>
-              <label>Role<select value={addForm.role} onChange={(e) => setAddForm({ ...addForm, role: e.target.value as "user" | "admin" })}><option value="user">User / Member</option><option value="admin">Administrator</option></select></label>
+              <label>Role<select value={addForm.role} onChange={(e) => setAddForm({ ...addForm, role: e.target.value as "user" | "editor" | "admin" })}><option value="user">User / Member</option><option value="editor">Program Editor</option><option value="admin">Administrator</option></select></label>
               <label>Account Type<select value={addForm.account_type} onChange={(e) => setAddForm({ ...addForm, account_type: e.target.value as "public" | "resident_teacher" | "admin" })}><option value="public">Public User</option><option value="resident_teacher">Resident Teacher</option><option value="admin">Administrator</option></select></label>
               <label>Account Status<select value={addForm.account_status} onChange={(e) => setAddForm({ ...addForm, account_status: e.target.value as "active" | "inactive" })}><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
             </div>
@@ -1005,7 +1252,7 @@ function UsersManager({ rows, stats, logs, onRole, onSetStatus, onUpdate, onCrea
             <div className="admin-form-grid">
               <label>Full Name<input required value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} /></label>
               <label>Email Address<input required type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} /></label>
-              <label>Role<select value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value as "user" | "admin" })}><option value="user">User / Member</option><option value="admin">Administrator</option></select></label>
+              <label>Role<select value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value as "user" | "editor" | "admin" })}><option value="user">User / Member</option><option value="editor">Program Editor</option><option value="admin">Administrator</option></select></label>
               <label>Account Type<select value={editForm.account_type} onChange={(e) => setEditForm({ ...editForm, account_type: e.target.value as "public" | "resident_teacher" | "admin" })}><option value="public">Public User</option><option value="resident_teacher">Resident Teacher</option><option value="admin">Administrator</option></select></label>
               <label>Account Status<select value={editForm.account_status} onChange={(e) => setEditForm({ ...editForm, account_status: e.target.value as "active" | "inactive" })}><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
             </div>
@@ -1030,6 +1277,7 @@ function UsersManager({ rows, stats, logs, onRole, onSetStatus, onUpdate, onCrea
             <select value={filterRole} onChange={(e) => setFilterRole(e.target.value)} className="px-3 py-2 rounded-lg border border-[#d1d5db] text-sm text-[#111] focus:ring-2 focus:ring-[#0098d9] focus:border-transparent outline-none">
               <option value="all">All Roles</option>
               <option value="admin">Administrator</option>
+              <option value="editor">Program Editor</option>
               <option value="user">User / Member</option>
             </select>
           </div>
@@ -1081,7 +1329,7 @@ function UsersManager({ rows, stats, logs, onRole, onSetStatus, onUpdate, onCrea
                       <button className="admin-table-action" onClick={() => { const r = rows.find((r2: any) => r2.id === row.id); setEditForm({ id: row.id, name: r.name, email: r.email, role: r.role, account_type: r.account_type, account_status: r.account_status }); setEditId(row.id); }}>Edit</button>
                       <button className="admin-table-action" onClick={() => onSetStatus(row.id, row.account_status === "active" ? "inactive" : "active")}>{row.account_status === "active" ? "Deactivate" : "Activate"}</button>
                       <button className="admin-table-action" onClick={() => { setResetId(row.id); setResetPasswordVal(""); }}>Reset Password</button>
-                      <button className="admin-table-action" onClick={() => onRole(row.id, row.role === "admin" ? "user" : "admin")} disabled={changing}>{row.role === "admin" ? "Remove Admin" : "Make Admin"}</button>
+                      <button className="admin-table-action" onClick={() => onRole(row.id, row.role === "admin" ? "user" : row.role === "editor" ? "admin" : "editor")} disabled={changing}>{row.role === "admin" ? "Remove Admin" : row.role === "editor" ? "Make Admin" : "Make Editor"}</button>
                       <button className="admin-table-action admin-danger" onClick={() => handleDelete(row.id)} disabled={changing}><Trash2 className="size-3.5" /></button>
                     </div>
                   </td>

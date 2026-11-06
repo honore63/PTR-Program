@@ -13,7 +13,7 @@ export const users = mysqlTable("users", {
   email: varchar("email", { length: 320 }).unique(),
   passwordHash: varchar("passwordHash", { length: 255 }),
   name: text("name"),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  role: mysqlEnum("role", ["user", "editor", "admin"]).default("user").notNull(),
   resetToken: varchar("resetToken", { length: 128 }),
   resetTokenExpires: timestamp("resetTokenExpires"),
   /** Legacy openId preserved for backwards compatibility with any existing records */

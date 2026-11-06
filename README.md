@@ -98,7 +98,7 @@ The navigation exposes five primary links plus a **More** menu on desktop, and a
 - Gallery album modal with Escape-key close.
 - SEO metadata per route, Open Graph and Twitter cards, and per-route static entry files.
 - Downloadable `.txt` resources that open quickly on slow connections.
-- Membership form composes a `mailto:info@ptr.rw` message in the browser; **no form data is stored by the website**.
+- The membership request remains a browser `mailto:` flow. The separate contact-message form submits to the PHP API, stores messages in MySQL, and sends email through server-configured SMTP; delivery is reported honestly if SMTP is unavailable.
 
 ### Administration
 
@@ -107,9 +107,10 @@ The navigation exposes five primary links plus a **More** menu on desktop, and a
 - Content records with slug, title, summary, body, and draft/published status.
 - Media library with upload validation, alt text, and pending/approved/archived status.
 - User list and role management restricted to administrators.
+- Contact-message inbox with sender details, submission dates, read status, delivery status, and administrator email retry/delete actions.
 - Server-side administrator checks on every administrative endpoint.
 
-> **Important:** admin-created `siteContent` records are stored in MySQL but are **not yet rendered by the public marketing pages**. Public page copy, schools, news, gallery, alumni previews, partners, and resources currently come from `client/src/data/ptrp.ts`. See [Content Editing](#content-editing).
+> **Important:** published `siteContent` page layouts are rendered by the public router and override the bundled page for that slug. Structured records such as schools, news, gallery, coordinators, mentors, and resident teachers continue to use their dedicated database-backed endpoints and may have bundled fallback content where configured.
 
 ---
 
@@ -119,9 +120,9 @@ This repository is honest about what is and is not implemented. The following li
 
 - **Alumni profiles are placeholders.** They are labelled “Profile under review” and do not represent verified individuals or placements.
 - **No member accounts or networking dashboard.** Membership is a `mailto:` request reviewed outside the site. The `/portal` page is informational.
-- **Admin roles are `user` and `admin` only.** Editor and Member tiers are not implemented.
-- **Email-notification and analytics modules** are not implemented.
-- **Admin content records are not yet rendered by the public marketing pages** (see the note above). Schools and news are now served from the database when records exist; model schools and news posts in `ptrp.ts` remain the fallback when the database is empty.
+- **Admin roles are `user`, `editor`, and `admin`.** Editors can manage page layouts, banners, media, and navigation; administrator-only modules remain restricted to admins. Reviewer-specific permissions and a separate super-administrator tier are not implemented.
+- **SMTP delivery requires deployment credentials.** Contact messages are stored even when SMTP is unavailable; configure the server-side SMTP settings before expecting email delivery. The unrelated email-notification module is not implemented.
+- **The CMS is not yet a complete visual website builder.** Published page layouts can replace supported public routes; dedicated content modules and bundled pages still have module-specific behavior. Homepage carousel management, per-section visibility/scheduling, drag-and-drop design settings, and translation management are not fully implemented.
 - **School location records are incomplete.** The `/network` map uses OpenStreetMap tiles and Google Maps search-result coordinates, and links to Google Maps for directions. Amber pins are area-level references where Google Maps did not identify an exact school entrance. Confirm the destination before travelling; sector/address details and exact coordinates should be verified by program administrators.
 - **Some school and contact details are marked pending** where no verified source exists.
 - **The language switcher is partial.** Page bodies and navigation labels remain in English.
@@ -288,7 +289,7 @@ Generated and ignored directories: `dist/`, `PTRP/`, `node_modules/`, `.env`, `c
 | --- | --- | --- |
 | Node.js | 22 (matches `Dockerfile`) | `node --version` |
 | pnpm | 10.18.0 | `corepack enable && pnpm --version` |
-| PHP | 8.1 with `pdo_mysql`, `fileinfo`, `mbstring` | `php -v` |
+| PHP | 8.1 with `pdo_mysql`, `fileinfo`, `mbstring`, `openssl` | `php -v` |
 | MySQL / MariaDB | MySQL 8+ or MariaDB 10.4+ | `mysql --version` |
 | Apache | 2.4 with `mod_rewrite` and `AllowOverride All` | XAMPP Control Panel |
 Email/password registration and login are provided by the PHP API. A random `manus_jwt_secret` of at least 32 characters is required to sign sessions.
@@ -325,6 +326,10 @@ Or, in phpMyAdmin, select **Import** and choose `database/ptrp.sql`. The script 
 
 For an existing XAMPP installation, back up `ptrp` first, then apply `database/migrations/20261105_website_cms.sql` in phpMyAdmin or with the MySQL CLI. This additive migration preserves existing content, adds CMS settings/navigation/page banners and the missing Admin Portal tables, and seeds the verified coordinators and 17 model-school records without duplicating matching schools.
 
+After applying the existing CMS migration, back up the database again and apply `database/migrations/20261105_contact_messages.sql` to add the contact-message inbox. Fresh installations using `database/ptrp.sql` already include this table. The migration is additive and does not modify existing records.
+
+For editor access, apply `database/migrations/20261106_editor_member_roles.sql` to existing installations. The API also upgrades older `users.role` enums on startup when the database account has permission to alter the table.
+
 Verify:
 
 ```sql
@@ -334,6 +339,7 @@ DESCRIBE users;
 DESCRIBE siteContent;
 DESCRIBE mediaAssets;
 DESCRIBE pageBanners;
+DESCRIBE contactMessages;
 ```
 
 ### Page image banners
@@ -347,6 +353,7 @@ cp config.php.example config.php
 ```
 
 Edit `config.php` with database credentials, the deployment base path, and a random session-signing secret of at least 32 characters. See [Configuration](#configuration). The file is gitignored and denied by `.htaccess`.
+Configure the SMTP keys from [Configuration](#configuration) in the server-only `config.php` to enable contact email delivery. Until credentials are configured, contact messages remain stored and visible in the Admin Portal, and the form reports email delivery failure instead of claiming success.
 
 ### 5. Build the frontend
 
@@ -440,8 +447,17 @@ Create this file from `config.php.example`. Never commit it.
 | `db_password` | Database password | Yes |
 | `base_path` | URL base path, default `/PTRP` | No |
 | `manus_jwt_secret` | HS256 secret used to sign session cookies; at least 32 random characters | **Yes** |
+| `smtp_host` | SMTP server hostname (Gmail: `smtp.gmail.com`) | No |
+| `smtp_port` | `587` for STARTTLS, or `465` for implicit TLS | No |
+| `smtp_encryption` | `tls` for port 587 or `ssl` for port 465 | No |
+| `smtp_username` | Authorized SMTP account email | **Yes** |
+| `smtp_password` | SMTP password or provider app password | **Yes** |
+| `smtp_from_email` | Optional verified sender address; defaults to `smtp_username` | **Yes** |
+| `smtp_from_name` | Optional sender display name | No |
 
 `base_path` controls the API prefix, cookie path, and local media URL prefix. It must match the URL where the site is served.
+
+The contact form delivers to `ptrpresidenteachers100@gmail.com`. For Gmail SMTP, enable 2-Step Verification and use an app password for `smtp_password`; standard account passwords may not work. The sending account must be authorized to relay messages. Store credentials only in the protected, gitignored PHP `config.php` or hosting-provider secret settings. Never put SMTP values in frontend code or `VITE_*` variables. Valid messages are stored before delivery, so an SMTP outage is visible in the Admin Portal inbox and administrators can retry after fixing configuration. A successful response means the SMTP server accepted the message, not that the recipient mailbox confirmed delivery.
 
 ### Node scaffold environment (`.env`)
 
@@ -504,7 +520,7 @@ Stores registered email/password accounts and any accounts created by the separa
 | `name` | `text` | Display name |
 | `email` | `varchar(320)` | Optional email |
 | `loginMethod` | `varchar(64)` | Login provider/method |
-| `role` | `enum('user','admin')` | Defaults to `user` |
+| `role` | `enum('user','editor','admin')` | Defaults to `user` |
 | `createdAt` | `timestamp` | Defaults to current time |
 | `updatedAt` | `timestamp` | Auto-updates |
 | `lastSignedIn` | `timestamp` | Updated on login |
@@ -602,6 +618,11 @@ All PHP endpoints are relative to the configured base path, e.g. `http://localho
 | Method | Endpoint | Access | Purpose |
 | --- | --- | --- | --- |
 | `GET` | `/platform/config.js` | Public | Returns the same-origin API base URL |
+| `POST` | `/contact-messages` | Public, same-origin | Validates and stores a contact message, then attempts SMTP delivery to PTRP administration |
+| `GET` | `/admin/contact-messages` | Admin | Lists stored messages and delivery/read status |
+| `PATCH` | `/admin/contact-messages/{id}/read` | Admin | Marks a message read |
+| `POST` | `/admin/contact-messages/{id}/retry` | Admin | Retries failed or pending SMTP delivery |
+| `DELETE` | `/admin/contact-messages/{id}` | Admin | Permanently deletes a stored message |
 | `GET` | `/auth/me` | Optional session | Returns the current user or `null` |
 | `POST` | `/auth/register` | Public | Creates a standard user account; never grants admin |
 | `POST` | `/auth/login` | Public | Signs in with email and password |
@@ -655,7 +676,7 @@ The PHP API verifies the detected MIME type, checks the declared byte length, li
 1. A user registers or signs in at `/portal` with an email address and password.
 2. The PHP API stores a password hash in MySQL and issues a signed, HttpOnly session cookie.
 3. Newly registered accounts receive the `user` role. Registration never grants administrator access based on email or account order.
-4. Every admin request revalidates the session and checks the role in MySQL.
+4. Every protected API request revalidates the session and checks the required role in MySQL.
 
 The separate Node/tRPC scaffold retains Manus OAuth support; it is not the authentication flow used by the PHP API client.
 
@@ -664,7 +685,8 @@ The separate Node/tRPC scaffold retains Manus OAuth support; it is not the authe
 | Role | Capabilities |
 | --- | --- |
 | `user` | Authenticated account; no administrative access |
-| `admin` | Manage content, media, users, and user roles |
+| `editor` | Manage page layouts, page banners, media, and navigation |
+| `admin` | Manage all available modules, users, and user roles |
 
 The session cookie is `HttpOnly`, `SameSite=Lax`, scoped to the base path, and marked `Secure` when served over HTTPS. Role changes are enforced server-side, not only hidden in the UI.
 
@@ -715,6 +737,8 @@ Full step-by-step instructions, including database import, environment configura
 9. Register the intended administrator account and promote it through a trusted database session.
 10. Enable HTTPS and confirm the session cookie is marked `Secure`.
 11. Smoke-test `/`, `/about`, `/network`, `/news`, `/resources`, `/contact`, `/admin`, and `/api/auth/me`.
+12. Configure server-side SMTP settings and verify an authorized test message reaches `ptrpresidenteachers100@gmail.com`; until mailbox receipt is confirmed, delivery is not verified.
+13. Submit a contact message and verify it is stored in the administrator inbox even when SMTP is unavailable.
 
 ### Deploying at the domain root or another subpath
 
@@ -808,7 +832,7 @@ Both `dist/` and `PTRP/` are gitignored. Rebuild them after frontend changes.
 - No CSRF token beyond the same-origin check.
 - No audit trail for content or role changes.
 - No automated dependency or vulnerability scanning in CI.
-- The current role model has only `user` and `admin`.
+- The role model has `user`, `editor`, and `admin`; editors are limited to content, banner, media, and navigation management.
 
 ### File permissions
 
@@ -888,7 +912,7 @@ Edit that file, run `pnpm check`, and rebuild. Keep unverified entries labelled 
 
 ### Admin content records
 
-The admin workspace writes to `siteContent` and `mediaAssets`. These records are currently **not consumed by the public pages**. `GET /api/content/{slug}` exists and can serve published records to a future page, but no public component calls it yet. Do not tell editors that changing a record updates the live marketing site until that integration is implemented.
+The public router queries `GET /api/content/{slug}` for public routes. A published, valid JSON page layout replaces that route's bundled fallback and is refreshed through the shared query cache after Admin Portal saves. Draft records remain private. Specialized content modules (such as news, gallery, and schools) use their corresponding tables and public endpoints.
 
 ### Adding a resource
 
@@ -971,7 +995,7 @@ The admin workspace writes to `siteContent` and `mediaAssets`. These records are
 ### Project
 
 - Repository: [github.com/honore63/PTR-Program](https://github.com/honore63/PTR-Program)
-- Website contact: [info@ptr.rw](mailto:info@ptr.rw)
+- Website contact: [ptrpresidenteachers100@gmail.com](mailto:ptrpresidenteachers100@gmail.com)
 - Social channels are listed in `client/src/data/ptrp.ts` and on the site footer.
 
 ### Built with

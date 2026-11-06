@@ -9,6 +9,8 @@ final class ApiError extends RuntimeException
     }
 }
 
+require_once __DIR__ . '/smtp.php';
+
 function respond(mixed $data, int $status = 200): never
 {
     http_response_code($status);
@@ -58,6 +60,11 @@ function ensureDatabaseSchema(PDO $pdo): void
 
     try {
         $columns = $pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_COLUMN);
+        $roleColumn = $pdo->query("SHOW COLUMNS FROM users LIKE 'role'")->fetch();
+        $roleType = strtolower((string) ($roleColumn['Type'] ?? ''));
+        if (str_starts_with($roleType, 'enum(') && !str_contains($roleType, "'editor'")) {
+            $pdo->exec("ALTER TABLE users MODIFY COLUMN role ENUM('user','editor','admin') NOT NULL DEFAULT 'user'");
+        }
         if (!in_array('passwordHash', $columns, true)) {
             $pdo->exec("ALTER TABLE users ADD COLUMN passwordHash VARCHAR(255) NULL AFTER email");
         }
@@ -105,6 +112,19 @@ function cmsUrlIsValid(mixed $value): bool
         && !empty($parts['host'])
         && !isset($parts['user'])
         && !isset($parts['pass']);
+}
+
+function isPublicWebsiteSetting(string $key): bool
+{
+    return in_array($key, [
+        'siteName', 'tagline', 'logoUrl', 'contactEmail', 'contactPhone', 'contactAddress',
+        'footerText', 'primaryColor', 'accentColor', 'metaTitle', 'metaDescription',
+    ], true) || preg_match('/^social\.(facebook|instagram|youtube|linkedin|x|tiktok|threads)$/', $key) === 1;
+}
+
+function isSensitiveSettingKey(string $key): bool
+{
+    return preg_match('/(?:password|secret|token|api[_-]?key|credential|smtp)/i', $key) === 1;
 }
 
 function queryLimit(int $default, int $maximum): int
@@ -255,6 +275,42 @@ function requireAdmin(): array
     return $user;
 }
 
+function requireEditor(): array
+{
+    $user = currentUser(true);
+    $role = (string) ($user['role'] ?? '');
+    if ($role !== 'admin' && $role !== 'editor') throw new ApiError(403, 'Editor or administrator access required.');
+    return $user;
+}
+
+function isEditorRoute(string $route, string $method): bool
+{
+    if (
+        in_array($route, ['/admin/content', '/admin/banners', '/admin/media', '/admin/navigation'], true)
+        && in_array($method, ['GET', 'POST'], true)
+    ) {
+        return true;
+    }
+
+    return ($method === 'POST' && $route === '/admin/media/upload')
+        || ($method === 'PUT' && preg_match('#^/admin/media/\d+$#', $route) === 1)
+        || ($method === 'DELETE' && preg_match('#^/admin/(?:content/\d+|banners/[a-zA-Z0-9_-]{1,80}|navigation/\d+)$#', $route) === 1);
+}
+
+function createNotification(int $userId, string $type, string $title, string $message, ?string $link = null): void
+{
+    $statement = database()->prepare('INSERT INTO notifications (userId, type, title, message, link) VALUES (?, ?, ?, ?, ?)');
+    $statement->execute([$userId, $type, $title, $message, $link]);
+}
+
+function notifyAdmins(string $type, string $title, string $message, ?string $link = null): void
+{
+    $admins = database()->query("SELECT id FROM users WHERE role IN ('admin','editor') AND account_status = 'active'")->fetchAll();
+    foreach ($admins as $admin) {
+        createNotification((int) $admin['id'], $type, $title, $message, $link);
+    }
+}
+
 function cookieOptions(int $expires): array
 {
     $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
@@ -275,6 +331,61 @@ function inputString(array $data, string $key, int $maxLength, bool $required = 
         throw new ApiError(400, 'Invalid ' . $key . '.');
     }
     return trim($value);
+}
+
+function deliverContactMessage(int $messageId): array
+{
+    $claim = database()->prepare(
+        "UPDATE contactMessages
+         SET deliveryStatus = 'sending', deliveryError = NULL, deliveryAttempts = deliveryAttempts + 1, lastAttemptAt = NOW()
+         WHERE id = ? AND deliveryStatus = 'pending'"
+    );
+    $claim->execute([$messageId]);
+    $statement = database()->prepare('SELECT * FROM contactMessages WHERE id = ? LIMIT 1');
+    $statement->execute([$messageId]);
+    $message = $statement->fetch();
+    if (!$message) throw new ApiError(404, 'Contact message not found.');
+    if ($claim->rowCount() !== 1) {
+        return [
+            'deliveryStatus' => $message['deliveryStatus'],
+            'message' => $message['deliveryStatus'] === 'sent'
+                ? 'This message has already been delivered to the PTRP email service.'
+                : 'Your message is saved for the PTRP administrators.',
+        ];
+    }
+
+    try {
+        sendContactEmail($message);
+        database()->prepare("UPDATE contactMessages SET deliveryStatus = 'sent', deliveryError = NULL, deliveredAt = NOW() WHERE id = ?")->execute([$messageId]);
+        return [
+            'deliveryStatus' => 'sent',
+            'message' => 'Your message was accepted for delivery to ptrpresidenteachers100@gmail.com.',
+        ];
+    } catch (Throwable $error) {
+        error_log('PTRP contact email delivery failed for message ' . $messageId . ': ' . $error->getMessage());
+        database()->prepare("UPDATE contactMessages SET deliveryStatus = 'failed', deliveryError = ? WHERE id = ?")->execute([
+            'Email delivery failed. The message is safely stored in the administrator inbox and can be retried.',
+            $messageId,
+        ]);
+        return [
+            'deliveryStatus' => 'failed',
+            'message' => 'Your message is saved, but email delivery could not be completed. Please try again later or email ptrpresidenteachers100@gmail.com directly.',
+        ];
+    }
+}
+
+function retryContactMessage(int $messageId): array
+{
+    $statement = database()->prepare('SELECT deliveryStatus FROM contactMessages WHERE id = ? LIMIT 1');
+    $statement->execute([$messageId]);
+    $message = $statement->fetch();
+    if (!$message) throw new ApiError(404, 'Contact message not found.');
+    if (!in_array($message['deliveryStatus'], ['failed', 'pending'], true)) {
+        throw new ApiError(409, 'Only failed or pending messages can be retried.');
+    }
+
+    database()->prepare("UPDATE contactMessages SET deliveryStatus = 'pending', deliveryError = NULL WHERE id = ? AND deliveryStatus = 'failed'")->execute([$messageId]);
+    return deliverContactMessage($messageId);
 }
 
 function serveLocalFile(string $filePath): never
@@ -338,6 +449,68 @@ function routeRequest(): void
 
     $prefix = basePath() . '/api';
     $route = str_starts_with($path, $prefix) ? substr($path, strlen($prefix)) : '';
+
+    if ($route === '/contact-messages') {
+        requireMethod('POST');
+        requireSameOrigin();
+        $data = jsonBody();
+        $honeypot = inputString($data, 'website', 500);
+        if ($honeypot !== null && $honeypot !== '') {
+            throw new ApiError(400, 'The message could not be submitted. Please review the form and try again.');
+        }
+        $submissionKey = strtolower((string) inputString($data, 'submissionKey', 36, true));
+        if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $submissionKey)) {
+            throw new ApiError(400, 'Invalid submission identifier.');
+        }
+        $senderName = inputString($data, 'name', 255, true);
+        $senderEmail = strtolower((string) inputString($data, 'email', 320, true));
+        $subject = inputString($data, 'subject', 200, true);
+        $messageText = inputString($data, 'message', 10000, true);
+        if (!filter_var($senderEmail, FILTER_VALIDATE_EMAIL)) throw new ApiError(400, 'Please enter a valid email address.');
+
+        $existing = database()->prepare('SELECT id, deliveryStatus FROM contactMessages WHERE submissionKey = ? LIMIT 1');
+        $existing->execute([$submissionKey]);
+        $existingMessage = $existing->fetch();
+        if ($existingMessage) {
+            $deliveryStatus = (string) $existingMessage['deliveryStatus'];
+            $statusMessages = [
+                'sent' => 'This message was already accepted by the PTRP email service.',
+                'failed' => 'This message is already saved, but email delivery failed. Please email ptrpresidenteachers100@gmail.com directly or ask an administrator to retry.',
+                'sending' => 'This message is already being processed. Please check the status before trying again.',
+                'pending' => 'This message is already saved for the PTRP administrators.',
+            ];
+            respond([
+                'id' => (int) $existingMessage['id'],
+                'deliveryStatus' => $deliveryStatus,
+                'message' => $statusMessages[$deliveryStatus] ?? 'This message is already saved for the PTRP administrators.',
+            ], 200);
+        }
+
+        $clientIp = (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+        $ipHash = hash_hmac('sha256', $clientIp, getSessionSecret());
+        $rateLimit = database()->prepare('SELECT COUNT(*) FROM contactMessages WHERE ipHash = ? AND createdAt >= DATE_SUB(NOW(), INTERVAL 1 HOUR)');
+        $rateLimit->execute([$ipHash]);
+        if ((int) $rateLimit->fetchColumn() >= 5) {
+            throw new ApiError(429, 'Too many messages were submitted from this connection. Please try again later.');
+        }
+
+        try {
+            $insert = database()->prepare(
+                "INSERT INTO contactMessages (submissionKey, senderName, senderEmail, subject, message, ipHash)
+                 VALUES (?, ?, ?, ?, ?, ?)"
+            );
+            $insert->execute([$submissionKey, $senderName, $senderEmail, $subject, $messageText, $ipHash]);
+            $messageId = (int) database()->lastInsertId();
+        } catch (PDOException $error) {
+            if ($error->getCode() !== '23000') throw $error;
+            $existing->execute([$submissionKey]);
+            $existingMessage = $existing->fetch();
+            if (!$existingMessage) throw $error;
+            $messageId = (int) $existingMessage['id'];
+        }
+
+        respond(['id' => $messageId] + deliverContactMessage($messageId), 201);
+    }
 
     // ---------- Platform Config (Frontend API resolution) ----------
     if ($route === '/platform/config.js' && $method === 'GET') {
@@ -489,7 +662,9 @@ function routeRequest(): void
     if ($route === '/settings' && $method === 'GET') {
         $settings = [];
         foreach (database()->query('SELECT settingKey, settingValue FROM websiteSettings')->fetchAll() as $row) {
-            $settings[$row['settingKey']] = $row['settingValue'];
+            if (isPublicWebsiteSetting((string) $row['settingKey'])) {
+                $settings[$row['settingKey']] = $row['settingValue'];
+            }
         }
         respond($settings);
     }
@@ -536,14 +711,55 @@ function routeRequest(): void
     // =========================================================================
     // Administrator-Protected Endpoints
     // =========================================================================
-    requireAdmin();
+    if (isEditorRoute($route, $method)) {
+        requireEditor();
+    } else {
+        requireAdmin();
+    }
+
+    if ($route === '/admin/contact-messages' && $method === 'GET') {
+        $limit = queryLimit(100, 200);
+        $status = $_GET['status'] ?? '';
+        $where = '';
+        if ($status === 'unread') {
+            $where = 'WHERE readAt IS NULL';
+        } elseif ($status === 'read') {
+            $where = 'WHERE readAt IS NOT NULL';
+        } elseif (in_array($status, ['pending', 'sending', 'sent', 'failed'], true)) {
+            $where = 'WHERE deliveryStatus = ' . database()->quote($status);
+        }
+        respond(database()->query("SELECT id, senderName, senderEmail, subject, message, deliveryStatus, deliveryError, deliveryAttempts, lastAttemptAt, deliveredAt, readAt, createdAt
+            FROM contactMessages $where ORDER BY readAt IS NULL DESC, createdAt DESC LIMIT $limit")->fetchAll());
+    }
+    if (preg_match('#^/admin/contact-messages/(\d+)/read$#', $route, $matches) && $method === 'PATCH') {
+        requireSameOrigin();
+        $statement = database()->prepare('UPDATE contactMessages SET readAt = COALESCE(readAt, NOW()) WHERE id = ?');
+        $statement->execute([(int) $matches[1]]);
+        if ($statement->rowCount() === 0) {
+            $exists = database()->prepare('SELECT id FROM contactMessages WHERE id = ?');
+            $exists->execute([(int) $matches[1]]);
+            if (!$exists->fetch()) throw new ApiError(404, 'Contact message not found.');
+        }
+        respond(['success' => true]);
+    }
+    if (preg_match('#^/admin/contact-messages/(\d+)/retry$#', $route, $matches) && $method === 'POST') {
+        requireSameOrigin();
+        respond(retryContactMessage((int) $matches[1]));
+    }
+    if (preg_match('#^/admin/contact-messages/(\d+)$#', $route, $matches) && $method === 'DELETE') {
+        requireSameOrigin();
+        $statement = database()->prepare('DELETE FROM contactMessages WHERE id = ?');
+        $statement->execute([(int) $matches[1]]);
+        if ($statement->rowCount() === 0) throw new ApiError(404, 'Contact message not found.');
+        respond(['success' => true]);
+    }
 
     if ($route === '/admin/banners' && $method === 'GET') {
         respond(database()->query('SELECT slug, eyebrow, title, description, imageUrl, imageAlt, imagePosition, isVisible, updatedAt FROM pageBanners ORDER BY slug ASC')->fetchAll());
     }
     if ($route === '/admin/banners' && $method === 'POST') {
         requireSameOrigin();
-        $user = currentUser();
+        $user = requireEditor();
         $data = jsonBody();
         $slug = inputString($data, 'slug', 80, true);
         $eyebrow = inputString($data, 'eyebrow', 120);
@@ -574,6 +790,7 @@ function routeRequest(): void
     }
     if (preg_match('#^/admin/banners/([a-zA-Z0-9_-]{1,80})$#', $route, $matches) && $method === 'DELETE') {
         requireSameOrigin();
+        requireEditor();
         $allowedSlugs = ['home', 'about', 'network', 'impact', 'news', 'gallery', 'alumni', 'resources', 'partners', 'contact', 'team', 'residents', 'register-resident'];
         if (!in_array($matches[1], $allowedSlugs, true)) throw new ApiError(400, 'Unknown public page banner.');
         database()->prepare('DELETE FROM pageBanners WHERE slug = ?')->execute([$matches[1]]);
@@ -652,7 +869,7 @@ function routeRequest(): void
     }
     if ($route === '/admin/content' && $method === 'POST') {
         requireSameOrigin();
-        $user = currentUser(); $data = jsonBody();
+        $user = requireEditor(); $data = jsonBody();
         $slug = inputString($data, 'slug', 120, true);
         $title = inputString($data, 'title', 255, true);
         $summary = inputString($data, 'summary', 500);
@@ -713,10 +930,14 @@ function routeRequest(): void
         $statement = database()->prepare('INSERT INTO siteContent (slug, title, summary, body, status, updatedBy) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE title = VALUES(title), summary = VALUES(summary), body = VALUES(body), status = VALUES(status), updatedBy = VALUES(updatedBy)');
         $statement->execute([$slug, $title, $summary, $body, $status, $user['id']]);
         $fetch = database()->prepare('SELECT * FROM siteContent WHERE slug = ? LIMIT 1'); $fetch->execute([$slug]);
+        if (($data['status'] ?? '') === 'published') {
+            notifyAdmins('content_publish', 'Content published', ($title ?? '') . ' published the ' . $slug . ' page content.', '/admin/content');
+        }
         respond($fetch->fetch());
     }
     if (preg_match('#^/admin/content/(\d+)$#', $route, $matches) && $method === 'DELETE') {
         requireSameOrigin();
+        requireEditor();
         $statement = database()->prepare('DELETE FROM siteContent WHERE id = ?'); $statement->execute([(int) $matches[1]]);
         respond(['success' => true]);
     }
@@ -732,6 +953,7 @@ function routeRequest(): void
         $settingKey = inputString($data, 'settingKey', 100, true);
         $settingValue = inputString($data, 'settingValue', 50000, true);
         if (!preg_match('/^[a-z][a-z0-9._-]{0,99}$/', $settingKey)) throw new ApiError(400, 'Invalid setting key.');
+        if (isSensitiveSettingKey($settingKey)) throw new ApiError(400, 'Sensitive credentials must be configured in server-only environment settings.');
         $statement = database()->prepare('INSERT INTO websiteSettings (settingKey, settingValue, updatedBy) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE settingValue = VALUES(settingValue), updatedBy = VALUES(updatedBy)');
         $statement->execute([$settingKey, $settingValue, $user['id']]);
         $fetch = database()->prepare('SELECT settingKey, settingValue, updatedBy, updatedAt FROM websiteSettings WHERE settingKey = ?');
@@ -750,7 +972,7 @@ function routeRequest(): void
     }
     if ($route === '/admin/navigation' && $method === 'POST') {
         requireSameOrigin();
-        $user = currentUser();
+        $user = requireEditor();
         $data = jsonBody();
         $label = inputString($data, 'label', 120, true);
         $href = inputString($data, 'href', 500, true);
@@ -782,6 +1004,7 @@ function routeRequest(): void
     }
     if (preg_match('#^/admin/navigation/(\d+)$#', $route, $matches) && $method === 'DELETE') {
         requireSameOrigin();
+        requireEditor();
         database()->prepare('DELETE FROM navigationItems WHERE id = ?')->execute([(int) $matches[1]]);
         respond(['success' => true]);
     }
@@ -792,7 +1015,7 @@ function routeRequest(): void
     }
     if ($route === '/admin/media/upload' && $method === 'POST') {
         requireSameOrigin();
-        $user = currentUser(); $data = jsonBody();
+        $user = requireEditor(); $data = jsonBody();
         $filename = inputString($data, 'filename', 255, true);
         $mimeType = inputString($data, 'mimeType', 120, true);
         $altText = inputString($data, 'altText', 255);
@@ -814,7 +1037,9 @@ function routeRequest(): void
         respond($fetch->fetch(), 201);
     }
     if (preg_match('#^/admin/media/(\d+)$#', $route, $matches) && $method === 'PUT') {
-        requireSameOrigin(); $data = jsonBody(); $updates = []; $values = [];
+        requireSameOrigin();
+        requireEditor();
+        $data = jsonBody(); $updates = []; $values = [];
         if (array_key_exists('altText', $data)) { $updates[] = 'altText = ?'; $values[] = inputString($data, 'altText', 255); }
         if (array_key_exists('status', $data)) {
             if (!in_array($data['status'], ['pending', 'approved', 'archived'], true)) throw new ApiError(400, 'Invalid media status.');
@@ -878,6 +1103,7 @@ function routeRequest(): void
             (SELECT COUNT(*) FROM users WHERE account_status = 'active') AS activeUsers,
             (SELECT COUNT(*) FROM users WHERE account_status = 'inactive') AS inactiveUsers,
             (SELECT COUNT(*) FROM users WHERE role = 'admin') AS adminUsers,
+            (SELECT COUNT(*) FROM users WHERE role = 'editor') AS editorUsers,
             (SELECT COUNT(*) FROM users WHERE role = 'user') AS publicUsers,
             (SELECT COUNT(*) FROM users WHERE account_type = 'resident_teacher') AS residentTeacherUsers,
             (SELECT COUNT(*) FROM users WHERE createdAt >= DATE_SUB(NOW(), INTERVAL 7 DAY)) AS recentUsers
@@ -895,7 +1121,7 @@ function routeRequest(): void
         $password = (string) ($data['password'] ?? '');
         if (strlen($password) < 8) throw new ApiError(400, 'Password must be at least 8 characters.');
         $role = $data['role'] ?? 'user';
-        if (!in_array($role, ['user', 'admin'], true)) throw new ApiError(400, 'Invalid role.');
+        if (!in_array($role, ['user', 'editor', 'admin'], true)) throw new ApiError(400, 'Invalid role.');
         $accountType = $data['account_type'] ?? 'public';
         if (!in_array($accountType, ['public', 'resident_teacher', 'admin'], true)) throw new ApiError(400, 'Invalid account type.');
         $accountStatus = $data['account_status'] ?? 'active';
@@ -943,7 +1169,7 @@ function routeRequest(): void
         }
         if (array_key_exists('role', $data)) {
             $role = $data['role'];
-            if (!in_array($role, ['user', 'admin'], true)) throw new ApiError(400, 'Invalid role.');
+            if (!in_array($role, ['user', 'editor', 'admin'], true)) throw new ApiError(400, 'Invalid role.');
             if ($role === 'user') {
                 $adminCount = (int) database()->query("SELECT COUNT(*) FROM users WHERE role = 'admin' AND account_status = 'active'")->fetchColumn();
                 $currentRole = database()->query("SELECT role FROM users WHERE id = ?")->execute([$targetId])->fetchColumn();
@@ -1024,7 +1250,7 @@ function routeRequest(): void
                 throw new ApiError(400, 'You are the only active administrator. Grant another administrator role before demoting yourself.');
             }
         }
-        if (!in_array($role, ['user', 'admin'], true)) throw new ApiError(400, 'Invalid role.');
+        if (!in_array($role, ['user', 'editor', 'admin'], true)) throw new ApiError(400, 'Invalid role.');
         $statement = database()->prepare('UPDATE users SET role = ? WHERE id = ?');
         $statement->execute([$role, $targetId]);
 
@@ -1086,6 +1312,55 @@ function routeRequest(): void
              ORDER BY al.createdAt DESC LIMIT $limit"
         )->fetchAll();
         respond($rows);
+    }
+
+    // ---------- Admin Notifications ----------
+    if ($route === '/admin/notifications' && $method === 'GET') {
+        requireAdmin();
+        $limit = queryLimit(50, 200);
+        $actor = currentUser();
+        $statement = database()->prepare('SELECT id, userId, type, title, message, link, readAt, createdAt FROM notifications WHERE userId = ? ORDER BY createdAt DESC LIMIT ?');
+        $statement->execute([$actor['id'], $limit]);
+        respond($statement->fetchAll());
+    }
+    if (preg_match('#^/admin/notifications/(\d+)/read$#', $route, $matches) && $method === 'PATCH') {
+        requireAdmin();
+        $actor = currentUser();
+        $targetId = (int) $matches[1];
+        $statement = database()->prepare('SELECT id, userId FROM notifications WHERE id = ?');
+        $statement->execute([$targetId]);
+        $notification = $statement->fetch();
+        if (!$notification) throw new ApiError(404, 'Notification not found.');
+        if ((int) $notification['userId'] !== (int) $actor['id']) throw new ApiError(403, 'You can only read your own notifications.');
+        database()->prepare('UPDATE notifications SET readAt = NOW() WHERE id = ?')->execute([$targetId]);
+        respond(['success' => true, 'message' => 'Notification marked as read.']);
+    }
+    if ($route === '/admin/notifications/read-all' && $method === 'POST') {
+        requireAdmin();
+        $actor = currentUser();
+        database()->prepare('UPDATE notifications SET readAt = NOW() WHERE userId = ? AND readAt IS NULL')->execute([$actor['id']]);
+        respond(['success' => true, 'message' => 'All notifications marked as read.']);
+    }
+
+    // ---------- Analytics ----------
+    if ($route === '/analytics/page-views' && $method === 'POST') {
+        $data = jsonBody();
+        $path = inputString($data, 'path', 255, true);
+        $referrer = inputString($data, 'referrer', 500);
+        database()->prepare('INSERT INTO page_views (path, referrer) VALUES (?, ?)')->execute([$path, $referrer]);
+        respond(['success' => true]);
+    }
+    if ($route === '/admin/analytics' && $method === 'GET') {
+        requireAdmin();
+        $totals = database()->query('SELECT COUNT(*) AS totalViews, COALESCE(SUM(CASE WHEN createdAt >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 1 ELSE 0 END), 0) AS viewsLast7Days, COUNT(DISTINCT path) AS trackedPaths FROM page_views')->fetch();
+        $top = database()->prepare('SELECT path, COUNT(*) AS views FROM page_views GROUP BY path ORDER BY views DESC LIMIT 10');
+        $top->execute();
+        respond([
+            'totalViews' => (int) $totals['totalViews'],
+            'viewsLast7Days' => (int) $totals['viewsLast7Days'],
+            'trackedPaths' => (int) $totals['trackedPaths'],
+            'topPages' => $top->fetchAll(),
+        ]);
     }
 
     // ---------- Schools ----------
@@ -1459,6 +1734,8 @@ function routeRequest(): void
         $statement->execute([$fullName, $email, $phone, $gender, $modelSchool, $position, $bestPractice, $bestPracticeDescription, $subjects, $skills, $contributions, $bio, $photoUrl]);
         $id = (int) database()->lastInsertId();
 
+        notifyAdmins('resident_teacher_submission', 'New resident teacher submission', ($fullName ?? '') . ' submitted a resident teacher profile for review.', '/residents');
+
         $fetch = database()->prepare('SELECT * FROM resident_teachers WHERE id = ?');
         $fetch->execute([$id]);
         respond($fetch->fetch(), 201);
@@ -1811,6 +2088,9 @@ function routeRequest(): void
 
         $fetch = database()->prepare('SELECT * FROM social_posts WHERE id = ?');
         $fetch->execute([$postId]);
+        if ($newStatus === 'approved' || $newStatus === 'published') {
+            notifyAdmins('social_post_' . $newStatus, 'Social post ' . $newStatus, 'A social media post was ' . $newStatus . ' for website publishing.', '/admin/social/posts');
+        }
         respond($fetch->fetch());
     }
 

@@ -43,6 +43,9 @@ export const queryKeys = {
   publicResidentBestPractices: ["api", "resident-best-practices"] as const,
   adminUserStats: ["api", "admin", "user-stats"] as const,
   adminActivityLogs: ["api", "admin", "activity-logs"] as const,
+  adminNotifications: ["api", "admin", "notifications"] as const,
+  adminContactMessages: ["api", "admin", "contact-messages"] as const,
+  adminAnalytics: ["api", "admin", "analytics"] as const,
 };
 
 export async function apiRequest<T>(

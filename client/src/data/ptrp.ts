@@ -21,13 +21,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-export type Language = "en" | "rw" | "fr";
-
-export const languages: Array<{ key: Language; label: string }> = [
-  { key: "en", label: "EN" },
-  { key: "rw", label: "RW" },
-  { key: "fr", label: "FR" },
-];
+export type Language = "en";
 
 export const brand = {
   name: "PTR Alumni Network",
@@ -388,41 +382,7 @@ export const copy = {
       copyright: "© PTR Alumni Network · Inspire, Educate and Empower.",
     },
   },
-  rw: {
-    nav: { login: "Kwinjira muri portal", menu: "Fungura menu", close: "Funga menu" },
-    hero: {
-      eyebrow: "PTR Alumni Network · Rwanda",
-      title: "Kwizihiza Ubuhanga mu Burezi bw'Abarimu",
-      body: "Urusobe rw'abanyeshuri barangije Gahunda y'Abarezi bigisha mu mashuri (PTRP), bakorana mu ntego yo guteza imbere ireme ry'uburezi bw'ibanze mu Rwanda.",
-      primary: "Injira mu rusobe",
-      secondary: "Reba inkuru yacu",
-      note: "Inspire, Educate and Empower.",
-    },
-    footer: {
-      description: "Urusobe rw'abanyeshuri barangije Gahunda y'Abarezi bigisha mu mashuri (PTRP), buhuza abarezi n'amashuri mu Rwanda.",
-      privacy: "Amabwiriza y'ibanga",
-      terms: "Amategeko yo gukoresha",
-      copyright: "© PTR Alumni Network · Inspire, Educate and Empower.",
-    },
-  },
-  fr: {
-    nav: { login: "Accéder au portail", menu: "Ouvrir la navigation", close: "Fermer la navigation" },
-    hero: {
-      eyebrow: "PTR Alumni Network · Rwanda",
-      title: "Célébrer l'excellence dans la formation des enseignants",
-      body: "Le réseau des anciens du Programme de résidence des enseignants du primaire (PTRP), uni pour une éducation primaire de qualité au Rwanda.",
-      primary: "Rejoindre le réseau",
-      secondary: "Voir notre histoire",
-      note: "Inspire, Educate and Empower.",
-    },
-    footer: {
-      description: "Le réseau des anciens du Programme de résidence des enseignants du primaire (PTRP), reliant les enseignants résidents et les écoles modèles au Rwanda.",
-      privacy: "Politique de confidentialité",
-      terms: "Conditions d'utilisation",
-      copyright: "© PTR Alumni Network · Inspire, Educate and Empower.",
-    },
-  },
-} as const;
+};
 
 export const sectionMeta: Record<string, { eyebrow: string; title: string; description: string; icon: LucideIcon; demo: string }> = {
   "/about": { eyebrow: "About the Program", title: "A 12-month residency that prepared 100 teachers for Rwanda's classrooms.", description: "What PTRP is, how it worked, what residents learned and received, where it took place, who launched it, and the journey from resident to alumnus.", icon: HeartHandshake, demo: "Program facts · Official sources" },

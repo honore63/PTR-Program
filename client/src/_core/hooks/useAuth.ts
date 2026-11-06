@@ -7,7 +7,7 @@ export type AuthUser = {
   id: number;
   name: string | null;
   email: string | null;
-  role: "user" | "admin";
+  role: "user" | "editor" | "admin";
   lastSignedIn?: string;
   createdAt?: string;
 };
@@ -83,9 +83,12 @@ export function useAuth(options?: UseAuthOptions) {
 
   const state = useMemo(() => {
     const user = meQuery.data ?? null;
+    const isAdmin = user?.role === "admin";
+    const isEditor = user?.role === "editor";
     return {
       user,
-      isAdmin: user?.role === "admin",
+      isAdmin,
+      isEditor,
       loading: meQuery.isLoading || logoutMutation.isPending || loginMutation.isPending,
       error: meQuery.error ?? logoutMutation.error ?? loginMutation.error ?? null,
       isAuthenticated: Boolean(user),

@@ -59,7 +59,9 @@ USE ptrp;
 SHOW TABLES;
 ```
 
-Expected tables: `users`, `siteContent`, `mediaAssets`, `schools`, `teachers`, `alumni`, `newsArticles`, `galleryItems`, `bestPractices`.
+Expected tables include `users`, `siteContent`, `mediaAssets`, `schools`, `teachers`, `alumni`, `newsArticles`, `galleryItems`, `bestPractices`, and `contactMessages`.
+
+For an existing database, take a fresh backup and apply `database/migrations/20261105_contact_messages.sql`. This creates the message inbox without replacing existing tables or content. Do not skip the backup.
 
 ---
 
@@ -84,11 +86,20 @@ Set at minimum:
 | `db_password` | Database password |
 | `base_path` | URL base path (`/` for a domain root, `/PTRP` for a subfolder) |
 | `manus_jwt_secret` | HS256 signing secret, at least 32 cryptographically random characters |
+| `smtp_host` | SMTP hostname; use `smtp.gmail.com` for Gmail |
+| `smtp_port` | `587` for STARTTLS, or `465` for implicit TLS |
+| `smtp_encryption` | `tls` for port 587 or `ssl` for port 465 |
+| `smtp_username` | Authorized SMTP sending account |
+| `smtp_password` | SMTP/app password (server-side only) |
+| `smtp_from_email` | Optional verified sender; defaults to `smtp_username` |
+| `smtp_from_name` | Optional sender display name |
 
 `config.php` is gitignored and must never be committed.
 Set `manus_jwt_secret` to at least 32 cryptographically random characters. Older deployments must replace the sample signing secret and invalidate existing sessions.
 
 The deployed PHP API uses email/password authentication and does not require an OAuth callback. Manus OAuth settings are used only by the separate Node scaffold.
+
+Contact submissions are delivered to `ptrpresidenteachers100@gmail.com`. For Gmail SMTP, enable 2-Step Verification and use an app password for `smtp_password`; standard account passwords may not work. Store credentials only in the protected `config.php` or hosting-provider secret settings. Never expose them in frontend code or `VITE_*` variables. The API stores each valid message before attempting delivery, so an SMTP outage is visible in the Admin Portal inbox and administrators can retry after fixing configuration. A successful response means the SMTP server accepted the message, not that the recipient mailbox confirmed delivery.
 
 ---
 
@@ -179,9 +190,17 @@ DB_USER=<user>
 DB_PASSWORD=<password>
 BASE_PATH=/
 MANUS_JWT_SECRET=...
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_ENCRYPTION=tls
+SMTP_USERNAME=<authorized sending account>
+SMTP_PASSWORD=<SMTP/app password>
+SMTP_FROM_EMAIL=<optional verified sender; defaults to SMTP_USERNAME>
+SMTP_FROM_NAME=PTR Alumni Network
 ```
 
 The container generates `config.php` from these variables on startup and imports nothing automatically - import `database/ptrp.sql` into the managed database first.
+For local Docker Compose, set the SMTP variables in `.env` before starting the container. Gmail requires 2-Step Verification and an app password; configure these values as protected deployment secrets in production. Never put SMTP credentials in frontend or `VITE_*` variables.
 
 ---
 
@@ -194,6 +213,9 @@ The container generates `config.php` from these variables on startup and imports
 - [ ] Upload an image through the admin media library; confirm it appears under `/uploads/`.
 - [ ] Publish a news article; confirm it appears on `/news`.
 - [ ] Open `/`, `/about`, `/network`, `/gallery`, `/resources`, `/contact` on desktop and mobile widths.
+- [ ] Submit a contact message using authorized SMTP credentials; confirm it appears in the Admin Portal inbox and that the SMTP server accepts delivery to `ptrpresidenteachers100@gmail.com`. Confirm mailbox receipt separately.
+- [ ] With SMTP unavailable, submit a contact message and verify the form reports email failure while the message remains available in the Admin Portal; restore SMTP and retry it from the inbox.
+- [ ] Verify unauthenticated requests to `/api/admin/contact-messages` are rejected and duplicate submission IDs do not create or resend messages.
 - [ ] Verify HTTPS is active and the session cookie is marked `Secure`.
 - [ ] Confirm `config.php` returns 403/404 when requested directly.
 

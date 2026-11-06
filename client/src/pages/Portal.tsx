@@ -307,9 +307,9 @@ export default function Portal({ language }: PortalProps) {
                   {mode === "reset" && "Set a new password"}
                 </h2>
                 <p className="text-xs text-[#6b7280] mb-6">
-                  {mode === "login" && "Enter your username and password to access the network."}
+                  {mode === "login" && "Enter your username or email and password to access the network."}
                   {mode === "register" && "Register your profile with your educational email address."}
-                  {mode === "forgot" && "Email-based password recovery is not available yet. Contact a network administrator for help."}
+                  {mode === "forgot" && "Username or email based password recovery is not available yet. Contact a network administrator for help."}
                   {mode === "reset" && "Enter your reset verification token and choose a new password."}
                 </p>
 
@@ -346,13 +346,14 @@ export default function Portal({ language }: PortalProps) {
                   {mode === "login" && (
                     <form onSubmit={handleLogin} className="space-y-5">
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold uppercase tracking-wide text-[#4b5563]">Username</label>
+                        <label className="text-xs font-bold uppercase tracking-wide text-[#4b5563]">Username or Email</label>
                         <input
                           type="text"
                           required
                           value={username}
                           onChange={(e) => setUsername(e.target.value)}
                           placeholder="Residents teachers"
+                          autoComplete="username"
                           className="px-4 py-2.5 border border-[#d1d5db] rounded-lg text-sm text-[#111] focus:ring-2 focus:ring-[#0098d9] focus:border-transparent outline-none transition-all"
                         />
                       </div>

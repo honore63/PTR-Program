@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `email` varchar(320) DEFAULT NULL,
   `passwordHash` varchar(255) DEFAULT NULL,
   `name` text DEFAULT NULL,
-  `role` enum('user','admin') NOT NULL DEFAULT 'user',
+  `role` enum('user','editor','admin') NOT NULL DEFAULT 'user',
   `resetToken` varchar(128) DEFAULT NULL,
   `resetTokenExpires` datetime DEFAULT NULL,
   `openId` varchar(64) DEFAULT NULL,
@@ -26,6 +26,7 @@ ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `passwordHash` varchar(255) DEFAULT
 ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `resetToken` varchar(128) DEFAULT NULL AFTER `role`;
 ALTER TABLE `users` ADD COLUMN IF NOT EXISTS `resetTokenExpires` datetime DEFAULT NULL AFTER `resetToken`;
 ALTER TABLE `users` MODIFY COLUMN `openId` varchar(64) NULL;
+ALTER TABLE `users` MODIFY COLUMN `role` enum('user','editor','admin') NOT NULL DEFAULT 'user';
 
 CREATE TABLE IF NOT EXISTS `siteContent` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -410,6 +411,31 @@ CREATE TABLE IF NOT EXISTS `admin_activity_logs` (
   CONSTRAINT `admin_activity_logs_adminId_fk` FOREIGN KEY (`adminId`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `notifications` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `userId` int NOT NULL,
+  `type` varchar(60) NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `message` text NOT NULL,
+  `link` varchar(255) DEFAULT NULL,
+  `readAt` timestamp NULL DEFAULT NULL,
+  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `notifications_userId_idx` (`userId`),
+  KEY `notifications_readAt_idx` (`readAt`),
+  CONSTRAINT `notifications_userId_fk` FOREIGN KEY (`userId`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `page_views` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `path` varchar(255) NOT NULL,
+  `referrer` varchar(500) DEFAULT NULL,
+  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `page_views_createdAt_idx` (`createdAt`),
+  KEY `page_views_path_idx` (`path`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ============================================================
 -- Seed Honore Tuyishime as the first featured resident teacher
 -- ============================================================
@@ -496,4 +522,27 @@ CREATE TABLE IF NOT EXISTS `social_sync_logs` (
   KEY `social_sync_logs_account_idx` (`accountId`),
   KEY `social_sync_logs_startedAt_idx` (`startedAt`),
   CONSTRAINT `social_sync_logs_account_fk` FOREIGN KEY (`accountId`) REFERENCES `social_accounts` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `contactMessages` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `submissionKey` char(36) NOT NULL,
+  `senderName` varchar(255) NOT NULL,
+  `senderEmail` varchar(320) NOT NULL,
+  `subject` varchar(200) NOT NULL,
+  `message` text NOT NULL,
+  `ipHash` char(64) NOT NULL,
+  `deliveryStatus` enum('pending','sending','sent','failed') NOT NULL DEFAULT 'pending',
+  `deliveryError` varchar(500) DEFAULT NULL,
+  `deliveryAttempts` smallint unsigned NOT NULL DEFAULT 0,
+  `lastAttemptAt` datetime DEFAULT NULL,
+  `deliveredAt` datetime DEFAULT NULL,
+  `readAt` datetime DEFAULT NULL,
+  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `contactMessages_submissionKey_unique` (`submissionKey`),
+  KEY `contactMessages_deliveryStatus_idx` (`deliveryStatus`),
+  KEY `contactMessages_readAt_createdAt_idx` (`readAt`,`createdAt`),
+  KEY `contactMessages_ipHash_createdAt_idx` (`ipHash`,`createdAt`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

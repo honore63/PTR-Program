@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS `contactMessages` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `submissionKey` char(36) NOT NULL,
+  `senderName` varchar(255) NOT NULL,
+  `senderEmail` varchar(320) NOT NULL,
+  `subject` varchar(200) NOT NULL,
+  `message` text NOT NULL,
+  `ipHash` char(64) NOT NULL,
+  `deliveryStatus` enum('pending','sending','sent','failed') NOT NULL DEFAULT 'pending',
+  `deliveryError` varchar(500) DEFAULT NULL,
+  `deliveryAttempts` smallint unsigned NOT NULL DEFAULT 0,
+  `lastAttemptAt` datetime DEFAULT NULL,
+  `deliveredAt` datetime DEFAULT NULL,
+  `readAt` datetime DEFAULT NULL,
+  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `contactMessages_submissionKey_unique` (`submissionKey`),
+  KEY `contactMessages_deliveryStatus_idx` (`deliveryStatus`),
+  KEY `contactMessages_readAt_createdAt_idx` (`readAt`,`createdAt`),
+  KEY `contactMessages_ipHash_createdAt_idx` (`ipHash`,`createdAt`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -7,6 +7,14 @@ return [
     'db_password' => '',
     'base_path' => '/PTRP',
     'manus_jwt_secret' => '',
+    // ----- Contact form email delivery (server-side only) -----
+    'smtp_host' => 'smtp.gmail.com',
+    'smtp_port' => 587,
+    'smtp_encryption' => 'tls', // tls (STARTTLS) or ssl (implicit TLS)
+    'smtp_username' => '',
+    'smtp_password' => '',
+    'smtp_from_email' => '', // Defaults to smtp_username
+    'smtp_from_name' => 'PTR Alumni Network',
     // ----- Social Media Integration API credentials -----
     // Facebook Graph API
     'social_facebook_app_id' => '',

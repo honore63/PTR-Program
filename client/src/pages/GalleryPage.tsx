@@ -1,11 +1,16 @@
 import { useEffect, useState } from "react";
-import { ArrowUpRight, Camera, CheckCircle2, ImagePlus, PlayCircle, ShieldCheck, X } from "lucide-react";
+import { ArrowUpRight, Camera, CheckCircle2, PlayCircle, ShieldCheck, X } from "lucide-react";
 import { Link } from "wouter";
 import { PageHero } from "@/components/ptrp/PageHero";
 import { SectionHeading } from "@/components/ptrp/SectionHeading";
 import { galleryAlbums, galleryPhotos, galleryRules } from "@/data/ptrp";
 
 type Album = typeof galleryAlbums[number];
+
+const publicImageUrl = (image: string) => {
+  if (/^https?:\/\//i.test(image) || image.startsWith(import.meta.env.BASE_URL)) return image;
+  return `${import.meta.env.BASE_URL}${image.replace(/^\/+/, "")}`;
+};
 
 export default function GalleryPage() {
   const [activeAlbum, setActiveAlbum] = useState<Album | null>(null);
@@ -40,24 +45,16 @@ export default function GalleryPage() {
       <div className="mx-auto max-w-[1400px] px-5 md:px-8 lg:px-12">
         <SectionHeading eyebrow="Albums" title="A visual record of the residency year and beyond." body="Select an album to view its description and available media. Where a photo or video is not yet available, the album remains a placeholder for approved contributions." />
         <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {galleryAlbums.map((album, index) => <button key={album.title} type="button" onClick={() => setActiveAlbum(album)} className={`group relative flex min-h-[270px] flex-col overflow-hidden border border-[#dce8ed] p-5 text-left ${index === 0 ? "sm:row-span-2 sm:min-h-[560px] lg:col-span-2" : ""}`}>
-            {album.image ? (
-              <div className="absolute inset-0">
-                <img src={album.image} alt="" className="absolute inset-0 h-full w-full object-contain transition-transform duration-500 group-hover:scale-[1.03]" loading="lazy" />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#071935]/25 via-transparent to-transparent" />
-              </div>
-            ) : (
-              <div className={`absolute inset-0 bg-gradient-to-br ${album.gradient}`} />
-            )}
-            {!album.image && <div className="absolute inset-[14%] border border-[#0b2347]/20" />}
-            <div className="relative z-10">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-[#0098d9]">{album.date}</span>
-                {album.videoUrl ? <PlayCircle className="size-5 text-[#0098d9]" /> : <ImagePlus className="size-4 text-[#0b2347]/70" />}
-              </div>
-              <h2 className={`mt-3 font-extrabold leading-tight tracking-[-0.04em] text-[#0b2347] ${index === 0 ? "text-2xl sm:text-3xl" : "text-lg"}`}>{album.title}</h2>
+          {galleryAlbums.map((album, index) => <button key={album.title} type="button" onClick={() => setActiveAlbum(album)} className={`group flex flex-col overflow-hidden border border-[#dce8ed] bg-white text-left transition-shadow hover:shadow-lg ${index === 0 ? "lg:col-span-2" : ""}`}>
+            <div className={`relative w-full overflow-hidden bg-gradient-to-br ${album.gradient} ${index === 0 ? "aspect-[16/9]" : "aspect-[4/3]"}`}>
+              {album.image && <img src={publicImageUrl(album.image)} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" loading="lazy" />}
+              {album.videoUrl && <PlayCircle className="absolute right-4 top-4 size-6 text-white drop-shadow" />}
+            </div>
+            <div className="flex flex-1 flex-col p-5">
+              <span className="text-[0.6rem] font-extrabold uppercase tracking-[0.12em] text-[#0098d9]">{album.date}</span>
+              <h2 className={`mt-2 font-extrabold leading-tight tracking-[-0.04em] text-[#0b2347] ${index === 0 ? "text-2xl sm:text-3xl" : "text-lg"}`}>{album.title}</h2>
               <p className="mt-2 max-w-md text-[0.72rem] leading-5 text-[#4b5563]">{album.body}</p>
-              <span className="mt-4 inline-flex items-center gap-2 text-[0.62rem] font-extrabold uppercase tracking-[0.1em] text-[#0098d9]">Open album <ArrowUpRight className="size-3.5" /></span>
+              <span className="mt-auto inline-flex items-center gap-2 pt-4 text-[0.62rem] font-extrabold uppercase tracking-[0.1em] text-[#0098d9]">Open album <ArrowUpRight className="size-3.5" /></span>
             </div>
           </button>)}
         </div>

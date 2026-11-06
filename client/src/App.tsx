@@ -146,6 +146,9 @@ function AppFrame() {
   const language: Language = "en";
   const isStandaloneRoute = location.startsWith("/admin") || location.startsWith("/portal");
   useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location]);
+  useEffect(() => {
     const primaryColor = settings.primaryColor;
     const accentColor = settings.accentColor;
     if (primaryColor && /^#[\da-f]{6}$/i.test(primaryColor)) document.documentElement.style.setProperty("--ptr-primary", primaryColor);

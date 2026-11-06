@@ -128,6 +128,12 @@ export default defineConfig({
       "localhost",
       "127.0.0.1",
     ],
+    proxy: {
+      "/PTRP/api": {
+        target: process.env.VITE_API_PROXY_TARGET ?? "http://localhost",
+        changeOrigin: false,
+      },
+    },
     fs: {
       strict: true,
       deny: ["**/.*"],

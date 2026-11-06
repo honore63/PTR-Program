@@ -592,6 +592,40 @@ export type ResidentTeacher = {
   bestPractices?: ResidentBestPractice[];
 };
 
+export const featuredHonoreProfileSlug = "featured-honore";
+
+export const featuredHonoreTuyishime: ResidentTeacher = {
+  id: 0,
+  fullName: "Honore Tuyishime",
+  email: "tuyishimehonore63@gmail.com",
+  phone: "0791684429",
+  gender: null,
+  modelSchool: "Rukara Model School",
+  position: "Program Designer, ICT Integration in Education Practitioner, and Website Manager",
+  bestPractice: "ICT Integration in Education",
+  bestPracticeDescription: "Designed and developed the 21st Century Lesson Plan Generator, a digital platform supporting teachers in creating competency-based, learner-centred lesson plans.",
+  subjects: "ICT Integration in Education, Competency-Based Education, Learner-Centred Lesson Planning",
+  skills: "Program Design, Educational Technology, Website Management, Digital Learning",
+  contributions: "Designed and developed the 21st Century Lesson Plan Generator, a digital platform supporting teachers in creating competency-based, learner-centred lesson plans.",
+  bio: "Honore Tuyishime is a Resident Teacher at Rukara Model School and a PTRP Alumni Network member. As a program designer, ICT integration practitioner, and website manager, he brings technology and practical digital tools into teacher development.",
+  photoUrl: "honore-tuyishime.png",
+  status: "published",
+  isFeatured: true,
+  displayOrder: -10000,
+  submittedAt: null,
+  reviewedAt: null,
+  reviewedBy: null,
+  publishedAt: null,
+  createdAt: null,
+  updatedAt: null,
+};
+
+export function residentTeacherPhotoUrl(photoUrl: string | null | undefined): string | null {
+  if (!photoUrl) return null;
+  if (/^(?:[a-z][a-z\d+.-]*:|\/|#)/i.test(photoUrl)) return photoUrl;
+  return `${import.meta.env.BASE_URL}${photoUrl.replace(/^\.\/+/, "")}`;
+}
+
 export type ResidentBestPractice = {
   id: number;
   teacherId: number;

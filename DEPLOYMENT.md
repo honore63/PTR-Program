@@ -62,6 +62,7 @@ SHOW TABLES;
 Expected tables include `users`, `siteContent`, `mediaAssets`, `schools`, `teachers`, `alumni`, `newsArticles`, `galleryItems`, `bestPractices`, and `contactMessages`.
 
 For an existing database, take a fresh backup and apply `database/migrations/20261105_contact_messages.sql`. This creates the message inbox without replacing existing tables or content. Do not skip the backup.
+To publish the featured Honore Tuyishime resident-teacher profile on an existing installation, back up the database and apply `database/migrations/20261106_feature_honore_tuyishime.sql`. The supplied portrait is bundled with the frontend as `client/public/honore-tuyishime.png`; administrators can replace it from the Resident Teachers editor.
 
 ---
 

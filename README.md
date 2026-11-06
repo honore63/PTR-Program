@@ -328,6 +328,8 @@ For an existing XAMPP installation, back up `ptrp` first, then apply `database/m
 
 After applying the existing CMS migration, back up the database again and apply `database/migrations/20261105_contact_messages.sql` to add the contact-message inbox. Fresh installations using `database/ptrp.sql` already include this table. The migration is additive and does not modify existing records.
 
+To run the Vite preview against a local XAMPP backend, start Apache and MySQL and apply any required database migrations. `pnpm dev:static` proxies `/PTRP/api/*` to `http://localhost/PTRP/api/*` by default; set `VITE_API_PROXY_TARGET` to another Apache origin if needed. The PHP API serves public resident profiles and protects resident administration endpoints with administrator authentication.
+
 For editor access, apply `database/migrations/20261106_editor_member_roles.sql` to existing installations. The API also upgrades older `users.role` enums on startup when the database account has permission to alter the table.
 
 Verify:

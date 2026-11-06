@@ -7,52 +7,27 @@ import {
 import { Link } from "wouter";
 import { useApiQuery } from "@/lib/api";
 import { toast } from "sonner";
-import { residentTeacherStatusLabels, residentTeacherStatusColors } from "@/data/ptrp";
+import {
+  featuredHonoreProfileSlug, featuredHonoreTuyishime, residentTeacherPhotoUrl,
+  residentTeacherStatusLabels, residentTeacherStatusColors, type ResidentTeacher,
+} from "@/data/ptrp";
 import { PageHero } from "@/components/ptrp/PageHero";
 import { SectionHeading } from "@/components/ptrp/SectionHeading";
 
-type ResidentTeacherDetailData = {
-  id: number;
-  fullName: string;
-  email: string;
-  phone: string | null;
-  gender: string | null;
-  modelSchool: string | null;
-  position: string | null;
-  bestPractice: string | null;
-  bestPracticeDescription: string | null;
-  subjects: string | null;
-  skills: string | null;
-  contributions: string | null;
-  bio: string | null;
-  photoUrl: string | null;
-  status: string;
-  isFeatured: boolean;
-  displayOrder: number;
-  submittedAt: string | null;
-  publishedAt: string | null;
-  bestPractices: Array<{
-    id: number;
-    title: string;
-    category: string;
-    description: string;
-    mediaUrl: string | null;
-    mediaType: string | null;
-    publishedAt: string | null;
-  }>;
-};
-
 export default function ResidentTeacherDetail() {
   const [, params] = useRoute("/resident-teacher/:id");
-  const teacherId = parseInt((params as any)?.id, 10);
+  const profileId = params?.id;
+  const teacherId = Number(profileId);
   const [isSharing, setIsSharing] = useState(false);
 
-  const { data: teacher, isLoading, error } = useApiQuery<ResidentTeacherDetailData>(
+  const { data: apiTeacher, isLoading, error } = useApiQuery<ResidentTeacher>(
     ["api", "resident-teacher", String(teacherId)],
-    isNaN(teacherId) ? "" : `resident-teachers/${teacherId}`
+    Number.isInteger(teacherId) && teacherId > 0 ? `resident-teachers/${teacherId}` : ""
   );
+  const isBundledProfile = profileId === featuredHonoreProfileSlug;
+  const teacher = isBundledProfile ? featuredHonoreTuyishime : apiTeacher;
 
-  if (isLoading) {
+  if (!isBundledProfile && isLoading) {
     return (
       <main className="min-h-screen bg-[#f6fafb] flex items-center justify-center">
         <div className="text-center">
@@ -80,6 +55,7 @@ export default function ResidentTeacherDetail() {
 
   const statusInfo = residentTeacherStatusLabels[teacher.status as keyof typeof residentTeacherStatusLabels] || teacher.status;
   const statusColor = residentTeacherStatusColors[teacher.status as keyof typeof residentTeacherStatusColors] || "text-[#6b7280]";
+  const photoUrl = residentTeacherPhotoUrl(teacher.photoUrl);
 
   const shareProfile = () => {
     setIsSharing(true);
@@ -103,9 +79,9 @@ export default function ResidentTeacherDetail() {
         eyebrow="Resident Teachers Directory"
         title={`${teacher.fullName} — Resident Teacher`}
         description={teacher.bio || `${teacher.modelSchool ?? "A PTR model school"} · Resident teacher profile currently under review.`}
-        image={teacher.photoUrl || "/manus-storage/ptrp-residents-2.jpg"}
+        image={photoUrl || "/manus-storage/ptrp-residents-2.jpg"}
         imageAlt={`${teacher.fullName} — PTR resident teacher profile`}
-        imageCredit="Photo: MINEDUC · PTR Alumni Network"
+        imageCredit={isBundledProfile ? "Photo provided by Honore Tuyishime" : "Photo: MINEDUC · PTR Alumni Network"}
       />
       <header className="border-b border-[#e2eef0] bg-white sticky top-0 z-40">
         <div className="mx-auto max-w-[1400px] px-5 md:px-8 h-[78px] flex items-center justify-between">
@@ -124,15 +100,15 @@ export default function ResidentTeacherDetail() {
           {/* Photo Column */}
           <div className="space-y-6">
             <div className="relative group">
-              {teacher.photoUrl ? (
+              {photoUrl ? (
                 <img
-                  src={teacher.photoUrl}
+                  src={photoUrl}
                   alt={`${teacher.fullName} - Professional portrait`}
-                  className="w-full h-64 object-cover rounded-2xl shadow-lg"
+                  className="w-full max-h-[640px] aspect-[2/3] object-contain rounded-2xl bg-[#f0f4f8] shadow-lg"
                   loading="eager"
                 />
               ) : (
-                <div className="w-full h-64 flex items-center justify-center rounded-2xl bg-[#e8f2f6] border-2 border-[#dce8ed] text-[#0098d9]">
+                <div className="w-full aspect-[2/3] max-h-[640px] flex items-center justify-center rounded-2xl bg-[#e8f2f6] border-2 border-[#dce8ed] text-[#0098d9]">
                   <UsersRound className="size-16" strokeWidth={1.5} />
                 </div>
               )}
@@ -230,14 +206,7 @@ export default function ResidentTeacherDetail() {
               {teacher.contributions && (
                 <div className="mt-8">
                   <p className="text-[0.68rem] font-extrabold uppercase tracking-[0.14em] text-[#38bdf8] mb-4">Professional Contributions &amp; Achievements</p>
-                  <ul className="space-y-3 text-[#4b5563] leading-relaxed text-lg">
-                    {teacher.contributions.split(/[.,;]\s*/).filter(Boolean).map((item, i) => (
-                      <li key={i} className="flex items-start gap-3 pl-4 relative">
-                        <span className="absolute left-0 top-1.5 size-1.5 rounded-full bg-[#0098d9]" />
-                        <span>{item.trim()}.</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <p className="text-[#4b5563] leading-relaxed text-lg">{teacher.contributions}</p>
                 </div>
               )}
               {teacher.subjects && (

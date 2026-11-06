@@ -6,8 +6,8 @@ import {
 import { Link } from "wouter";
 import { useApiQuery } from "@/lib/api";
 import {
-  ResidentTeacher,
-  residentTeacherStatusLabels, residentTeacherStatusColors,
+  featuredHonoreProfileSlug, featuredHonoreTuyishime, ResidentTeacher,
+  residentTeacherPhotoUrl, residentTeacherStatusLabels, residentTeacherStatusColors,
 } from "@/data/ptrp";
 import { PageHero } from "@/components/ptrp/PageHero";
 import { SectionHeading } from "@/components/ptrp/SectionHeading";
@@ -18,10 +18,19 @@ export default function ResidentsDirectory() {
   const [practiceFilter, setPracticeFilter] = useState("All practices");
   const [sortBy, setSortBy] = useState("featured");
 
-  const { data: teachers = [], isLoading } = useApiQuery<ResidentTeacher[]>(
+  const { data: teacherResponse, isLoading, error, refetch } = useApiQuery<ResidentTeacher[]>(
     ["api", "resident-teachers", "list"],
     "resident-teachers?limit=100"
   );
+  const apiTeachers = Array.isArray(teacherResponse) ? teacherResponse : [];
+  const teachers = apiTeachers.some((teacher) => teacher.email.toLowerCase() === featuredHonoreTuyishime.email)
+    ? apiTeachers
+    : [featuredHonoreTuyishime, ...apiTeachers];
+  const directoryError = error instanceof Error
+    ? error.message
+    : teacherResponse !== undefined && !Array.isArray(teacherResponse)
+      ? "The full resident directory is unavailable. Showing the featured profile while the API is disconnected."
+      : null;
 
   const allSchools = useMemo(() => [
     "All schools",
@@ -158,6 +167,17 @@ export default function ResidentsDirectory() {
             </div>
           </div>
 
+          {directoryError && (
+            <div role="status" className="mt-6 flex flex-wrap items-center justify-between gap-3 border border-[#fde68a] bg-[#fffbeb] p-4 text-sm text-[#92400e]">
+              <p>{directoryError}</p>
+              <button type="button" onClick={() => refetch()} className="font-bold underline underline-offset-2">
+                Try again
+              </button>
+            </div>
+          )}
+
+          {isLoading && <p className="mt-8 text-sm text-[#6b7280]">Loading resident teachers…</p>}
+
           {featured.length > 0 && (
             <section className="mt-12">
               <div className="flex flex-wrap items-end justify-between gap-3">
@@ -181,14 +201,14 @@ export default function ResidentsDirectory() {
                 <p className="eyebrow text-[#0098d9]">Directory</p>
                 <h3 className="mt-2 text-2xl font-extrabold tracking-[-0.04em] text-[#0b2347]">All Resident Teachers</h3>
               </div>
-              <span className="text-xs font-semibold text-[#7b8da2]">{regular.length} profiles</span>
+              <span className="text-xs font-semibold text-[#7b8da2]">{filtered.length} profiles</span>
             </div>
             <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {regular.length > 0 ? (
                 regular.map((teacher) => (
                   <TeacherCard key={teacher.id} teacher={teacher} />
                 ))
-              ) : (
+              ) : filtered.length === 0 ? (
                 <div className="sm:col-span-3 border border-dashed border-[#d1d5db] bg-white rounded-xl p-12 text-center">
                   <UserRound className="mx-auto size-10 text-[#0098d9]" />
                   <p className="mt-4 text-sm font-bold text-[#0b2347]">No teachers match those filters.</p>
@@ -205,7 +225,7 @@ export default function ResidentsDirectory() {
                     Clear filters
                   </button>
                 </div>
-              )}
+              ) : null}
             </div>
           </section>
         </div>
@@ -218,6 +238,7 @@ function TeacherCard({ teacher, featured }: { teacher: ResidentTeacher; featured
   const statusInfo = residentTeacherStatusLabels[teacher.status];
   const statusColor = residentTeacherStatusColors[teacher.status];
   const hasContact = Boolean(teacher.email || teacher.phone);
+  const photoUrl = residentTeacherPhotoUrl(teacher.photoUrl);
 
   return (
     <article className="flex h-full flex-col border border-[#e2eef0] bg-white rounded-xl p-6 transition-colors hover:border-[#0098d9] hover:shadow-md">
@@ -226,16 +247,16 @@ function TeacherCard({ teacher, featured }: { teacher: ResidentTeacher; featured
           Featured
         </span>
       )}
-      <div className="relative mb-4">
-        {teacher.photoUrl ? (
+      <div className="relative mx-auto mb-4 flex h-[360px] w-full max-w-[320px] items-center justify-center overflow-hidden rounded-lg bg-[#f0f4f8]">
+        {photoUrl ? (
           <img
-            src={teacher.photoUrl}
+            src={photoUrl}
             alt={`${teacher.fullName} photo`}
-            className="w-full h-40 object-cover rounded-lg bg-[#f0f4f8]"
+            className="h-full w-full object-contain"
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-40 flex items-center justify-center rounded-lg bg-[#e8f2f6] text-[#0098d9] border border-[#dce8ed]">
+          <div className="flex h-full w-full items-center justify-center rounded-lg bg-[#e8f2f6] text-[#0098d9] border border-[#dce8ed]">
             <UserRound className="size-10" strokeWidth={1.5} />
           </div>
         )}
@@ -248,12 +269,21 @@ function TeacherCard({ teacher, featured }: { teacher: ResidentTeacher; featured
           <span className="ml-auto text-[0.6rem] font-extrabold text-[#0098d9]">Featured</span>
         )}
       </div>
-      <Link href={`/resident-teacher/${teacher.id}`} className="block">
+      <Link href={`/resident-teacher/${teacher.id === 0 ? featuredHonoreProfileSlug : teacher.id}`} className="block">
         <h3 className="mt-1 text-lg font-extrabold leading-tight tracking-[-0.03em] text-[#0b2347] hover:text-[#0098d9] transition-colors">{teacher.fullName}</h3>
       </Link>
       <p className="mt-1 text-[0.66rem] font-extrabold uppercase tracking-[0.1em] text-[#0098d9]">{teacher.modelSchool}</p>
       <p className="mt-2 text-sm text-[#4b5563]">{teacher.position || "Professional role"}</p>
-      <p className="mt-3 text-[0.68rem] leading-5 text-[#6b7280] line-clamp-2">{teacher.bestPracticeDescription || teacher.bio || ""}</p>
+      {teacher.bio && <p className="mt-3 text-[0.72rem] leading-5 text-[#4b5563] line-clamp-3">{teacher.bio}</p>}
+      {teacher.bestPractice && (
+        <p className="mt-3 text-[0.66rem] font-bold text-[#168d6d]">Best practice: {teacher.bestPractice}</p>
+      )}
+      {(teacher.contributions || teacher.bestPracticeDescription) && (
+        <p className="mt-2 text-[0.68rem] leading-5 text-[#6b7280] line-clamp-3">
+          <strong className="text-[#0b2347]">Contribution: </strong>
+          {teacher.contributions || teacher.bestPracticeDescription}
+        </p>
+      )}
       {hasContact && (
         <dl className="mt-4 grid gap-2 border-t border-[#eef2f5] pt-3 text-[0.7rem]">
           {teacher.email && (
@@ -271,7 +301,7 @@ function TeacherCard({ teacher, featured }: { teacher: ResidentTeacher; featured
         </dl>
       )}
       <div className="mt-auto pt-4">
-        <Link href={`/resident-teacher/${teacher.id}`} className="button-ghost-light w-full py-2 text-xs font-bold uppercase tracking-[0.1em]">
+        <Link href={`/resident-teacher/${teacher.id === 0 ? featuredHonoreProfileSlug : teacher.id}`} className="button-ghost-light w-full py-2 text-xs font-bold uppercase tracking-[0.1em]">
           View Profile <ArrowUpRight className="size-3.5" />
         </Link>
       </div>

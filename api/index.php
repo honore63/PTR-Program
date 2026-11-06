@@ -297,6 +297,14 @@ function isEditorRoute(string $route, string $method): bool
         || ($method === 'DELETE' && preg_match('#^/admin/(?:content/\d+|banners/[a-zA-Z0-9_-]{1,80}|navigation/\d+)$#', $route) === 1);
 }
 
+function isPublicResidentTeacherRoute(string $route, string $method): bool
+{
+    return ($route === '/resident-teachers' && $method === 'GET')
+        || (preg_match('#^/resident-teachers/\d+$#', $route) === 1 && $method === 'GET')
+        || ($route === '/resident-best-practices' && $method === 'GET')
+        || ($route === '/resident-teachers/register' && $method === 'POST');
+}
+
 function createNotification(int $userId, string $type, string $title, string $message, ?string $link = null): void
 {
     $statement = database()->prepare('INSERT INTO notifications (userId, type, title, message, link) VALUES (?, ?, ?, ?, ?)');
@@ -713,7 +721,7 @@ function routeRequest(): void
     // =========================================================================
     if (isEditorRoute($route, $method)) {
         requireEditor();
-    } else {
+    } elseif (!isPublicResidentTeacherRoute($route, $method)) {
         requireAdmin();
     }
 
@@ -1638,7 +1646,7 @@ function routeRequest(): void
         $role = $_GET['role'] ?? null;
         $sort = $_GET['sort'] ?? 'displayOrder';
 
-        $sql = "SELECT * FROM resident_teachers WHERE status = 'published' AND isVisible = 1";
+        $sql = "SELECT * FROM resident_teachers WHERE status = 'published'";
         $params = [];
         if ($search) {
             $sql .= " AND (fullName LIKE ? OR bio LIKE ? OR contributions LIKE ?)";
@@ -1667,7 +1675,7 @@ function routeRequest(): void
     }
 
     if (preg_match('#^/resident-teachers/(\d+)$#', $route, $matches) && $method === 'GET') {
-        $statement = database()->prepare("SELECT * FROM resident_teachers WHERE id = ? AND status = 'published' AND isVisible = 1 LIMIT 1");
+        $statement = database()->prepare("SELECT * FROM resident_teachers WHERE id = ? AND status = 'published' LIMIT 1");
         $statement->execute([(int) $matches[1]]);
         $teacher = $statement->fetch();
         if (!$teacher) throw new ApiError(404, 'Resident teacher not found.');
@@ -1685,7 +1693,7 @@ function routeRequest(): void
 
         $sql = "SELECT rbp.*, rt.fullName AS teacherName, rt.modelSchool FROM resident_best_practices rbp
                 JOIN resident_teachers rt ON rbp.teacherId = rt.id
-                WHERE rt.status = 'published' AND rt.isVisible = 1";
+                WHERE rt.status = 'published'";
         $params = [];
         if ($category) {
             $sql .= " AND rbp.category = ?";

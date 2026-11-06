@@ -14,6 +14,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SocialManager } from "./SocialManager";
 import { CmsPageRenderer, parseCmsPageLayout, type CmsPageSection } from "@/components/ptrp/CmsPageRenderer";
+import { residentTeacherPhotoUrl } from "@/data/ptrp";
 
 type AdminTab =
   | "overview" | "content" | "banners" | "uploads" | "users"
@@ -1738,6 +1739,7 @@ function TeamManager({ rows, role, onDelete, onRefresh }: { rows: any[]; role: "
 }
 
 function ResidentTeachersManager({ rows, onSave, onSetStatus, onDelete, onRefresh, saving }: any) {
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     id: 0, fullName: "", email: "", phone: "", gender: "", modelSchool: "",
     position: "", bestPractice: "", bestPracticeDescription: "", subjects: "",
@@ -1745,6 +1747,7 @@ function ResidentTeachersManager({ rows, onSave, onSetStatus, onDelete, onRefres
     status: "pending", isFeatured: false, displayOrder: 0,
   });
   const [savingLocal, setSavingLocal] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const statuses: { value: string; label: string }[] = [
     { value: "pending", label: "Pending Review" },
@@ -1777,6 +1780,44 @@ function ResidentTeachersManager({ rows, onSave, onSetStatus, onDelete, onRefres
     onSetStatus({ id, status: row?.status || "published", isFeatured: row?.isFeatured, displayOrder: Number(order) || 0 });
   };
 
+  const uploadPhoto = async (file: File) => {
+    if (!["image/jpeg", "image/png", "image/gif", "image/webp"].includes(file.type)) {
+      toast.error("Choose a JPG, PNG, GIF, or WEBP image for the profile photo.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Profile photos are limited to 10 MB.");
+      return;
+    }
+
+    setUploadingPhoto(true);
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
+        reader.onerror = () => reject(reader.error ?? new Error("Could not read the selected image."));
+        reader.readAsDataURL(file);
+      });
+      const uploaded = await apiRequest<{ url: string }>("admin/media/upload", {
+        method: "POST",
+        body: {
+          filename: file.name,
+          mimeType: file.type,
+          size: file.size,
+          base64,
+          altText: form.fullName ? `Portrait of ${form.fullName}` : "Resident teacher profile photo",
+        },
+      });
+      setForm((current) => ({ ...current, photoUrl: uploaded.url }));
+      toast.success("Profile photo uploaded. Save the profile to apply it.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Profile photo upload failed.");
+    } finally {
+      setUploadingPhoto(false);
+      if (photoInputRef.current) photoInputRef.current.value = "";
+    }
+  };
+
   return (
     <div className="admin-content">
       {editingId !== null && (
@@ -1792,12 +1833,14 @@ function ResidentTeachersManager({ rows, onSave, onSetStatus, onDelete, onRefres
             <label className="admin-full">Best practice description<textarea value={form.bestPracticeDescription} onChange={(e) => setForm({ ...form, bestPracticeDescription: e.target.value })} rows={3} /></label>
             <label className="admin-full">Bio<textarea value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} rows={3} /></label>
             <label className="admin-full">Contributions<textarea value={form.contributions} onChange={(e) => setForm({ ...form, contributions: e.target.value })} rows={3} /></label>
-            <label>Photo URL<input value={form.photoUrl} onChange={(e) => setForm({ ...form, photoUrl: e.target.value })} /></label>
+            <label className="admin-full">Upload profile photo<input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" disabled={uploadingPhoto} onChange={(event) => event.target.files?.[0] && uploadPhoto(event.target.files[0])} /><span>{uploadingPhoto ? "Uploading securely…" : "JPG, PNG, GIF, or WEBP · max 10 MB"}</span></label>
+            <label className="admin-full">Photo URL<input value={form.photoUrl} onChange={(e) => setForm({ ...form, photoUrl: e.target.value })} /></label>
+            {form.photoUrl && <div className="admin-full"><img src={residentTeacherPhotoUrl(form.photoUrl) ?? undefined} alt={`Profile photo preview for ${form.fullName || "resident teacher"}`} className="size-24 rounded-lg object-cover" /></div>}
             <label>Status<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{statuses.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select></label>
             <label>Featured<input type="checkbox" checked={form.isFeatured} onChange={(e) => setForm({ ...form, isFeatured: e.target.checked })} /></label>
             <label>Display order<input type="number" value={form.displayOrder} onChange={(e) => setForm({ ...form, displayOrder: Number(e.target.value) || 0 })} /></label>
           </div>
-          <div className="admin-form-actions"><button className="button-primary" onClick={submit} disabled={savingLocal || saving}>{savingLocal || saving ? "Saving…" : "Save teacher"}</button></div>
+          <div className="admin-form-actions"><button className="button-primary" onClick={submit} disabled={savingLocal || saving || uploadingPhoto}>{savingLocal || saving ? "Saving…" : uploadingPhoto ? "Uploading photo…" : "Save teacher"}</button></div>
         </section>
       )}
       <section className="admin-panel">

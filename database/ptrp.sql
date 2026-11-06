@@ -380,6 +380,28 @@ CREATE TABLE IF NOT EXISTS `resident_teachers` (
   CONSTRAINT `resident_teachers_reviewedBy_fk` FOREIGN KEY (`reviewedBy`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+INSERT IGNORE INTO `resident_teachers`
+  (`fullName`, `email`, `phone`, `modelSchool`, `position`, `bestPractice`, `bestPracticeDescription`, `subjects`, `skills`, `contributions`, `bio`, `photoUrl`, `status`, `isFeatured`, `displayOrder`, `publishedAt`)
+VALUES
+  (
+    'Honore Tuyishime',
+    'tuyishimehonore63@gmail.com',
+    '0791684429',
+    'Rukara Model School',
+    'Program Designer, ICT Integration in Education Practitioner, and Website Manager',
+    'ICT Integration in Education',
+    'Designed and developed the 21st Century Lesson Plan Generator, a digital platform supporting teachers in creating competency-based, learner-centred lesson plans.',
+    'ICT Integration in Education, Competency-Based Education, Learner-Centred Lesson Planning',
+    'Program Design, Educational Technology, Website Management, Digital Learning',
+    'Designed and developed the 21st Century Lesson Plan Generator, a digital platform supporting teachers in creating competency-based, learner-centred lesson plans.',
+    'Honore Tuyishime is a Resident Teacher at Rukara Model School and a PTRP Alumni Network member. As a program designer, ICT integration practitioner, and website manager, he brings technology and practical digital tools into teacher development.',
+    'honore-tuyishime.png',
+    'published',
+    1,
+    -10000,
+    NOW()
+  );
+
 CREATE TABLE IF NOT EXISTS `resident_best_practices` (
   `id` int NOT NULL AUTO_INCREMENT,
   `teacherId` int NOT NULL,

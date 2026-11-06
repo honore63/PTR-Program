@@ -41,7 +41,14 @@ function database(): PDO
     static $pdo;
     if (!$pdo) {
         $settings = config();
-        $dsn = sprintf('mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4', $settings['db_host'], $settings['db_port'], $settings['db_name']);
+        $dbHost = trim((string) ($settings['db_host'] ?? ''));
+        $dbUser = trim((string) ($settings['db_user'] ?? ''));
+        $dbPassword = (string) ($settings['db_password'] ?? '');
+        $dbName = trim((string) ($settings['db_name'] ?? ''));
+        if ($dbHost === '' || $dbUser === '' || $dbName === '') {
+            throw new RuntimeException('Database configuration is incomplete: DB_HOST, DB_NAME, and DB_USER must be configured.');
+        }
+        $dsn = sprintf('mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4', $dbHost, (int) ($settings['db_port'] ?? 3306), $dbName);
         $options = [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -54,7 +61,7 @@ function database(): PDO
             $options[PDO::MYSQL_ATTR_SSL_CA] = $settings['db_ssl_ca'];
             $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = true;
         }
-        $pdo = new PDO($dsn, $settings['db_user'], $settings['db_password'], $options);
+        $pdo = new PDO($dsn, $dbUser, $dbPassword, $options);
         ensureDatabaseSchema($pdo);
     }
     return $pdo;
@@ -746,10 +753,17 @@ function routeRequest(): void
             'primaryColor' => '#0b2347',
             'accentColor' => '#0098d9',
         ];
-        foreach (database()->query('SELECT settingKey, settingValue FROM websiteSettings')->fetchAll() as $row) {
-            if (isPublicWebsiteSetting((string) $row['settingKey'])) {
-                $settings[$row['settingKey']] = $row['settingValue'];
+        try {
+            $tableExists = database()->query("SHOW TABLES LIKE 'websiteSettings'")->fetchColumn();
+            if ($tableExists) {
+                foreach (database()->query('SELECT settingKey, settingValue FROM websiteSettings')->fetchAll() as $row) {
+                    if (isPublicWebsiteSetting((string) $row['settingKey'])) {
+                        $settings[$row['settingKey']] = $row['settingValue'];
+                    }
+                }
             }
+        } catch (Throwable $error) {
+            error_log('PTRP settings endpoint database failure: ' . $error->getMessage());
         }
         respond($settings);
     }

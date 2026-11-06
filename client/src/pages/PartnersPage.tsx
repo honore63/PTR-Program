@@ -1,6 +1,7 @@
 import { ArrowUpRight, Globe2, Handshake, HeartHandshake, Landmark, School, Sparkles, UsersRound } from "lucide-react";
 import { Link } from "wouter";
 import { PageHero } from "@/components/ptrp/PageHero";
+import { PublicImage } from "@/components/ptrp/PublicImage";
 import { SectionHeading } from "@/components/ptrp/SectionHeading";
 import { brand, partners } from "@/data/ptrp";
 
@@ -29,7 +30,7 @@ export default function PartnersPage() {
             <div className="flex items-start justify-between gap-5">
               <span className="flex size-16 shrink-0 items-center justify-center border border-[#dce8ed] bg-white p-2">
                 {partner.logo ? (
-                  <img src={`${import.meta.env.BASE_URL}${partner.logo.startsWith("/") ? partner.logo.slice(1) : partner.logo}`} alt={`${partner.name} logo`} className="max-h-12 max-w-[52px] object-contain" loading="lazy" />
+                  <PublicImage src={partner.logo} alt={`${partner.name} logo`} className="h-12 w-[52px] object-contain" loading="lazy" />
                 ) : (
                   <span className="text-[0.78rem] font-extrabold tracking-[0.04em] text-[#0098d9]">{initials(partner.shortName)}</span>
                 )}

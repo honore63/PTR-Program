@@ -12,13 +12,14 @@ import {
   UsersRound,
 } from "lucide-react";
 import { PageHero } from "@/components/ptrp/PageHero";
+import { PublicImage } from "@/components/ptrp/PublicImage";
 import { SectionHeading } from "@/components/ptrp/SectionHeading";
 import {
   coordinatorsPlaceholder,
   mentorsPlaceholder,
   ProgramTeamMember,
 } from "@/data/ptrp";
-import { queryKeys, resolveMediaUrl, useApiQuery } from "@/lib/api";
+import { queryKeys, useApiQuery } from "@/lib/api";
 
 const organizations = ["All organizations", "TTC De La Salle Byumba", "De La Salle", "SAVE"];
 const coordinatorOrganizations = ["TTC De La Salle Byumba", "SAVE"];
@@ -257,8 +258,8 @@ function TeamMemberCard({ member }: { member: ProgramTeamMember }) {
     <article className="overflow-hidden rounded-xl border border-[#dce8ed] bg-white shadow-sm transition-shadow hover:shadow-lg">
       <div className="relative aspect-[16/9] overflow-hidden bg-[#e8f2f6]">
         {member.photoUrl ? (
-          <img
-            src={resolveMediaUrl(member.photoUrl) ?? member.photoUrl}
+          <PublicImage
+            src={member.photoUrl}
             alt={`Portrait of ${member.fullName}`}
             className="h-full w-full object-cover object-center"
             loading="lazy"

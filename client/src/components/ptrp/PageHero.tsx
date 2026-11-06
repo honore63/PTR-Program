@@ -3,7 +3,7 @@ import { GraduationCap } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useLocation } from "wouter";
 import { queryKeys, useApiQuery } from "@/lib/api";
-import { BannerImage } from "./BannerImage";
+import { PublicImage } from "./PublicImage";
 import { RotatingBannerHeading } from "./RotatingBannerHeading";
 import { getBannerHeadings } from "./bannerHeadings";
 
@@ -69,13 +69,14 @@ export function PageHero({ eyebrow, title, description, meta, icon: Icon = Gradu
     <>
       <section className={`page-banner relative isolate flex min-h-[300px] items-center overflow-hidden bg-[#071935] text-white sm:min-h-[360px] lg:min-h-[410px] ${showImage ? "page-banner-photo" : ""}`}>
         {showImage && (
-          <BannerImage
+          <PublicImage
             src={bannerImage}
             fallbackSrc={[fallbackImage, defaultBannerImages.about]}
             alt={banner?.imageAlt || imageAlt || `${title} banner`}
             className="page-banner-image absolute inset-0 -z-10 h-full w-full object-cover"
             objectPosition={banner?.imagePosition || "center"}
             fetchPriority="high"
+            loading="eager"
           />
         )}
         <div className="page-banner-overlay absolute inset-0 -z-10" />

@@ -5,6 +5,7 @@ import {
   RefreshCw, Smartphone, FileVideo, Trash2, Plus,
 } from "lucide-react";
 import { useState } from "react";
+import { PublicImage } from "@/components/ptrp/PublicImage";
 
 const platformLabels: Record<string, string> = {
   facebook: "Facebook",
@@ -139,7 +140,7 @@ export function SocialManager({
       <td><span style={{ color: platformColor[row.platform] || "#0098d9", fontWeight: 700 }}>{platformLabels[row.platform]}</span></td>
       <td><strong>{row.authorName || "Unknown"}</strong></td>
       <td className="admin-social-preview">
-        {row.mediaUrl && row.mediaType === "image" ? <img src={row.mediaUrl} alt={row.message} className="social-thumb" loading="lazy" /> : row.mediaType === "video" ? <FileVideo className="size-4 text-[#0098d9]" /> : <span className="text-[#6b7280]">Text post</span>}
+        {row.mediaUrl && row.mediaType === "image" ? <PublicImage src={row.mediaUrl} alt={row.message} className="social-thumb" loading="lazy" /> : row.mediaType === "video" ? <FileVideo className="size-4 text-[#0098d9]" /> : <span className="text-[#6b7280]">Text post</span>}
         <span className="social-text">{row.message || ""}</span>
       </td>
       <td>{row.publishedAt ? new Date(row.publishedAt).toLocaleDateString() : "—"}</td>

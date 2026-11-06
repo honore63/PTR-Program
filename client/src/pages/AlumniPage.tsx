@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { PageHero } from "@/components/ptrp/PageHero";
+import { PublicImage } from "@/components/ptrp/PublicImage";
 import { SectionHeading } from "@/components/ptrp/SectionHeading";
 import { apiRequest } from "@/lib/api";
 import { alumniFields, featuredHonoreTuyishime, hostColleges, modelSchools, residentTeacherPhotoUrl } from "@/data/ptrp";
@@ -169,7 +170,7 @@ export default function AlumniPage() {
         <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((profile) => <article key={profile.id} className="flex h-full flex-col border border-[#e2eef0] bg-white p-6 transition-colors hover:border-[#0098d9]">
             <div className="flex items-start justify-between gap-4">
-              {profile.photoUrl ? <img src={residentTeacherPhotoUrl(profile.photoUrl) ?? undefined} alt={`Portrait of ${profile.name}`} className="size-16 rounded-full object-cover" /> : <div className="flex size-16 items-center justify-center rounded-full bg-[#e8f2f6] text-[#0098d9]"><UserRound className="size-7" strokeWidth={1.5} /></div>}
+              {profile.photoUrl ? <PublicImage src={residentTeacherPhotoUrl(profile.photoUrl) ?? ""} alt={`Portrait of ${profile.name}`} className="size-16 rounded-full object-cover" /> : <div className="flex size-16 items-center justify-center rounded-full bg-[#e8f2f6] text-[#0098d9]"><UserRound className="size-7" strokeWidth={1.5} /></div>}
               <span className="inline-flex items-center gap-1.5 border border-[#d6ecdf] bg-[#f1faf4] px-2.5 py-1 text-[0.58rem] font-extrabold uppercase tracking-[0.08em] text-[#25754a]">Verified profile</span>
             </div>
             <h3 className="mt-5 text-lg font-extrabold leading-tight tracking-[-0.03em] text-[#0b2347]">{profile.name}</h3>

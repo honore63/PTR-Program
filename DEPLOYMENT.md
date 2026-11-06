@@ -216,6 +216,8 @@ pnpm exec vite build --base=/ --outDir dist/public --emptyOutDir
 pnpm build:static
 ```
 
+The XAMPP asset-path rewrite is enabled only for the `/PTRP/` Vite base. Root deployments preserve the `/storage/` and `/manus-storage/` public asset paths; the rewrite does not depend on Render-specific build environment variables.
+
 ---
 
 ## 6. Deploy files

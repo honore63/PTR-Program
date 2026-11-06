@@ -30,7 +30,7 @@ import {
 } from "@/data/ptrp";
 import { StatCard } from "@/components/ptrp/ContentCards";
 import { RotatingBannerHeading } from "@/components/ptrp/RotatingBannerHeading";
-import { BannerImage, resolvePublicImageUrl } from "@/components/ptrp/BannerImage";
+import { PublicImage } from "@/components/ptrp/PublicImage";
 import { getBannerHeadings } from "@/components/ptrp/bannerHeadings";
 import { SectionHeading } from "@/components/ptrp/SectionHeading";
 import { queryKeys, useApiQuery } from "@/lib/api";
@@ -83,7 +83,7 @@ export default function Home({ language }: HomeProps) {
       {activeSlide && (
         <div className="absolute inset-0 -z-10" aria-hidden="true">
           {slides.map((photo, index) => (
-            <BannerImage
+            <PublicImage
               key={photo.src}
               src={photo.src}
               fallbackSrc={["gallery/gallery-07.jpg", "gallery/gallery-01.jpg"]}
@@ -182,7 +182,7 @@ export default function Home({ language }: HomeProps) {
           </div>
           <div className="relative">
             <div className="overflow-hidden border border-[#dce8ed] bg-[#eef7fa] shadow-[0_24px_70px_rgba(11,35,71,0.12)]">
-              <img src={resolvePublicImageUrl(officialPilot.image)} alt="Teacher residents and education leaders at the PTRP pilot launch" className="aspect-[4/3] w-full object-contain" loading="lazy" />
+              <PublicImage src={officialPilot.image} alt="Teacher residents and education leaders at the PTRP pilot launch" className="aspect-[4/3] w-full object-contain" loading="lazy" />
               <div className="flex flex-col gap-2 border-t border-[#dce8ed] bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-[0.7rem] font-extrabold uppercase tracking-[0.1em] text-[#0b2347]">Pilot launch · Kigali, 4 October 2023</p>
                 <a href={officialPilot.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[0.66rem] font-bold uppercase tracking-[0.08em] text-[#0098d9] hover:text-[#007ab0]">MINEDUC source <ArrowUpRight className="size-3.5" /></a>
@@ -307,7 +307,7 @@ export default function Home({ language }: HomeProps) {
         <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           {partners.map((partner) => <Link key={partner.shortName} href="/partners" className="group flex min-h-28 flex-col items-center justify-center gap-3 border border-[#e2eef0] bg-white p-4 transition-all duration-300 hover:-translate-y-1 hover:border-[#0098d9] hover:shadow-lg">
             {partner.logo ? (
-              <img src={`${import.meta.env.BASE_URL}${partner.logo.startsWith("/") ? partner.logo.slice(1) : partner.logo}`} alt={`${partner.name} logo`} className="h-10 w-auto max-w-[110px] object-contain transition-transform duration-300 group-hover:scale-110" loading="lazy" />
+              <PublicImage src={partner.logo} alt={`${partner.name} logo`} className="h-10 min-w-[2.5rem] max-w-[110px] object-contain transition-transform duration-300 group-hover:scale-110" loading="lazy" />
             ) : (
               <span className="text-[0.68rem] font-extrabold uppercase tracking-[0.1em] text-[#0098d9]">{partner.shortName}</span>
             )}

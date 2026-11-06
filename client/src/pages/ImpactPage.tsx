@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { PageHero } from "@/components/ptrp/PageHero";
+import { PublicImage } from "@/components/ptrp/PublicImage";
 import { SectionHeading } from "@/components/ptrp/SectionHeading";
 import { impactContent, keyNumbers, officialSocialVideo, programOverview } from "@/data/ptrp";
 
@@ -45,7 +46,7 @@ export default function ImpactPage() {
             </div>
           </div>
           <div className="overflow-hidden border border-[#dce8ed] bg-[#f8fbfc] shadow-[0_20px_60px_rgba(11,35,71,0.1)]">
-            <img src="/manus-storage/ptrp-pilot-launch.jpg" alt="The first PTRP cohort at the commissioning celebration" className="aspect-[4/3] w-full object-contain" loading="lazy" />
+            <PublicImage src="/manus-storage/ptrp-pilot-launch.jpg" alt="The first PTRP cohort at the commissioning celebration" className="aspect-[4/3] w-full object-contain" loading="lazy" />
             <div className="grid grid-cols-3 divide-x divide-[#e2eef0] border-t border-[#e2eef0] bg-white">
               {keyNumbers.slice(0, 3).map((stat) => <div key={stat.label} className="p-4 text-center"><p className="text-2xl font-extrabold tracking-[-0.05em] text-[#0b2347]">{stat.value}{stat.suffix}</p><p className="mt-1 text-[0.58rem] font-extrabold uppercase leading-4 tracking-[0.06em] text-[#7b8da2]">{stat.label}</p></div>)}
             </div>

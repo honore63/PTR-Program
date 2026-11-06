@@ -3,17 +3,12 @@ import { ArrowUpRight, Camera, CheckCircle2, PlayCircle, ShieldCheck, X } from "
 import { Link } from "wouter";
 import { PageHero } from "@/components/ptrp/PageHero";
 import { SectionHeading } from "@/components/ptrp/SectionHeading";
-import { apiRequest, resolveMediaUrl } from "@/lib/api";
+import { apiRequest } from "@/lib/api";
+import { PublicImage } from "@/components/ptrp/PublicImage";
 import { galleryAlbums, galleryPhotos, galleryRules } from "@/data/ptrp";
 
 type Album = typeof galleryAlbums[number];
 type GalleryPhoto = { src: string; alt: string };
-
-const publicImageUrl = (image: string) => {
-  const resolvedUrl = resolveMediaUrl(image) ?? image;
-  if (/^https?:\/\//i.test(resolvedUrl) || resolvedUrl.startsWith(import.meta.env.BASE_URL)) return resolvedUrl;
-  return `${import.meta.env.BASE_URL}${resolvedUrl.replace(/^\/+/, "")}`;
-};
 
 export default function GalleryPage() {
   const [activeAlbum, setActiveAlbum] = useState<Album | null>(null);
@@ -67,7 +62,7 @@ export default function GalleryPage() {
         <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {galleryAlbums.map((album, index) => <button key={album.title} type="button" onClick={() => setActiveAlbum(album)} className={`group flex flex-col overflow-hidden border border-[#dce8ed] bg-white text-left transition-shadow hover:shadow-lg ${index === 0 ? "lg:col-span-2" : ""}`}>
             <div className={`relative w-full overflow-hidden bg-gradient-to-br ${album.gradient} ${index === 0 ? "aspect-[16/9]" : "aspect-[4/3]"}`}>
-              {album.image && <img src={publicImageUrl(album.image)} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" loading="lazy" />}
+              {album.image && <PublicImage src={album.image} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" loading="lazy" />}
               {album.videoUrl && <PlayCircle className="absolute right-4 top-4 size-6 text-white drop-shadow" />}
             </div>
             <div className="flex flex-1 flex-col p-5">
@@ -88,7 +83,7 @@ export default function GalleryPage() {
         <div className="mt-12 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {photos.map((photo, index) => (
             <button key={photo.src} type="button" onClick={() => setLightboxIndex(index)} className="group relative aspect-square overflow-hidden border border-[#dce8ed] bg-white" aria-label={`View photo ${index + 1}`}>
-              <img src={publicImageUrl(photo.src)} alt={photo.alt} className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-[1.03]" loading="lazy" />
+              <PublicImage src={photo.src} alt={photo.alt} className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-[1.03]" loading="lazy" />
             </button>
           ))}
         </div>
@@ -100,7 +95,9 @@ export default function GalleryPage() {
         <button type="button" onClick={() => setLightboxIndex(null)} className="absolute right-4 top-4 z-10 flex size-10 items-center justify-center border border-white/20 bg-white/10 text-white hover:bg-white/20" aria-label="Close photo"><X className="size-5" /></button>
         <button type="button" onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => (i! - 1 + photos.length) % photos.length); }} className="absolute left-4 top-1/2 z-10 flex size-10 -translate-y-1/2 items-center justify-center border border-white/20 bg-white/10 text-white hover:bg-white/20" aria-label="Previous photo">‹</button>
         <button type="button" onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => (i! + 1) % photos.length); }} className="absolute right-4 top-1/2 z-10 flex size-10 -translate-y-1/2 items-center justify-center border border-white/20 bg-white/10 text-white hover:bg-white/20" aria-label="Next photo">›</button>
-        <img src={publicImageUrl(photos[lightboxIndex].src)} alt={photos[lightboxIndex].alt} className="max-h-[85vh] max-w-[90vw] object-contain shadow-2xl" onClick={(e) => e.stopPropagation()} />
+        <div onClick={(event) => event.stopPropagation()}>
+          <PublicImage src={photos[lightboxIndex].src} alt={photos[lightboxIndex].alt} className="max-h-[85vh] max-w-[90vw] object-contain shadow-2xl" />
+        </div>
         <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[0.7rem] font-bold uppercase tracking-[0.1em] text-white/60">{lightboxIndex + 1} / {photos.length}</p>
       </div>
     )}
@@ -130,7 +127,7 @@ export default function GalleryPage() {
     {activeAlbum && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[#071935]/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`${activeAlbum.title} album`} onClick={() => setActiveAlbum(null)}>
       <div className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto border border-white/15 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <button type="button" onClick={() => setActiveAlbum(null)} className="absolute right-4 top-4 z-10 flex size-10 items-center justify-center border border-[#d1d5db] bg-white text-[#0b2347] hover:border-[#0098d9] hover:text-[#0098d9]" aria-label="Close album"><X className="size-5" /></button>
-        {activeAlbum.videoUrl ? <div className="social-video-frame"><iframe src="https://www.youtube.com/embed/kDFHWe75e-I?rel=0" title={activeAlbum.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen /></div> : activeAlbum.image ? <img src={activeAlbum.image} alt={activeAlbum.title} className="aspect-[16/10] w-full object-contain" /> : <div className={`flex aspect-[16/10] items-center justify-center bg-gradient-to-br ${activeAlbum.gradient}`}><Camera className="size-14 text-white/60" /></div>}
+        {activeAlbum.videoUrl ? <div className="social-video-frame"><iframe src="https://www.youtube.com/embed/kDFHWe75e-I?rel=0" title={activeAlbum.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen /></div> : activeAlbum.image ? <PublicImage src={activeAlbum.image} alt={activeAlbum.title} className="aspect-[16/10] w-full object-contain" /> : <div className={`flex aspect-[16/10] items-center justify-center bg-gradient-to-br ${activeAlbum.gradient}`}><Camera className="size-14 text-white/60" /></div>}
         <div className="p-6 sm:p-8">
           <div className="flex flex-wrap items-center gap-3 text-[0.62rem] font-extrabold uppercase tracking-[0.1em] text-[#0098d9]"><span>{activeAlbum.date}</span>{activeAlbum.credit && <span className="text-[#8a9bab]">{activeAlbum.credit}</span>}</div>
           <h2 className="mt-3 text-3xl font-extrabold tracking-[-0.045em] text-[#0b2347]">{activeAlbum.title}</h2>

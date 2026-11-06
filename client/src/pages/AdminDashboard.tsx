@@ -14,7 +14,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SocialManager } from "./SocialManager";
 import { CmsPageRenderer, parseCmsPageLayout, type CmsPageSection } from "@/components/ptrp/CmsPageRenderer";
-import { BannerImage } from "@/components/ptrp/BannerImage";
+import { PublicImage } from "@/components/ptrp/PublicImage";
 import { residentTeacherPhotoUrl } from "@/data/ptrp";
 
 type AdminTab =
@@ -941,7 +941,7 @@ function BannerManager({ rows, onSave, onDelete, saving, deleting }: { rows: any
       <section className="admin-panel">
         <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Live preview</p><h3>{selectedPage.label} banner</h3></div></div>
         <div className="relative flex min-h-64 items-center overflow-hidden bg-[#071935] px-6 py-10 sm:px-10" aria-label="Banner preview">
-          {form.isVisible && <BannerImage src={form.imageUrl || selectedPage.imageUrl} fallbackSrc={[selectedPage.imageUrl, "gallery/gallery-01.jpg"]} alt="" className="absolute inset-0 h-full w-full object-cover" objectPosition={form.imagePosition} />}
+          {form.isVisible && <PublicImage src={form.imageUrl || selectedPage.imageUrl} fallbackSrc={[selectedPage.imageUrl, "gallery/gallery-01.jpg"]} alt="" className="absolute inset-0 h-full w-full object-cover" objectPosition={form.imagePosition} />}
           <div className="absolute inset-0 bg-gradient-to-r from-[#071935]/95 via-[#071935]/70 to-[#071935]/25" />
           <div className="relative max-w-2xl text-white">
             <p className="text-[0.62rem] font-extrabold uppercase tracking-[0.16em] text-[#7dd3fc]">PTR Alumni Network · {form.eyebrow || selectedPage.label}</p>
@@ -1059,7 +1059,7 @@ function UploadManager({ rows, altText, setAltText, fileRef, onFile, uploading, 
         <div className="admin-media-grid">
           {rows.length ? rows.map((row: any) => (
             <article className="admin-media-card" key={row.id}>
-              {row.mimeType?.startsWith("image/") ? <img src={resolveMediaUrl(row.url) ?? row.url} alt={row.altText || row.filename} /> : <div className="admin-media-file"><FileText className="size-7" /><span>{row.mimeType?.split("/").pop()}</span></div>}
+              {row.mimeType?.startsWith("image/") ? <PublicImage src={row.url} alt={row.altText || row.filename} className="h-[150px] w-full object-cover" /> : <div className="admin-media-file"><FileText className="size-7" /><span>{row.mimeType?.split("/").pop()}</span></div>}
               <div className="admin-media-meta"><strong title={row.filename}>{row.filename}</strong><span>{Math.round(row.size / 1024)} KB · {row.status}</span><div className="admin-media-actions"><a href={row.url} target="_blank" rel="noreferrer">Open</a><button onClick={() => onArchive(row.id)}>Archive</button></div></div>
             </article>
           )) : <p className="admin-empty">No uploads yet.</p>}
@@ -1713,7 +1713,7 @@ function TeamManager({ rows, role, onDelete, onRefresh }: { rows: any[]; role: "
           </label>
           {form.photoUrl && (
             <div className="flex items-center gap-3">
-              <img src={resolveMediaUrl(form.photoUrl) ?? form.photoUrl} alt={`Profile photo preview for ${form.fullName || "team member"}`} className="size-16 rounded-lg object-cover" />
+              <PublicImage src={form.photoUrl} alt={`Profile photo preview for ${form.fullName || "team member"}`} className="size-16 rounded-lg object-cover" />
               <span className="text-xs font-semibold text-[#4e677f]">Current profile photo</span>
             </div>
           )}
@@ -1834,7 +1834,7 @@ function ResidentTeachersManager({ rows, onSave, onSetStatus, onDelete, onRefres
             <label className="admin-full">Contributions<textarea value={form.contributions} onChange={(e) => setForm({ ...form, contributions: e.target.value })} rows={3} /></label>
             <label className="admin-full">Upload profile photo<input ref={photoInputRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" disabled={uploadingPhoto} onChange={(event) => event.target.files?.[0] && uploadPhoto(event.target.files[0])} /><span>{uploadingPhoto ? "Uploading securely…" : "JPG, PNG, GIF, or WEBP · max 10 MB"}</span></label>
             <label className="admin-full">Photo URL<input value={form.photoUrl} onChange={(e) => setForm({ ...form, photoUrl: e.target.value })} /></label>
-            {form.photoUrl && <div className="admin-full"><img src={residentTeacherPhotoUrl(form.photoUrl) ?? undefined} alt={`Profile photo preview for ${form.fullName || "resident teacher"}`} className="size-24 rounded-lg object-cover" /></div>}
+            {form.photoUrl && <div className="admin-full"><PublicImage src={residentTeacherPhotoUrl(form.photoUrl) || ""} alt={`Profile photo preview for ${form.fullName || "resident teacher"}`} className="size-24 rounded-lg object-cover" /></div>}
             <label>Status<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{statuses.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select></label>
             <label>Featured<input type="checkbox" checked={form.isFeatured} onChange={(e) => setForm({ ...form, isFeatured: e.target.checked })} /></label>
             <label>PTRP Alumni Network member<input type="checkbox" checked={form.isAlumni} onChange={(e) => setForm({ ...form, isAlumni: e.target.checked })} /></label>

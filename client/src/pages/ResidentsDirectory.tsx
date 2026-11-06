@@ -10,6 +10,7 @@ import {
   residentTeacherPhotoUrl, residentTeacherStatusLabels, residentTeacherStatusColors,
 } from "@/data/ptrp";
 import { PageHero } from "@/components/ptrp/PageHero";
+import { PublicImage } from "@/components/ptrp/PublicImage";
 import { SectionHeading } from "@/components/ptrp/SectionHeading";
 
 export default function ResidentsDirectory() {
@@ -248,7 +249,7 @@ function TeacherCard({ teacher, featured }: { teacher: ResidentTeacher; featured
       )}
       <div className="relative mx-auto mb-4 flex h-[360px] w-full max-w-[320px] items-center justify-center overflow-hidden rounded-lg bg-[#f0f4f8]">
         {photoUrl ? (
-          <img
+          <PublicImage
             src={photoUrl}
             alt={`${teacher.fullName} photo`}
             className="h-full w-full object-contain"

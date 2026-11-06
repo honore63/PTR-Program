@@ -25,11 +25,15 @@ function vitePluginPublicPlatformConfig(): Plugin {
 }
 
 function vitePluginXamppAssetPaths(): Plugin {
+  let usesXamppBasePath = false;
   return {
     name: "xampp-asset-paths",
     enforce: "pre",
+    configResolved(config) {
+      usesXamppBasePath = config.base === "/PTRP/";
+    },
     transform(code) {
-      if (process.env.VERCEL === "1" || process.env.RENDER === "true") return null;
+      if (!usesXamppBasePath) return null;
       if (!code.includes("/storage/") && !code.includes("/manus-storage/") && !code.includes('window.location.href = "/"') && !code.includes('<a href="/" className="admin-back-link"')) return null;
       return code
         .replaceAll("/storage/", "/PTRP/storage/")

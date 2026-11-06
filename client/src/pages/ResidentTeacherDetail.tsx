@@ -12,6 +12,7 @@ import {
   residentTeacherStatusLabels, residentTeacherStatusColors, type ResidentTeacher,
 } from "@/data/ptrp";
 import { PageHero } from "@/components/ptrp/PageHero";
+import { PublicImage } from "@/components/ptrp/PublicImage";
 import { SectionHeading } from "@/components/ptrp/SectionHeading";
 
 export default function ResidentTeacherDetail() {
@@ -101,7 +102,7 @@ export default function ResidentTeacherDetail() {
           <div className="space-y-6">
             <div className="relative group">
               {photoUrl ? (
-                <img
+                <PublicImage
                   src={photoUrl}
                   alt={`${teacher.fullName} - Professional portrait`}
                   className="w-full max-h-[640px] aspect-[2/3] object-contain rounded-2xl bg-[#f0f4f8] shadow-lg"
@@ -253,7 +254,7 @@ export default function ResidentTeacherDetail() {
                       {bp.mediaUrl && (
                         <div className="mt-4">
                           {bp.mediaType === "image" ? (
-                            <img src={bp.mediaUrl} alt={bp.title} className="w-full h-32 object-cover rounded-lg" loading="lazy" />
+                            <PublicImage src={bp.mediaUrl} alt={bp.title} className="w-full h-32 object-cover rounded-lg" loading="lazy" />
                           ) : bp.mediaType && (
                             <a href={bp.mediaUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-4 py-3 rounded-lg border border-[#e2eef0] bg-[#f8fbfc] text-left text-sm font-semibold text-[#0098d9] hover:bg-[#e0f2fe] transition-colors">
                               <LinkIcon className="size-4" /> {bp.mediaType.toUpperCase()} Document

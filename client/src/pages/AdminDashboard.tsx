@@ -430,7 +430,7 @@ export default function AdminDashboard() {
     { id: "banners", label: "Page banners", icon: ImagePlus },
     { id: "uploads", label: "Media uploads", icon: ImagePlus },
     { id: "schools", label: "Schools", icon: School },
-    { id: "teachers", label: "Resident teachers", icon: GraduationCap },
+    { id: "teachers", label: "Teacher applications", icon: GraduationCap },
     { id: "alumni", label: "Alumni", icon: UsersRound },
     { id: "news", label: "News & events", icon: BookOpen },
     { id: "gallery", label: "Gallery", icon: ImagePlus },
@@ -488,7 +488,7 @@ export default function AdminDashboard() {
         <header className="admin-header">
           <div>
             <p className="eyebrow text-[#168d6d]">Protected administration</p>
-            <h1>{tab === "overview" ? "Keep every public surface trustworthy." : tab === "content" ? "Edit website content" : tab === "banners" ? "Manage page image banners" : tab === "uploads" ? "Manage media uploads" : tab === "schools" ? "Manage model schools" : tab === "teachers" ? "Manage resident teachers" : tab === "alumni" ? "Manage alumni" : tab === "news" ? "Manage news and events" : tab === "gallery" ? "Manage gallery" : tab === "practices" ? "Manage best practices" : tab === "social" ? "Social Media Integration" : tab === "coordinators" ? "Program Coordinators" : tab === "mentors" ? "Program Mentors" : tab === "resident-teachers" ? "Resident Teachers" : tab === "resident-best-practices" ? "Best Practices" : tab === "navigation" ? "Manage website navigation" : tab === "settings" ? "Website identity and contact settings" : tab === "notifications" ? "Admin notifications" : tab === "contact-messages" ? "Contact message inbox" : tab === "analytics" ? "Website analytics" : "Access and roles"}</h1>
+            <h1>{tab === "overview" ? "Keep every public surface trustworthy." : tab === "content" ? "Edit website content" : tab === "banners" ? "Manage page image banners" : tab === "uploads" ? "Manage media uploads" : tab === "schools" ? "Manage model schools" : tab === "teachers" ? "Manage teacher applications" : tab === "alumni" ? "Manage alumni" : tab === "news" ? "Manage news and events" : tab === "gallery" ? "Manage gallery" : tab === "practices" ? "Manage best practices" : tab === "social" ? "Social Media Integration" : tab === "coordinators" ? "Program Coordinators" : tab === "mentors" ? "Program Mentors" : tab === "resident-teachers" ? "Resident Teachers" : tab === "resident-best-practices" ? "Best Practices" : tab === "navigation" ? "Manage website navigation" : tab === "settings" ? "Website identity and contact settings" : tab === "notifications" ? "Admin notifications" : tab === "contact-messages" ? "Contact message inbox" : tab === "analytics" ? "Website analytics" : "Access and roles"}</h1>
             <p>Signed in as <strong>{user.name || user.email || (isAdmin ? "Administrator" : "Content editor")}</strong>. Editors manage pages, banners, media, and navigation; administrator-only modules remain restricted.</p>
           </div>
           <div className="admin-header-actions"><span className="admin-user-pill"><span className="admin-online-dot" /> {isAdmin ? "Admin" : "Editor"}</span><button className="admin-icon-button" onClick={() => window.location.href = "/"} aria-label="Close admin workspace"><X className="size-4" /></button></div>
@@ -634,7 +634,8 @@ function OverviewPanel({ stats, recentUpdates, onNavigate, onSeedHome }: any) {
     { id: "content", label: "Public pages", value: stats?.publicPageCount ?? cmsPageCatalog.length, desc: "Editable website routes" },
     { id: "content", label: "Content items", value: stats?.contentCount ?? 0, desc: `${stats?.publishedCount ?? 0} published · ${stats?.draftCount ?? 0} drafts or hidden` },
     { id: "schools", label: "Model schools", value: stats?.schoolCount ?? 0, desc: "TTC-partner demonstration schools" },
-    { id: "teachers", label: "Resident teachers", value: stats?.teacherCount ?? 0, desc: `${stats?.pendingTeachers ?? 0} pending review` },
+    { id: "resident-teachers", label: "Resident teachers", value: stats?.residentTeacherCount ?? 0, desc: `${stats?.pendingResidentTeachers ?? 0} pending review` },
+    { id: "teachers", label: "Teacher applications", value: stats?.teacherCount ?? 0, desc: `${stats?.pendingTeachers ?? 0} pending review` },
     { id: "alumni", label: "Alumni network", value: stats?.alumniCount ?? 0, desc: `${stats?.pendingAlumni ?? 0} pending review` },
     { id: "news", label: "News & updates", value: stats?.newsCount ?? 0, desc: "Articles, briefings, events" },
     { id: "gallery", label: "Gallery records", value: stats?.galleryCount ?? 0, desc: "Photos & event videos" },
@@ -656,7 +657,7 @@ function OverviewPanel({ stats, recentUpdates, onNavigate, onSeedHome }: any) {
       </div>
       <section className="admin-panel">
         <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Quick start</p><h3>Editorial workflows</h3></div></div>
-        <p className="admin-muted">Manage the PTR Alumni Network repository from this workspace. Publish verified news, maintain alumni and teacher directories, and upload approved media assets.</p>
+        <p className="admin-muted">These totals show records managed in the admin database. Public pages can also display bundled PTRP content when a database section has no records.</p>
         <div className="admin-starter-grid">
           {starterPages.map((item) => (
             <article className="admin-starter-card" key={item.slug}>
@@ -1480,11 +1481,12 @@ function AlumniManager({ rows, schools, onDelete, onRefresh }: any) {
         <div className="admin-form-actions"><button className="button-primary" onClick={submit} disabled={saving}>{saving ? "Saving…" : "Save alumni"}</button></div>
       </section>
       <section className="admin-panel">
-        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Alumni members</p><h3>{rows.length} records</h3></div></div>
+        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Alumni members</p><h3>{rows.length} standalone records</h3></div></div>
+        <p className="admin-muted">Resident teachers marked as PTRP Alumni Network members are managed in the Resident Teachers section so their profiles stay in sync.</p>
         <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Name</th><th>Graduation</th><th>Status</th><th /></tr></thead><tbody>
           {rows.length ? rows.map((row: any) => (
             <tr key={row.id}><td><strong>{row.fullName}</strong><span>{row.email}</span></td><td>{row.graduationYear || "—"}</td><td><span className={`admin-status ${row.status === "approved" ? "admin-status-published" : "admin-status-draft"}`}>{row.status}</span></td><td className="admin-row-actions"><button className="admin-table-action" onClick={() => setForm({ id: row.id, fullName: row.fullName, email: row.email ?? "", phone: row.phone ?? "", graduationYear: row.graduationYear ?? "", schoolId: row.schoolId ?? "", bio: row.bio ?? "", status: row.status })}>Edit</button><button className="admin-table-action admin-danger" onClick={() => onDelete(row.id)}><Trash2 className="size-3.5" /></button></td></tr>
-          )) : <tr><td colSpan={4} className="admin-empty">No alumni yet.</td></tr>}
+          )) : <tr><td colSpan={4} className="admin-empty">No standalone alumni records yet. Check Resident Teachers for members flagged as alumni.</td></tr>}
         </tbody></table></div>
       </section>
     </div>
@@ -1745,7 +1747,7 @@ function ResidentTeachersManager({ rows, onSave, onSetStatus, onDelete, onRefres
     id: 0, fullName: "", email: "", phone: "", gender: "", modelSchool: "",
     position: "", bestPractice: "", bestPracticeDescription: "", subjects: "",
     skills: "", contributions: "", bio: "", photoUrl: "",
-    status: "pending", isFeatured: false, displayOrder: 0,
+    status: "pending", isFeatured: false, isAlumni: false, displayOrder: 0,
   });
   const [savingLocal, setSavingLocal] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -1762,7 +1764,7 @@ function ResidentTeachersManager({ rows, onSave, onSetStatus, onDelete, onRefres
     setSavingLocal(true);
     try {
       await onSave({ ...form, id: form.id || undefined, isFeatured: form.isFeatured, displayOrder: form.displayOrder ? Number(form.displayOrder) : 0 });
-      setForm({ id: 0, fullName: "", email: "", phone: "", gender: "", modelSchool: "", position: "", bestPractice: "", bestPracticeDescription: "", subjects: "", skills: "", contributions: "", bio: "", photoUrl: "", status: "pending", isFeatured: false, displayOrder: 0 });
+      setForm({ id: 0, fullName: "", email: "", phone: "", gender: "", modelSchool: "", position: "", bestPractice: "", bestPracticeDescription: "", subjects: "", skills: "", contributions: "", bio: "", photoUrl: "", status: "pending", isFeatured: false, isAlumni: false, displayOrder: 0 });
       setEditingId(null);
       onRefresh();
     } catch (error: any) { toast.error(error.message); } finally { setSavingLocal(false); }
@@ -1839,16 +1841,17 @@ function ResidentTeachersManager({ rows, onSave, onSetStatus, onDelete, onRefres
             {form.photoUrl && <div className="admin-full"><img src={residentTeacherPhotoUrl(form.photoUrl) ?? undefined} alt={`Profile photo preview for ${form.fullName || "resident teacher"}`} className="size-24 rounded-lg object-cover" /></div>}
             <label>Status<select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{statuses.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}</select></label>
             <label>Featured<input type="checkbox" checked={form.isFeatured} onChange={(e) => setForm({ ...form, isFeatured: e.target.checked })} /></label>
+            <label>PTRP Alumni Network member<input type="checkbox" checked={form.isAlumni} onChange={(e) => setForm({ ...form, isAlumni: e.target.checked })} /></label>
             <label>Display order<input type="number" value={form.displayOrder} onChange={(e) => setForm({ ...form, displayOrder: Number(e.target.value) || 0 })} /></label>
           </div>
           <div className="admin-form-actions"><button className="button-primary" onClick={submit} disabled={savingLocal || saving || uploadingPhoto}>{savingLocal || saving ? "Saving…" : uploadingPhoto ? "Uploading photo…" : "Save teacher"}</button></div>
         </section>
       )}
       <section className="admin-panel">
-        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Resident Teachers</p><h3>{rows.length} registered teachers</h3><button className="button-primary" onClick={() => { setEditingId(null); setForm({ id: 0, fullName: "", email: "", phone: "", gender: "", modelSchool: "", position: "", bestPractice: "", bestPracticeDescription: "", subjects: "", skills: "", contributions: "", bio: "", photoUrl: "", status: "pending", isFeatured: false, displayOrder: 0 }); }}><Plus className="size-4" /> Add Teacher</button></div></div>
+        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Resident Teachers</p><h3>{rows.length} registered teachers</h3><button className="button-primary" onClick={() => { setEditingId(null); setForm({ id: 0, fullName: "", email: "", phone: "", gender: "", modelSchool: "", position: "", bestPractice: "", bestPracticeDescription: "", subjects: "", skills: "", contributions: "", bio: "", photoUrl: "", status: "pending", isFeatured: false, isAlumni: false, displayOrder: 0 }); }}><Plus className="size-4" /> Add Teacher</button></div></div>
         <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Name</th><th>Email</th><th>School</th><th>Status</th><th>Featured</th><th /></tr></thead><tbody>
           {rows.length ? rows.map((row: any) => (
-            <tr key={row.id}><td><strong>{row.fullName}</strong><span>{row.position || "—"}</span></td><td>{row.email}</td><td>{row.modelSchool || "—"}</td><td><span className={`admin-status ${row.status === "published" ? "admin-status-published" : row.status === "approved" ? "admin-status-published" : "admin-status-draft"}`}>{row.status}</span></td><td><button className="admin-table-action" onClick={() => handleFeature(row.id, !row.isFeatured)}>{row.isFeatured ? "Unfeature" : "Feature"}</button></td><td className="admin-row-actions"><button className="admin-table-action" onClick={() => { setEditingId(row.id); setForm({ id: row.id, fullName: row.fullName, email: row.email, phone: row.phone, gender: row.gender, modelSchool: row.modelSchool, position: row.position, bestPractice: row.bestPractice, bestPracticeDescription: row.bestPracticeDescription, subjects: row.subjects, skills: row.skills, contributions: row.contributions, bio: row.bio, photoUrl: row.photoUrl, status: row.status, isFeatured: row.isFeatured, displayOrder: row.displayOrder }); }}><Pencil className="size-3.5" /></button><button className="admin-table-action admin-danger" onClick={() => { if (confirm(`Delete ${row.fullName}?`)) onDelete(row.id); }}><Trash2 className="size-3.5" /></button></td></tr>
+            <tr key={row.id}><td><strong>{row.fullName}</strong><span>{row.position || "—"}</span></td><td>{row.email}</td><td>{row.modelSchool || "—"}</td><td><span className={`admin-status ${row.status === "published" ? "admin-status-published" : row.status === "approved" ? "admin-status-published" : "admin-status-draft"}`}>{row.status}</span></td><td><button className="admin-table-action" onClick={() => handleFeature(row.id, !row.isFeatured)}>{row.isFeatured ? "Unfeature" : "Feature"}</button></td><td className="admin-row-actions"><button className="admin-table-action" onClick={() => { setEditingId(row.id); setForm({ id: row.id, fullName: row.fullName, email: row.email, phone: row.phone, gender: row.gender, modelSchool: row.modelSchool, position: row.position, bestPractice: row.bestPractice, bestPracticeDescription: row.bestPracticeDescription, subjects: row.subjects, skills: row.skills, contributions: row.contributions, bio: row.bio, photoUrl: row.photoUrl, status: row.status, isFeatured: row.isFeatured, isAlumni: row.isAlumni, displayOrder: row.displayOrder }); }}><Pencil className="size-3.5" /></button><button className="admin-table-action admin-danger" onClick={() => { if (confirm(`Delete ${row.fullName}?`)) onDelete(row.id); }}><Trash2 className="size-3.5" /></button></td></tr>
           )) : <tr><td colSpan={6} className="admin-empty">No resident teachers registered yet.</td></tr>}
         </tbody></table></div>
       </section>

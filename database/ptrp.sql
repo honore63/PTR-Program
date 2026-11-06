@@ -231,35 +231,70 @@ CREATE TABLE IF NOT EXISTS `bestPractices` (
 INSERT IGNORE INTO `users` (email, passwordHash, name, role, loginMethod, lastSignedIn)
 VALUES ('Residents teachers', '$2y$12$qzy0UYcQIDtMAKIa0QN0/ezs/U8aJxs3qAPkZfyiiwhVBZUPWrEOa', 'Resident Teachers', 'admin', 'local', NOW());
 
--- ============================================================
--- Seed sample data for demonstration
--- ============================================================
-INSERT IGNORE INTO `schools` (name, district, description, status) VALUES
-  ('Lincoln High School', 'Springfield', 'Partner demonstration school for teacher residency.', 'published'),
-  ('Roosevelt Elementary', 'Shelbyville', 'Primary demonstration school for guided teaching practice.', 'published'),
-  ('Washington Middle School', 'Capital City', 'Model school for residency training.', 'published');
+-- Seed the verified PTRP model schools, news, and gallery photos. No sample profiles are created.
+INSERT IGNORE INTO `schools` (`name`, `district`, `description`, `latitude`, `longitude`, `status`) VALUES
+  ('GS Matimba', 'Nyagatare', NULL, -1.1192116, 30.4293638, 'published'),
+  ('GS Jean de la Mennais Kirambo', 'Burera', NULL, -1.5078282, 29.8432030, 'published'),
+  ('GS Byumba Catholique', 'Gicumbi', NULL, -1.5739545, 30.0547538, 'published'),
+  ('GS Bihinga', 'Gatsibo', NULL, -1.6119493, 30.3823329, 'published'),
+  ('GS Akanzu', 'Rwamagana', NULL, -2.0310475, 30.3336315, 'published'),
+  ('Rukara Model School', 'Kayonza', NULL, -1.8007845, 30.5034396, 'published'),
+  ('GS Zaza A', 'Ngoma', NULL, -2.1547942, 30.4303954, 'published'),
+  ('GS Mayange A', 'Bugesera', NULL, -2.1857909, 30.0958743, 'published'),
+  ('GS St Jean Paul II', 'Gisagara', 'Recently called ES Save', -2.6529852, 29.8352303, 'published'),
+  ('GS St Laurent Cyahinda', 'Nyaruguru', NULL, -2.7426028, 29.6127451, 'published'),
+  ('GS Mururu', 'Rusizi', NULL, -2.5067736, 28.8952211, 'published'),
+  ('GS Uwinkomo', 'Nyamagabe', NULL, -2.5028998, 29.4770416, 'published'),
+  ('GS Rubengera I', 'Karongi', NULL, -2.0424556, 29.4126085, 'published'),
+  ('GS Muramba B', 'Ngororero', NULL, -1.7638062, 29.6151639, 'published'),
+  ('GS St Etienne', 'Muhanga', NULL, -2.1299460, 29.7774184, 'published'),
+  ('G.S Umubano I', 'Rubavu', NULL, -1.6819550, 29.2537440, 'published'),
+  ('GS Nyarusange', 'Rwamagana', 'Confirm the school identity and district with program administrators.', -1.9335036, 30.4529740, 'published');
 
-INSERT IGNORE INTO `teachers` (fullName, email, phone, schoolId, bio, photoUrl, status) VALUES
-  ('Maria Garcia', 'maria.garcia@school.edu', '555-0101', 1, 'Third-grade teacher with 5 years of experience.', NULL, 'approved'),
-  ('James Wilson', 'james.wilson@school.edu', '555-0102', 2, 'Science teacher focusing on inquiry-based learning.', NULL, 'pending'),
-  ('Sarah Chen', 'sarah.chen@school.edu', '555-0103', 3, 'English literature teacher and mentor.', NULL, 'pending');
+INSERT IGNORE INTO `newsArticles` (`slug`, `title`, `category`, `excerpt`, `body`, `imageUrl`, `status`, `publishedAt`) VALUES
+  (
+    'celebrating-excellence-in-teacher-education',
+    'Celebrating Excellence in Teacher Education: The Success of the Primary Teacher Residency Program (PTRP)',
+    'Success Stories',
+    'On 5 August 2024, a remarkable milestone was celebrated in Rwanda''s education sector as 100 Primary Teacher Residents graduated from the one-year Primary Teacher Residency Program.',
+    'On 5 August 2024, a remarkable milestone was celebrated in Rwanda''s education sector as 100 Primary Teacher Residents graduated from the one-year Primary Teacher Residency Program.\n\nThe commissioning ceremony was more than a celebration of graduation. It was a recognition of dedication, resilience, professional growth, and the collective commitment to transforming the quality of primary education in Rwanda.\n\nThe successful completion of this pilot showed the importance of investing in teachers, strengthening professional competencies, and equipping educators with the knowledge, practical skills, and confidence to respond effectively to the diverse learning needs of pupils.\n\nBehind this achievement was a strong partnership involving the RAINWATER Foundation, Rwanda Basic Education Board (REB), Inspire, Educate and Empower Rwanda (IEE), Bridge2Rwanda, and Florida State University.\n\nSpecial recognition goes to the Teacher Residents, tutors, mentors, implementing partners, and all stakeholders. A nation that invests in its teachers invests in the future of its children. Together, let us continue to Inspire, Educate and Empower!',
+    '/manus-storage/ptrp-pilot-launch.jpg',
+    'published',
+    '2024-08-05 00:00:00'
+  ),
+  (
+    'lsi-encouraging-results',
+    'LSI reports encouraging results from the Primary Teacher Residency Program',
+    'Announcements',
+    'Florida State University''s Learning Systems Institute reported positive outcomes from the PTRP pilot, including strong performance in observed lessons and growth in literacy, mathematics, and science.',
+    'Florida State University''s Learning Systems Institute reported encouraging results from the Primary Teacher Residency Program in Rwanda.\n\nMore than 80 teacher residents received a performance rating of meets or exceeds expectations in all three observed lessons during term two.\n\nResidents continued to grow in literacy, mathematics, and science knowledge, skills, and attitudes, with increased confidence in teaching, English literacy, and ICT use.',
+    '/manus-storage/ptrp-residents-2.jpg',
+    'published',
+    '2024-06-27 00:00:00'
+  ),
+  (
+    'commissioning-ceremony-in-pictures',
+    'Commissioning ceremony in pictures and video',
+    'Videos',
+    'Relive the celebration as 100 Teacher Residents mark the end of their residency year and the beginning of their journey as PTRP alumni.',
+    'The commissioning ceremony brought together residents, tutors, mentors, partners, and education leaders to celebrate the first PTRP cohort.\n\nPhotos and video from the day are being prepared for the gallery. Alumni can contribute approved media through the network.',
+    '/manus-storage/ptrp-pilot-launch.jpg',
+    'published',
+    '2024-08-05 00:00:00'
+  );
 
-INSERT IGNORE INTO `alumni` (fullName, email, phone, graduationYear, schoolId, bio, status) VALUES
-  ('David Johnson', 'david.johnson@alumni.edu', '555-0201', 2024, 1, 'Teaching 4th grade at Lincoln High School.', 'pending'),
-  ('Lisa Wong', 'lisa.wong@alumni.edu', '555-0202', 2024, 2, 'Teaching 2nd grade at Roosevelt Elementary.', 'pending'),
-  ('Michael Brown', 'michael.brown@alumni.edu', '555-0203', 2024, 3, 'Teaching 6th grade math at Washington Middle School.', 'pending');
-
-INSERT IGNORE INTO `newsArticles` (slug, title, category, excerpt, body, imageUrl, status, publishedAt) VALUES
-  ('welcome-to-alumni-network', 'Welcome to the PTR Alumni Network', 'Announcements', 'Welcome to the official community of PTRP alumni.', 'Welcome to the official digital community of the Primary Teacher Residency Program.', NULL, 'published', NOW()),
-  ('first-cohort-graduates', 'First Cohort Graduates Successfully', 'Success Stories', 'Celebrating the first class of PTRP graduates.', 'The first cohort of Primary Teacher Residents has successfully completed the 12-month residency program.', NULL, 'published', NOW());
-
-INSERT IGNORE INTO `galleryItems` (title, caption, url, mediaType, category, status, createdBy) VALUES
-  ('Graduation Ceremony', 'Graduation day for the first PTRP cohort', '/manus-storage/ptrp-pilot-launch.jpg', 'image', 'events', 'approved', 1),
-  ('Classroom Practice', 'Resident teachers in guided practice', '/manus-storage/ptrp-residents-1.jpg', 'image', 'practice', 'approved', 1);
-
-INSERT IGNORE INTO `bestPractices` (title, category, summary, body, status, createdAt) VALUES
-  ('Inquiry-Based Learning', 'Teaching practice', 'Encouraging students to ask questions and explore.', 'Inquiry-based learning is a student-centered approach...', 'published', NOW()),
-  ('Differentiated Instruction', 'Teaching practice', 'Tailoring instruction to meet diverse learner needs.', 'Differentiated instruction adapts content...', 'draft', NOW());
+INSERT IGNORE INTO `galleryItems` (`title`, `caption`, `url`, `mediaType`, `category`, `status`) VALUES
+  ('PTRP community moment 1', 'PTRP community moment 1', '/gallery/gallery-01.jpg', 'image', 'community', 'approved'),
+  ('PTRP community moment 2', 'PTRP community moment 2', '/gallery/gallery-02.jpg', 'image', 'community', 'approved'),
+  ('PTRP community moment 3', 'PTRP community moment 3', '/gallery/gallery-03.jpg', 'image', 'community', 'approved'),
+  ('PTRP community moment 4', 'PTRP community moment 4', '/gallery/gallery-04.jpg', 'image', 'community', 'approved'),
+  ('PTRP community moment 5', 'PTRP community moment 5', '/gallery/gallery-05.jpg', 'image', 'community', 'approved'),
+  ('PTRP community moment 6', 'PTRP community moment 6', '/gallery/gallery-06.jpg', 'image', 'community', 'approved'),
+  ('PTRP community moment 7', 'PTRP community moment 7', '/gallery/gallery-07.jpg', 'image', 'community', 'approved'),
+  ('PTRP community moment 8', 'PTRP community moment 8', '/gallery/gallery-08.jpg', 'image', 'community', 'approved'),
+  ('PTRP community moment 9', 'PTRP community moment 9', '/gallery/gallery-09.jpg', 'image', 'community', 'approved'),
+  ('PTRP community moment 10', 'PTRP community moment 10', '/gallery/gallery-10.jpg', 'image', 'community', 'approved'),
+  ('PTRP community moment 11', 'PTRP community moment 11', '/gallery/gallery-11.jpg', 'image', 'community', 'approved');
 
 -- ============================================================
 -- Program Coordinators & Mentors tables
@@ -363,6 +398,7 @@ CREATE TABLE IF NOT EXISTS `resident_teachers` (
   `photoUrl` varchar(700) DEFAULT NULL,
   `status` enum('pending','approved','published','rejected','unpublished') NOT NULL DEFAULT 'pending',
   `isFeatured` tinyint(1) NOT NULL DEFAULT 0,
+  `isAlumni` tinyint(1) NOT NULL DEFAULT 0,
   `displayOrder` int NOT NULL DEFAULT 0,
   `submittedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `reviewedAt` timestamp NULL DEFAULT NULL,
@@ -381,7 +417,7 @@ CREATE TABLE IF NOT EXISTS `resident_teachers` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT IGNORE INTO `resident_teachers`
-  (`fullName`, `email`, `phone`, `modelSchool`, `position`, `bestPractice`, `bestPracticeDescription`, `subjects`, `skills`, `contributions`, `bio`, `photoUrl`, `status`, `isFeatured`, `displayOrder`, `publishedAt`)
+  (`fullName`, `email`, `phone`, `modelSchool`, `position`, `bestPractice`, `bestPracticeDescription`, `subjects`, `skills`, `contributions`, `bio`, `photoUrl`, `status`, `isFeatured`, `isAlumni`, `displayOrder`, `publishedAt`)
 VALUES
   (
     'Honore Tuyishime',
@@ -397,6 +433,7 @@ VALUES
     'Honore Tuyishime is a Resident Teacher at Rukara Model School and a PTRP Alumni Network member. As a program designer, ICT integration practitioner, and website manager, he brings technology and practical digital tools into teacher development.',
     'honore-tuyishime.png',
     'published',
+    1,
     1,
     -10000,
     NOW()
@@ -457,30 +494,6 @@ CREATE TABLE IF NOT EXISTS `page_views` (
   KEY `page_views_createdAt_idx` (`createdAt`),
   KEY `page_views_path_idx` (`path`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ============================================================
--- Seed Honore Tuyishime as the first featured resident teacher
--- ============================================================
-INSERT IGNORE INTO `resident_teachers` (fullName, email, phone, gender, modelSchool, position, bestPractice, bestPracticeDescription, subjects, skills, contributions, bio, photoUrl, status, isFeatured, displayOrder, publishedAt)
-VALUES (
-  'Honore Tuyishime',
-  'tuyishimehonore63@gmail.com',
-  '0791684429',
-  'male',
-  'Rukara Model School',
-  'Program Designer, ICT Integration in Education Practitioner, and Website Manager',
-  'ICT Integration in Education',
-  'Honore Tuyishime is an educator, program designer, and ICT integration practitioner passionate about transforming education through technology. He designed the 21st Century Lesson Plan Generator, a digital platform that supports teachers in preparing competency-based, learner-centred lessons. His work focuses on educational technology, digital innovation, teacher development, and integrating ICT into teaching and learning.',
-  'ICT, Educational Technology, Digital Innovation, Teacher Development',
-  'ICT Integration, Lesson Planning, Digital Literacy, Web Development',
-  'Designed and developed the 21st Century Lesson Plan Generator. Promotes ICT Integration in Education. Supports teachers in using technology to improve teaching and learning.',
-  'Program Designer, ICT Integration Practitioner, and Website Manager for the PTR Alumni Network.',
-  '/storage/honore-tuyishime-profile.svg',
-  'published',
-  1,
-  1,
-  NOW()
-);
 
 -- ============================================================
 -- Social Media Integration tables

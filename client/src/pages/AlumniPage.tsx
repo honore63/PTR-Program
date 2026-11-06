@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowUpRight,
   BadgeCheck,
@@ -13,21 +13,73 @@ import {
 import { Link } from "wouter";
 import { PageHero } from "@/components/ptrp/PageHero";
 import { SectionHeading } from "@/components/ptrp/SectionHeading";
-import { alumniFields, alumniProfiles, hostColleges, modelSchools } from "@/data/ptrp";
+import { apiRequest } from "@/lib/api";
+import { alumniFields, featuredHonoreTuyishime, hostColleges, modelSchools, residentTeacherPhotoUrl } from "@/data/ptrp";
 
-const districts = ["All districts", ...Array.from(new Set(alumniProfiles.map((profile) => profile.district))).sort((a, b) => a.localeCompare(b))];
+type AlumniProfile = {
+  id: string;
+  email: string | null;
+  name: string;
+  ttc: string | null;
+  school: string;
+  district: string;
+  year: string | null;
+  bio: string;
+  photoUrl: string | null;
+};
+
+const featuredAlumniFallback: AlumniProfile = {
+  id: "featured-honore",
+  email: featuredHonoreTuyishime.email,
+  name: featuredHonoreTuyishime.fullName,
+  ttc: null,
+  school: featuredHonoreTuyishime.modelSchool ?? "",
+  district: modelSchools.find((school) => school.name === featuredHonoreTuyishime.modelSchool)?.district ?? "",
+  year: null,
+  bio: featuredHonoreTuyishime.bio ?? "",
+  photoUrl: featuredHonoreTuyishime.photoUrl,
+};
 
 export default function AlumniPage() {
   const [query, setQuery] = useState("");
   const [district, setDistrict] = useState("All districts");
   const [ttc, setTtc] = useState("All host TTCs");
+  const [apiProfiles, setApiProfiles] = useState<AlumniProfile[] | null>(null);
 
-  const filtered = useMemo(() => alumniProfiles.filter((profile) => {
+  useEffect(() => {
+    let cancelled = false;
+    apiRequest<any[]>("alumni").then((rows) => {
+      if (!Array.isArray(rows)) throw new Error("The alumni API returned an invalid response.");
+      const profiles = rows.map((row): AlumniProfile => {
+        const school = String(row.schoolName ?? "Not listed");
+        const modelSchool = modelSchools.find((item) => item.name.toLowerCase() === school.toLowerCase());
+        return {
+          id: String(row.id),
+          email: row.email ?? null,
+          name: String(row.fullName ?? ""),
+          ttc: row.hostTtc ?? null,
+          school,
+          district: modelSchool?.district ?? "",
+          year: row.graduationYear == null ? null : String(row.graduationYear),
+          bio: String(row.bio ?? ""),
+          photoUrl: row.photoUrl ?? null,
+        };
+      }).filter((profile) => profile.name);
+      if (!cancelled) setApiProfiles(profiles);
+    }).catch((error) => {
+      console.error("Alumni directory API error", error);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const profiles = apiProfiles ?? [featuredAlumniFallback];
+  const districts = useMemo(() => ["All districts", ...Array.from(new Set(profiles.map((profile) => profile.district).filter(Boolean))).sort((a, b) => a.localeCompare(b))], [profiles]);
+  const filtered = useMemo(() => profiles.filter((profile) => {
     const matchesQuery = `${profile.name} ${profile.school} ${profile.district} ${profile.ttc}`.toLowerCase().includes(query.trim().toLowerCase());
     const matchesDistrict = district === "All districts" || profile.district === district;
     const matchesTtc = ttc === "All host TTCs" || profile.ttc === ttc;
     return matchesQuery && matchesDistrict && matchesTtc;
-  }), [district, query, ttc]);
+  }), [profiles, district, query, ttc]);
 
   return <main>
     <PageHero
@@ -57,7 +109,7 @@ export default function AlumniPage() {
             </div>
             <div className="mt-6 flex items-start gap-3 border border-[#f0d9a8] bg-[#fffaf0] p-5 text-sm leading-7 text-[#7a5a1f]">
               <ShieldCheck className="mt-0.5 size-5 shrink-0 text-[#c88a20]" />
-              <p><strong>Directory status:</strong> The profiles below are placeholders. Members control what appears publicly, and no personal contact details are published without consent.</p>
+              <p><strong>Directory status:</strong> Only approved member profiles appear here. Contact details are not displayed without consent.</p>
             </div>
           </div>
 
@@ -110,32 +162,30 @@ export default function AlumniPage() {
         </div>
 
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-[0.66rem] font-extrabold uppercase tracking-[0.1em] text-[#7b8da2]">{filtered.length} of {alumniProfiles.length} profiles shown</p>
-          <p className="text-[0.66rem] font-bold uppercase tracking-[0.08em] text-[#a3b2bf]">Placeholder directory · Awaiting member profiles</p>
+          <p className="text-[0.66rem] font-extrabold uppercase tracking-[0.1em] text-[#7b8da2]">{filtered.length} of {profiles.length} profiles shown</p>
+          <p className="text-[0.66rem] font-bold uppercase tracking-[0.08em] text-[#a3b2bf]">Approved alumni profiles</p>
         </div>
 
         <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((profile) => <article key={profile.name} className="flex h-full flex-col border border-[#e2eef0] bg-white p-6 transition-colors hover:border-[#0098d9]">
+          {filtered.map((profile) => <article key={profile.id} className="flex h-full flex-col border border-[#e2eef0] bg-white p-6 transition-colors hover:border-[#0098d9]">
             <div className="flex items-start justify-between gap-4">
-              <div className="flex size-16 items-center justify-center rounded-full bg-[#e8f2f6] text-[#0098d9]">
-                <UserRound className="size-7" strokeWidth={1.5} />
-              </div>
-              <span className="inline-flex items-center gap-1.5 border border-[#f0d9a8] bg-[#fffaf0] px-2.5 py-1 text-[0.58rem] font-extrabold uppercase tracking-[0.08em] text-[#8a6a2a]">Profile under review</span>
+              {profile.photoUrl ? <img src={residentTeacherPhotoUrl(profile.photoUrl) ?? undefined} alt={`Portrait of ${profile.name}`} className="size-16 rounded-full object-cover" /> : <div className="flex size-16 items-center justify-center rounded-full bg-[#e8f2f6] text-[#0098d9]"><UserRound className="size-7" strokeWidth={1.5} /></div>}
+              <span className="inline-flex items-center gap-1.5 border border-[#d6ecdf] bg-[#f1faf4] px-2.5 py-1 text-[0.58rem] font-extrabold uppercase tracking-[0.08em] text-[#25754a]">Verified profile</span>
             </div>
             <h3 className="mt-5 text-lg font-extrabold leading-tight tracking-[-0.03em] text-[#0b2347]">{profile.name}</h3>
-            <p className="mt-1 text-[0.66rem] font-extrabold uppercase tracking-[0.1em] text-[#0098d9]">Cohort {profile.year}</p>
+            <p className="mt-1 text-[0.66rem] font-extrabold uppercase tracking-[0.1em] text-[#0098d9]">{profile.year ? `Cohort ${profile.year}` : "PTRP Alumni"}</p>
             <p className="mt-4 flex-1 text-sm leading-6 text-[#4b5563]">{profile.bio}</p>
             <dl className="mt-5 grid gap-2 border-t border-[#eef2f5] pt-4 text-[0.74rem]">
               <div className="flex items-start justify-between gap-3"><dt className="font-bold uppercase tracking-[0.06em] text-[#9aabba]">School</dt><dd className="text-right font-semibold text-[#264665]">{profile.school}</dd></div>
               <div className="flex items-start justify-between gap-3"><dt className="font-bold uppercase tracking-[0.06em] text-[#9aabba]">District</dt><dd className="text-right font-semibold text-[#264665]">{profile.district}</dd></div>
-              <div className="flex items-start justify-between gap-3"><dt className="font-bold uppercase tracking-[0.06em] text-[#9aabba]">Host TTC</dt><dd className="text-right font-semibold text-[#264665]">{profile.ttc}</dd></div>
+              <div className="flex items-start justify-between gap-3"><dt className="font-bold uppercase tracking-[0.06em] text-[#9aabba]">Host TTC</dt><dd className="text-right font-semibold text-[#264665]">{profile.ttc || "Not listed"}</dd></div>
             </dl>
           </article>)}
 
           {filtered.length === 0 && <div className="sm:col-span-2 lg:col-span-3 border border-dashed border-[#d1d5db] bg-white p-10 text-center">
             <UsersRound className="mx-auto size-8 text-[#0098d9]" />
-            <p className="mt-4 text-sm font-bold text-[#0b2347]">No alumni match those filters yet.</p>
-            <button type="button" onClick={() => { setQuery(""); setDistrict("All districts"); setTtc("All host TTCs"); }} className="mt-3 text-[0.7rem] font-extrabold uppercase tracking-[0.1em] text-[#0098d9]">Clear filters</button>
+            <p className="mt-4 text-sm font-bold text-[#0b2347]">{profiles.length ? "No alumni match those filters yet." : "No approved alumni profiles are published yet."}</p>
+            {profiles.length > 0 && <button type="button" onClick={() => { setQuery(""); setDistrict("All districts"); setTtc("All host TTCs"); }} className="mt-3 text-[0.7rem] font-extrabold uppercase tracking-[0.1em] text-[#0098d9]">Clear filters</button>}
           </div>}
         </div>
       </div>
@@ -154,7 +204,7 @@ export default function AlumniPage() {
             <p className="mt-3 text-sm leading-6 text-[#4b5563]">{item.body}</p>
           </div>)}
         </div>
-        <p className="mt-6 text-[0.68rem] leading-6 text-[#7b8da2]">School names in this preview are drawn from the published list of {modelSchools.length} model schools. A profile appearing here does not confirm an individual placement.</p>
+        <p className="mt-6 text-[0.68rem] leading-6 text-[#7b8da2]">School districts are matched to the published model-school directory. Contact information is kept private unless a member consents to share it.</p>
       </div>
     </section>
 

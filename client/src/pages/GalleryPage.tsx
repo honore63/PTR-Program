@@ -3,9 +3,11 @@ import { ArrowUpRight, Camera, CheckCircle2, PlayCircle, ShieldCheck, X } from "
 import { Link } from "wouter";
 import { PageHero } from "@/components/ptrp/PageHero";
 import { SectionHeading } from "@/components/ptrp/SectionHeading";
+import { apiRequest } from "@/lib/api";
 import { galleryAlbums, galleryPhotos, galleryRules } from "@/data/ptrp";
 
 type Album = typeof galleryAlbums[number];
+type GalleryPhoto = { src: string; alt: string };
 
 const publicImageUrl = (image: string) => {
   if (/^https?:\/\//i.test(image) || image.startsWith(import.meta.env.BASE_URL)) return image;
@@ -15,18 +17,35 @@ const publicImageUrl = (image: string) => {
 export default function GalleryPage() {
   const [activeAlbum, setActiveAlbum] = useState<Album | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [apiPhotos, setApiPhotos] = useState<GalleryPhoto[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiRequest<any[]>("gallery").then((items) => {
+      if (!Array.isArray(items)) throw new Error("The gallery API returned an invalid response.");
+      const photos = items
+        .filter((item) => item.mediaType === "image" && item.url)
+        .map((item) => ({ src: String(item.url), alt: String(item.caption || item.title || "PTRP community photo") }));
+      if (!cancelled && photos.length) setApiPhotos(photos);
+    }).catch((error) => {
+      console.error("Gallery API error", error);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const photos = apiPhotos ?? galleryPhotos;
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") { setActiveAlbum(null); setLightboxIndex(null); }
       if (lightboxIndex !== null) {
-        if (event.key === "ArrowRight") setLightboxIndex((i) => (i! + 1) % galleryPhotos.length);
-        if (event.key === "ArrowLeft") setLightboxIndex((i) => (i! - 1 + galleryPhotos.length) % galleryPhotos.length);
+        if (event.key === "ArrowRight") setLightboxIndex((i) => (i! + 1) % photos.length);
+        if (event.key === "ArrowLeft") setLightboxIndex((i) => (i! - 1 + photos.length) % photos.length);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [lightboxIndex]);
+  }, [lightboxIndex, photos.length]);
 
   return <main>
     <PageHero
@@ -64,11 +83,11 @@ export default function GalleryPage() {
 
     <section id="photos" className="scroll-mt-24 bg-[#f6fafb] py-20 md:py-28">
       <div className="mx-auto max-w-[1400px] px-5 md:px-8 lg:px-12">
-        <SectionHeading eyebrow="Community photos" title="Moments from the network." body="A selection of photographs from PTRP events, residencies, and alumni gatherings. Click any photo to view it larger." />
+        <SectionHeading eyebrow="Community photos" title="Moments from the network." body="Approved photographs from PTRP events, residencies, and alumni gatherings. Click any photo to view it larger." />
         <div className="mt-12 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {galleryPhotos.map((photo, index) => (
+          {photos.map((photo, index) => (
             <button key={photo.src} type="button" onClick={() => setLightboxIndex(index)} className="group relative aspect-square overflow-hidden border border-[#dce8ed] bg-white" aria-label={`View photo ${index + 1}`}>
-              <img src={`${import.meta.env.BASE_URL}${photo.src.replace(/^\//, "")}`} alt={photo.alt} className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-[1.03]" loading="lazy" />
+              <img src={publicImageUrl(photo.src)} alt={photo.alt} className="h-full w-full object-contain transition-transform duration-500 group-hover:scale-[1.03]" loading="lazy" />
             </button>
           ))}
         </div>
@@ -78,10 +97,10 @@ export default function GalleryPage() {
     {lightboxIndex !== null && (
       <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#071935]/90 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Photo viewer" onClick={() => setLightboxIndex(null)}>
         <button type="button" onClick={() => setLightboxIndex(null)} className="absolute right-4 top-4 z-10 flex size-10 items-center justify-center border border-white/20 bg-white/10 text-white hover:bg-white/20" aria-label="Close photo"><X className="size-5" /></button>
-        <button type="button" onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => (i! - 1 + galleryPhotos.length) % galleryPhotos.length); }} className="absolute left-4 top-1/2 z-10 flex size-10 -translate-y-1/2 items-center justify-center border border-white/20 bg-white/10 text-white hover:bg-white/20" aria-label="Previous photo">‹</button>
-        <button type="button" onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => (i! + 1) % galleryPhotos.length); }} className="absolute right-4 top-1/2 z-10 flex size-10 -translate-y-1/2 items-center justify-center border border-white/20 bg-white/10 text-white hover:bg-white/20" aria-label="Next photo">›</button>
-        <img src={`${import.meta.env.BASE_URL}${galleryPhotos[lightboxIndex].src.replace(/^\//, "")}`} alt={galleryPhotos[lightboxIndex].alt} className="max-h-[85vh] max-w-[90vw] object-contain shadow-2xl" onClick={(e) => e.stopPropagation()} />
-        <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[0.7rem] font-bold uppercase tracking-[0.1em] text-white/60">{lightboxIndex + 1} / {galleryPhotos.length}</p>
+        <button type="button" onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => (i! - 1 + photos.length) % photos.length); }} className="absolute left-4 top-1/2 z-10 flex size-10 -translate-y-1/2 items-center justify-center border border-white/20 bg-white/10 text-white hover:bg-white/20" aria-label="Previous photo">‹</button>
+        <button type="button" onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => (i! + 1) % photos.length); }} className="absolute right-4 top-1/2 z-10 flex size-10 -translate-y-1/2 items-center justify-center border border-white/20 bg-white/10 text-white hover:bg-white/20" aria-label="Next photo">›</button>
+        <img src={publicImageUrl(photos[lightboxIndex].src)} alt={photos[lightboxIndex].alt} className="max-h-[85vh] max-w-[90vw] object-contain shadow-2xl" onClick={(e) => e.stopPropagation()} />
+        <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[0.7rem] font-bold uppercase tracking-[0.1em] text-white/60">{lightboxIndex + 1} / {photos.length}</p>
       </div>
     )}
 

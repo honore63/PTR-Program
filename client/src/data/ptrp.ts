@@ -302,15 +302,6 @@ export const galleryRules = [
   "All submissions are reviewed and approved by an administrator.",
 ];
 
-export const alumniProfiles = [
-  { name: "Alumni Profile 01", ttc: "TTC Save", school: "GS Matimba", district: "Nyagatare", year: "2024", bio: "Profile details will be published after the member completes and approves their profile.", demo: true },
-  { name: "Alumni Profile 02", ttc: "TTC de la Salle Byumba", school: "GS Byumba Catholique", district: "Gicumbi", year: "2024", bio: "Profile details will be published after the member completes and approves their profile.", demo: true },
-  { name: "Alumni Profile 03", ttc: "TTC Save", school: "GS St Jean Paul II", district: "Gisagara", year: "2024", bio: "Profile details will be published after the member completes and approves their profile.", demo: true },
-  { name: "Alumni Profile 04", ttc: "TTC de la Salle Byumba", school: "GS St Etienne", district: "Muhanga", year: "2024", bio: "Profile details will be published after the member completes and approves their profile.", demo: true },
-  { name: "Alumni Profile 05", ttc: "TTC Save", school: "GS Mururu", district: "Rusizi", year: "2024", bio: "Profile details will be published after the member completes and approves their profile.", demo: true },
-  { name: "Alumni Profile 06", ttc: "TTC de la Salle Byumba", school: "GS Umubano I", district: "Rubavu", year: "2024", bio: "Profile details will be published after the member completes and approves their profile.", demo: true },
-];
-
 export const alumniFields = [
   "Name",
   "Photo",
@@ -582,6 +573,7 @@ export type ResidentTeacher = {
   photoUrl: string | null;
   status: ResidentTeacherStatus;
   isFeatured: boolean;
+  isAlumni: boolean;
   displayOrder: number;
   submittedAt: string | null;
   reviewedAt: string | null;
@@ -611,6 +603,7 @@ export const featuredHonoreTuyishime: ResidentTeacher = {
   photoUrl: "honore-tuyishime.png",
   status: "published",
   isFeatured: true,
+  isAlumni: true,
   displayOrder: -10000,
   submittedAt: null,
   reviewedAt: null,

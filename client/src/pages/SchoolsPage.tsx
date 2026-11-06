@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   ArrowUpRight,
@@ -13,20 +13,61 @@ import { Link } from "wouter";
 import { PageHero } from "@/components/ptrp/PageHero";
 import { ModelSchoolsMap } from "@/components/ptrp/ModelSchoolsMap";
 import { SectionHeading } from "@/components/ptrp/SectionHeading";
-import { hostColleges, modelSchools } from "@/data/ptrp";
-
-const districts = ["All districts", ...Array.from(new Set(modelSchools.map((school) => school.district))).sort((a, b) => a.localeCompare(b))];
+import { hostColleges, modelSchools, type ModelSchool } from "@/data/ptrp";
+import { apiRequest } from "@/lib/api";
 
 export default function SchoolsPage() {
   const [district, setDistrict] = useState("All districts");
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState(1);
+  const [apiSchools, setApiSchools] = useState<ModelSchool[] | null>(null);
 
-  const filtered = useMemo(() => modelSchools.filter((school) => {
+  useEffect(() => {
+    let cancelled = false;
+    apiRequest<any[]>("schools").then((rows) => {
+      if (!Array.isArray(rows) || rows.length === 0) throw new Error("The model schools API returned an invalid response.");
+      const schools = rows.map((row): ModelSchool => {
+        const name = String(row.name ?? "");
+        const schoolDistrict = String(row.district ?? "");
+        const fallback = modelSchools.find((school) => school.name.toLowerCase() === name.toLowerCase());
+        const latitude = Number(row.latitude);
+        const longitude = Number(row.longitude);
+        if (!name || !schoolDistrict || !Number.isInteger(Number(row.id))) {
+          throw new Error("The model schools API returned an invalid record.");
+        }
+        let position: [number, number];
+        if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+          position = [latitude, longitude];
+        } else if (fallback) {
+          position = fallback.position;
+        } else {
+          throw new Error(`Missing map coordinates for ${name}.`);
+        }
+        return {
+          id: Number(row.id),
+          name,
+          district: schoolDistrict,
+          position,
+          mapQuery: fallback?.mapQuery ?? `${name} ${schoolDistrict} Rwanda`,
+          address: fallback?.address ?? schoolDistrict,
+          locationIsApproximate: fallback?.locationIsApproximate ?? true,
+          ...(fallback?.note ? { note: fallback.note } : {}),
+        };
+      });
+      if (!cancelled) setApiSchools(schools);
+    }).catch((error) => {
+      console.error("Model schools API error", error);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const schools = apiSchools ?? modelSchools;
+  const districts = useMemo(() => ["All districts", ...Array.from(new Set(schools.map((school) => school.district))).sort((a, b) => a.localeCompare(b))], [schools]);
+  const filtered = useMemo(() => schools.filter((school) => {
     const matchesDistrict = district === "All districts" || school.district === district;
     const matchesQuery = `${school.name} ${school.district}`.toLowerCase().includes(query.trim().toLowerCase());
     return matchesDistrict && matchesQuery;
-  }), [district, query]);
+  }), [schools, district, query]);
 
   const selected = filtered.find((school) => school.id === selectedId) ?? filtered[0];
   const directionsUrl = selected ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(selected.mapQuery)}` : undefined;

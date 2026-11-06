@@ -22,10 +22,9 @@ export default function ResidentsDirectory() {
     ["api", "resident-teachers", "list"],
     "resident-teachers?limit=100"
   );
-  const apiTeachers = Array.isArray(teacherResponse) ? teacherResponse : [];
-  const teachers = apiTeachers.some((teacher) => teacher.email.toLowerCase() === featuredHonoreTuyishime.email)
-    ? apiTeachers
-    : [featuredHonoreTuyishime, ...apiTeachers];
+  const apiTeachers = Array.isArray(teacherResponse) ? teacherResponse : [featuredHonoreTuyishime];
+  // Only show approved and published residents publicly
+  const teachers = apiTeachers.filter((t) => t.status === 'approved' || t.status === 'published');
   const directoryError = error instanceof Error
     ? error.message
     : teacherResponse !== undefined && !Array.isArray(teacherResponse)

@@ -691,7 +691,16 @@ function routeRequest(): void
         respond(database()->query("SELECT t.*, s.name AS schoolName FROM teachers t LEFT JOIN schools s ON s.id = t.schoolId WHERE t.status = 'approved' ORDER BY t.fullName ASC")->fetchAll());
     }
     if ($route === '/alumni' && $method === 'GET') {
-        respond(database()->query("SELECT a.*, s.name AS schoolName FROM alumni a LEFT JOIN schools s ON s.id = a.schoolId WHERE a.status = 'approved' ORDER BY a.fullName ASC")->fetchAll());
+        $rows = database()->query("SELECT a.id, a.fullName, a.email, a.phone, a.graduationYear, a.schoolId, a.bio, a.status, a.createdAt, a.updatedAt, s.name AS schoolName, NULL AS position, NULL AS photoUrl
+            FROM alumni a LEFT JOIN schools s ON s.id = a.schoolId
+            WHERE a.status = 'approved'
+            UNION ALL
+            SELECT rt.id, rt.fullName, rt.email, rt.phone, NULL AS graduationYear, s.id AS schoolId, rt.bio, 'approved' AS status, rt.createdAt, rt.updatedAt, s.name AS schoolName, rt.position, rt.photoUrl
+            FROM resident_teachers rt
+            LEFT JOIN schools s ON LOWER(s.name) = LOWER(rt.modelSchool)
+            WHERE rt.status = 'published' AND rt.isAlumni = 1
+            ORDER BY fullName ASC")->fetchAll();
+        respond($rows);
     }
     if ($route === '/news' && $method === 'GET') {
         respond(database()->query("SELECT * FROM newsArticles WHERE status = 'published' ORDER BY COALESCE(publishedAt, createdAt) DESC")->fetchAll());
@@ -844,12 +853,14 @@ function routeRequest(): void
             (SELECT COUNT(*) FROM users WHERE role = 'admin') AS adminCount,
             (SELECT COUNT(*) FROM schools) AS schoolCount,
             (SELECT COUNT(*) FROM teachers) AS teacherCount,
-            (SELECT COUNT(*) FROM alumni) AS alumniCount,
+            (SELECT COUNT(*) FROM resident_teachers) AS residentTeacherCount,
+            ((SELECT COUNT(*) FROM alumni) + (SELECT COUNT(*) FROM resident_teachers WHERE isAlumni = 1)) AS alumniCount,
             (SELECT COUNT(*) FROM newsArticles) AS newsCount,
             (SELECT COUNT(*) FROM galleryItems) AS galleryCount,
             (SELECT COUNT(*) FROM bestPractices) AS practiceCount,
             (SELECT COUNT(*) FROM teachers WHERE status = 'pending') AS pendingTeachers,
-            (SELECT COUNT(*) FROM alumni WHERE status = 'pending') AS pendingAlumni,
+            (SELECT COUNT(*) FROM resident_teachers WHERE status = 'pending') AS pendingResidentTeachers,
+            ((SELECT COUNT(*) FROM alumni WHERE status = 'pending') + (SELECT COUNT(*) FROM resident_teachers WHERE isAlumni = 1 AND status = 'pending')) AS pendingAlumni,
             (SELECT COUNT(*) FROM social_accounts WHERE status = 'connected') AS socialCount,
             ((SELECT COUNT(*) FROM teachers WHERE status = 'pending') +
              (SELECT COUNT(*) FROM alumni WHERE status = 'pending') +
@@ -1788,6 +1799,7 @@ function routeRequest(): void
         $contributions = inputString($data, 'contributions', 5000);
         $bio = inputString($data, 'bio', 5000);
         $photoUrl = inputString($data, 'photoUrl', 700);
+        $isAlumni = !empty($data['isAlumni']) ? 1 : 0;
         $status = $data['status'] ?? 'pending';
         if (!in_array($status, ['pending','approved','published','rejected','unpublished'], true)) throw new ApiError(400, 'Invalid status.');
         $isFeatured = !empty($data['isFeatured']);
@@ -1796,8 +1808,8 @@ function routeRequest(): void
         if ($id > 0) {
             $updates = [];
             $values = [];
-            $fields = ['fullName','email','phone','gender','modelSchool','position','bestPractice','bestPracticeDescription','subjects','skills','contributions','bio','photoUrl','status','isFeatured','displayOrder'];
-            $fieldValues = [$fullName,$email,$phone,$gender,$modelSchool,$position,$bestPractice,$bestPracticeDescription,$subjects,$skills,$contributions,$bio,$photoUrl,$status,$isFeatured ? 1 : 0,$displayOrder];
+            $fields = ['fullName','email','phone','gender','modelSchool','position','bestPractice','bestPracticeDescription','subjects','skills','contributions','bio','photoUrl','status','isFeatured','isAlumni','displayOrder'];
+            $fieldValues = [$fullName,$email,$phone,$gender,$modelSchool,$position,$bestPractice,$bestPracticeDescription,$subjects,$skills,$contributions,$bio,$photoUrl,$status,$isFeatured ? 1 : 0,$isAlumni,$displayOrder];
             foreach ($fields as $i => $field) {
                 $updates[] = "$field = ?";
                 $values[] = $fieldValues[$i];
@@ -1813,10 +1825,10 @@ function routeRequest(): void
             if ($check->fetch()) throw new ApiError(409, 'A registration with this email already exists.');
             $publishedAt = ($status === 'published') ? 'NOW()' : 'NULL';
             $statement = database()->prepare(
-                "INSERT INTO resident_teachers (fullName, email, phone, gender, modelSchool, position, bestPractice, bestPracticeDescription, subjects, skills, contributions, bio, photoUrl, status, isFeatured, displayOrder, publishedAt)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, $publishedAt)"
+                "INSERT INTO resident_teachers (fullName, email, phone, gender, modelSchool, position, bestPractice, bestPracticeDescription, subjects, skills, contributions, bio, photoUrl, status, isFeatured, isAlumni, displayOrder, publishedAt)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, $publishedAt)"
             );
-            $statement->execute([$fullName, $email, $phone, $gender, $modelSchool, $position, $bestPractice, $bestPracticeDescription, $subjects, $skills, $contributions, $bio, $photoUrl, $status, $isFeatured ? 1 : 0, $displayOrder]);
+            $statement->execute([$fullName, $email, $phone, $gender, $modelSchool, $position, $bestPractice, $bestPracticeDescription, $subjects, $skills, $contributions, $bio, $photoUrl, $status, $isFeatured ? 1 : 0, $isAlumni, $displayOrder]);
             $id = (int) database()->lastInsertId();
         }
 

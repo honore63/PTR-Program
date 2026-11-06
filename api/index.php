@@ -2327,10 +2327,20 @@ try {
     respond(['error' => $error->getMessage()], $error->status);
 } catch (Throwable $error) {
     error_log('PTRP API error: ' . $error->getMessage());
+    $status = 500;
     $message = strtolower((string) getenv('APP_ENV')) === 'development'
         ? 'The request could not be completed: ' . $error->getMessage()
         : 'The request could not be completed.';
-    respond(['error' => $message], 500);
+    if ($error instanceof PDOException) {
+        $driverCode = (int) ($error->errorInfo[1] ?? 0);
+        if (in_array($driverCode, [2002, 2003], true)) {
+            $status = 503;
+            $message = 'The database service is temporarily unavailable. Please try again later.';
+        } elseif (strtolower((string) getenv('APP_ENV')) !== 'development') {
+            $message = 'A database operation could not be completed. Please try again later.';
+        }
+    }
+    respond(['error' => $message], $status);
 }
 
 /* ============================================================================

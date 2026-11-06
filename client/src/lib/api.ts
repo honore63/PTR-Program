@@ -73,17 +73,30 @@ export async function apiRequest<T>(
   const { body, headers, ...requestOptions } = options;
   const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
   const apiBaseUrl = getApiBaseUrl();
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    ...requestOptions,
-    credentials: "include",
-    headers: {
-      ...(body !== undefined && !isFormData ? { "Content-Type": "application/json" } : {}),
-      ...headers,
-    },
-    body: body === undefined ? undefined : isFormData || typeof body === "string" ? body : JSON.stringify(body),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${apiBaseUrl}${path}`, {
+      ...requestOptions,
+      credentials: "include",
+      headers: {
+        ...(body !== undefined && !isFormData ? { "Content-Type": "application/json" } : {}),
+        ...headers,
+      },
+      body: body === undefined ? undefined : isFormData || typeof body === "string" ? body : JSON.stringify(body),
+    });
+  } catch {
+    throw new ApiError("PTRP services are temporarily unreachable. Please try again later.", 0);
+  }
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
+    if (response.status >= 500) {
+      throw new ApiError(
+        response.status === 503
+          ? "PTRP services are temporarily unavailable. Please try again later."
+          : "The request could not be completed. Please try again later.",
+        response.status,
+      );
+    }
     throw new ApiError(payload?.error || `Request failed (${response.status})`, response.status);
   }
   return payload as T;

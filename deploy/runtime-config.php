@@ -17,12 +17,25 @@ $allowedOrigins = array_values(array_filter(array_map(
     explode(',', $env('ALLOWED_ORIGINS'))
 )));
 
+$dbUrl = $env('DATABASE_URL', $env('MYSQL_URL'));
+$urlHost = null; $urlPort = null; $urlUser = null; $urlPass = null; $urlPath = null;
+if ($dbUrl !== '' && (str_starts_with($dbUrl, 'mysql://') || str_starts_with($dbUrl, 'mysql:'))) {
+    $parsed = parse_url($dbUrl);
+    if ($parsed) {
+        $urlHost = $parsed['host'] ?? null;
+        $urlPort = isset($parsed['port']) ? (int) $parsed['port'] : null;
+        $urlUser = isset($parsed['user']) ? rawurldecode($parsed['user']) : null;
+        $urlPass = isset($parsed['pass']) ? rawurldecode($parsed['pass']) : null;
+        $urlPath = isset($parsed['path']) ? trim($parsed['path'], '/') : null;
+    }
+}
+
 return [
-    'db_host' => $env('DB_HOST'),
-    'db_port' => (int) $env('DB_PORT', '3306'),
-    'db_name' => $env('DB_NAME', $env('MYSQL_DATABASE', 'ptrp')),
-    'db_user' => $env('DB_USER', $env('MYSQL_USER', 'ptrp')),
-    'db_password' => $env('DB_PASSWORD', $env('MYSQL_PASSWORD')),
+    'db_host' => $env('DB_HOST', $urlHost ?? ''),
+    'db_port' => (int) $env('DB_PORT', (string) ($urlPort ?? 3306)),
+    'db_name' => $env('DB_NAME', $env('MYSQL_DATABASE', $urlPath ?? 'ptrp')),
+    'db_user' => $env('DB_USER', $env('MYSQL_USER', $urlUser ?? 'ptrp')),
+    'db_password' => $env('DB_PASSWORD', $env('MYSQL_PASSWORD', $urlPass ?? '')),
     'db_ssl_ca' => $env('DB_SSL_CA'),
     'base_path' => $env('BASE_PATH', '/'),
     'manus_jwt_secret' => $env('MANUS_JWT_SECRET'),

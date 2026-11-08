@@ -691,8 +691,8 @@ function routeRequest(): void
         }
 
         if (password_needs_rehash($user['passwordHash'], PASSWORD_BCRYPT, ['cost' => 12])) {
-            database()->prepare('UPDATE users SET passwordHash = ? WHERE id = ?')
-                ->execute([password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]), $user['id']]);
+            database()->prepare('UPDATE users SET passwordHash = ? WHERE id = ? AND passwordHash = ?')
+                ->execute([password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]), $user['id'], $user['passwordHash']]);
         }
         database()->prepare('UPDATE users SET lastSignedIn = NOW() WHERE id = ?')->execute([$user['id']]);
 

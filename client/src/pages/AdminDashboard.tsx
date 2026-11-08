@@ -10,6 +10,8 @@ import {
   Smartphone,
   UserRound,
   Briefcase,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SocialManager } from "./SocialManager";
@@ -73,81 +75,107 @@ const emptyCmsLayout = JSON.stringify({
 
 function AdminLoginForm() {
   const { login } = useAuth();
-  const [username, setUsername] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!username || !password) {
-      setError("Please enter your username or email and password.");
+    if (!identifier.trim()) {
+      setError("Please enter your email address or username.");
+      return;
+    }
+    if (!password) {
+      setError("Please enter your password.");
       return;
     }
     setLoading(true);
     try {
-      const u = await login({ username, password });
+      const u = await login({ identifier: identifier.trim(), password });
       if (u.role === "admin") {
-        toast.success("Administrator session verified.");
+        toast.success("Welcome back. Opening the Admin Dashboard.");
       } else if (u.role === "editor") {
         toast.success("Content editor session verified.");
       } else {
         setError("Your account is authenticated, but does not have content editor or administrator privileges.");
       }
     } catch (err: any) {
-      setError(err.message || "Failed to authenticate administrator.");
+      setError(err?.message || "We could not sign you in. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
+  const labelStyle = { fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#4b5563", display: "block", marginBottom: "0.3rem" } as const;
+  const inputStyle = { width: "100%", padding: "0.65rem 0.85rem", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "1rem", color: "#111", background: "#fff" } as const;
+
   return (
     <div className="admin-access">
-      <div className="admin-access-card" style={{ maxWidth: 440 }}>
+      <div className="admin-access-card" style={{ width: "100%", maxWidth: 440 }}>
         <div className="admin-brand-mark" style={{ margin: "0 auto 1rem" }}>P</div>
         <h1>PTRP Admin Portal</h1>
-        <p className="admin-access-subtitle">Secure workspace for PTR Alumni Network content and administration.</p>
+        <p className="admin-access-subtitle">Sign in with your email address or username to manage the PTR Alumni Network.</p>
 
         {error && (
-          <div style={{ background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", padding: "0.75rem", borderRadius: "8px", fontSize: "0.8rem", marginBottom: "1rem", textAlign: "left" }}>
-            {error}
+          <div role="alert" style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start", background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", padding: "0.75rem", borderRadius: "8px", fontSize: "0.85rem", marginBottom: "1rem", textAlign: "left" }}>
+            <AlertCircle className="size-4" style={{ flexShrink: 0, marginTop: 2 }} />
+            <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.9rem", textAlign: "left" }}>
+        <form onSubmit={handleSubmit} noValidate aria-busy={loading} style={{ display: "flex", flexDirection: "column", gap: "0.9rem", textAlign: "left" }}>
           <div>
-            <label style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#4b5563", display: "block", marginBottom: "0.3rem" }}>
-              Username or Email
-            </label>
+            <label htmlFor="admin-login-identifier" style={labelStyle}>Email or Username</label>
             <input
+              id="admin-login-identifier"
+              name="identifier"
               type="text"
-              required
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Residents teachers"
+              inputMode="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder="you@example.com or username"
               autoComplete="username"
-              style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.9rem", color: "#111" }}
+              disabled={loading}
+              style={inputStyle}
             />
           </div>
 
           <div>
-            <label style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#4b5563", display: "block", marginBottom: "0.3rem" }}>
-              Password
-            </label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              autoComplete="current-password"
-              style={{ width: "100%", padding: "0.65rem 0.85rem", border: "1px solid #d1d5db", borderRadius: "8px", fontSize: "0.9rem", color: "#111" }}
-            />
+            <label htmlFor="admin-login-password" style={labelStyle}>Password</label>
+            <div style={{ position: "relative" }}>
+              <input
+                id="admin-login-password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+                disabled={loading}
+                style={{ ...inputStyle, paddingRight: "5.5rem" }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
+                aria-controls="admin-login-password"
+                style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", display: "inline-flex", alignItems: "center", gap: 4, border: 0, background: "transparent", color: "#0098d9", fontSize: "0.75rem", fontWeight: 700, padding: "0.4rem 0.5rem", cursor: "pointer" }}
+              >
+                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                {showPassword ? "Hide" : "Show"}
+              </button>
+            </div>
           </div>
 
-          <button type="submit" disabled={loading} className="button-primary" style={{ width: "100%", marginTop: "0.5rem" }}>
-            {loading ? "Authenticating…" : "Sign In to Admin Portal"} <ShieldCheck className="size-4" />
+          <button type="submit" disabled={loading} className="button-primary" style={{ width: "100%", marginTop: "0.5rem", justifyContent: "center" }}>
+            {loading ? <><Loader2 className="size-4 animate-spin" /> Logging in…</> : <><ShieldCheck className="size-4" /> Login</>}
           </button>
         </form>
 
@@ -155,7 +183,7 @@ function AdminLoginForm() {
           This workspace is restricted to authorized content editors and administrators. Administrative operations are protected.
         </p>
         <div style={{ marginTop: "1rem" }}>
-          <a href="/" style={{ color: "#0098d9", fontSize: "0.8rem", fontWeight: 700, textDecoration: "none" }}>
+          <a href={import.meta.env.BASE_URL} style={{ color: "#0098d9", fontSize: "0.8rem", fontWeight: 700, textDecoration: "none" }}>
             ← Return to public site
           </a>
         </div>

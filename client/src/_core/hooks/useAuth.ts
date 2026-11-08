@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo } from "react";
 export type AuthUser = {
   id: number;
   name: string | null;
+  username?: string | null;
   email: string | null;
   role: "user" | "editor" | "admin";
   lastSignedIn?: string;
@@ -29,7 +30,7 @@ export function useAuth(options?: UseAuthOptions) {
   });
 
   const loginMutation = useMutation({
-    mutationFn: (credentials: { username: string; password: string }) =>
+    mutationFn: (credentials: { identifier: string; password: string }) =>
       apiRequest<AuthUser>("auth/login", { method: "POST", body: credentials }),
     onSuccess: (data) => {
       queryClient.setQueryData(queryKeys.authMe, data);
@@ -126,7 +127,7 @@ export function useAuth(options?: UseAuthOptions) {
   return {
     ...state,
     refresh: () => meQuery.refetch(),
-    login: (credentials: { username: string; password: string }) => loginMutation.mutateAsync(credentials),
+    login: (credentials: { identifier: string; password: string }) => loginMutation.mutateAsync(credentials),
     register: (payload: { name: string; email: string; password: string }) => registerMutation.mutateAsync(payload),
     forgotPassword: (email: string) => forgotPasswordMutation.mutateAsync(email),
     resetPassword: (payload: { token: string; password: string }) => resetPasswordMutation.mutateAsync(payload),

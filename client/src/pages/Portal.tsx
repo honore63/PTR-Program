@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, ShieldCheck, UsersRound, Instagram, Facebook, Send, Youtube, Linkedin, Music2, AtSign, CheckCircle2, AlertCircle, LogOut, LayoutDashboard } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Loader2, ShieldCheck, UsersRound, Instagram, Facebook, Send, Youtube, Linkedin, Music2, AtSign, CheckCircle2, AlertCircle, LogOut, LayoutDashboard } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { copy, socialLinks, type Language } from "@/data/ptrp";
 import { BrandMark } from "@/components/ptrp/BrandMark";
@@ -16,6 +16,7 @@ export default function Portal({ language }: PortalProps) {
   const [mode, setMode] = useState<AuthMode>("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [resetToken, setResetToken] = useState("");
@@ -27,15 +28,19 @@ export default function Portal({ language }: PortalProps) {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
-    if (!username || !password) {
-      setErrorMsg("Please enter both username and password.");
+    if (!username.trim()) {
+      setErrorMsg("Please enter your email address or username.");
+      return;
+    }
+    if (!password) {
+      setErrorMsg("Please enter your password.");
       return;
     }
     setSubmitting(true);
     try {
-      const loggedUser = await login({ username, password });
+      const loggedUser = await login({ identifier: username.trim(), password });
       toast.success("Signed in successfully!");
-      if (loggedUser.role === "admin") {
+      if (loggedUser.role === "admin" || loggedUser.role === "editor") {
         setLocation("/admin");
       }
     } catch (err: any) {
@@ -307,7 +312,7 @@ export default function Portal({ language }: PortalProps) {
                   {mode === "reset" && "Set a new password"}
                 </h2>
                 <p className="text-xs text-[#6b7280] mb-6">
-                  {mode === "login" && "Enter your username or email and password to access the network."}
+                  {mode === "login" && "Enter your email address or username and your password to access the network."}
                   {mode === "register" && "Register your profile with your educational email address."}
                   {mode === "forgot" && "Username or email based password recovery is not available yet. Contact a network administrator for help."}
                   {mode === "reset" && "Enter your reset verification token and choose a new password."}
@@ -344,30 +349,52 @@ export default function Portal({ language }: PortalProps) {
                 {/* Form based on mode */}
                 <div className="bg-white rounded-xl p-6 border border-[#d1d5db] shadow-xs">
                   {mode === "login" && (
-                    <form onSubmit={handleLogin} className="space-y-5">
+                    <form onSubmit={handleLogin} noValidate aria-busy={submitting} className="space-y-5">
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold uppercase tracking-wide text-[#4b5563]">Username or Email</label>
+                        <label htmlFor="portal-login-identifier" className="text-xs font-bold uppercase tracking-wide text-[#4b5563]">Email or Username</label>
                         <input
+                          id="portal-login-identifier"
+                          name="identifier"
                           type="text"
-                          required
+                          inputMode="email"
+                          autoCapitalize="none"
+                          autoCorrect="off"
+                          spellCheck={false}
                           value={username}
                           onChange={(e) => setUsername(e.target.value)}
-                          placeholder="Residents teachers"
+                          placeholder="you@example.com or username"
                           autoComplete="username"
-                          className="px-4 py-2.5 border border-[#d1d5db] rounded-lg text-sm text-[#111] focus:ring-2 focus:ring-[#0098d9] focus:border-transparent outline-none transition-all"
+                          disabled={submitting}
+                          className="px-4 py-2.5 border border-[#d1d5db] rounded-lg text-base sm:text-sm text-[#111] focus:ring-2 focus:ring-[#0098d9] focus:border-transparent outline-none transition-all"
                         />
                       </div>
 
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold uppercase tracking-wide text-[#4b5563]">Password</label>
-                        <input
-                          type="password"
-                          required
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="••••••••"
-                          className="px-4 py-2.5 border border-[#d1d5db] rounded-lg text-sm text-[#111] focus:ring-2 focus:ring-[#0098d9] focus:border-transparent outline-none transition-all"
-                        />
+                        <label htmlFor="portal-login-password" className="text-xs font-bold uppercase tracking-wide text-[#4b5563]">Password</label>
+                        <div className="relative">
+                          <input
+                            id="portal-login-password"
+                            name="password"
+                            type={showPassword ? "text" : "password"}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Enter your password"
+                            autoComplete="current-password"
+                            disabled={submitting}
+                            className="w-full px-4 py-2.5 pr-24 border border-[#d1d5db] rounded-lg text-base sm:text-sm text-[#111] focus:ring-2 focus:ring-[#0098d9] focus:border-transparent outline-none transition-all"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword((v) => !v)}
+                            aria-label={showPassword ? "Hide password" : "Show password"}
+                            aria-pressed={showPassword}
+                            aria-controls="portal-login-password"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 px-2 py-1 text-xs font-bold text-[#0098d9]"
+                          >
+                            {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                            {showPassword ? "Hide" : "Show"}
+                          </button>
+                        </div>
                       </div>
 
                       <div className="flex items-center justify-between text-xs pt-1">
@@ -386,7 +413,7 @@ export default function Portal({ language }: PortalProps) {
                         disabled={submitting}
                         className="button-primary w-full py-3 font-bold text-sm tracking-wide disabled:opacity-50"
                       >
-                        {submitting ? "Signing in…" : "Sign In"}
+                        {submitting ? <span className="inline-flex items-center justify-center gap-2"><Loader2 className="size-4 animate-spin" /> Logging in…</span> : "Login"}
                       </button>
                     </form>
                   )}

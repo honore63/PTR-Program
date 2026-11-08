@@ -353,15 +353,17 @@ function currentUser(bool $required = true): ?array
     }
     $uid = $identity['uid'] ?? 0;
     if ($uid > 0) {
-        $statement = database()->prepare('SELECT id, name, email, loginMethod, role, createdAt, updatedAt, lastSignedIn FROM users WHERE id = ? LIMIT 1');
+        $statement = database()->prepare('SELECT * FROM users WHERE id = ? LIMIT 1');
         $statement->execute([$uid]);
     } else {
         // Fallback for legacy session containing openId
-        $statement = database()->prepare('SELECT id, name, email, loginMethod, role, createdAt, updatedAt, lastSignedIn FROM users WHERE openId = ? OR email = ? LIMIT 1');
+        $statement = database()->prepare('SELECT * FROM users WHERE openId = ? OR email = ? LIMIT 1');
         $statement->execute([$identity['openId'] ?? '', $identity['email'] ?? '']);
     }
     $user = $statement->fetch();
-    if (!$user && $required) throw new ApiError(401, 'Account not found. Please log in again.');
+    if ($user && ($user['account_status'] ?? 'active') !== 'active') $user = false;
+    if (!$user && $required) throw new ApiError(401, 'Account not found or inactive. Please log in again.');
+    if ($user) $user = array_intersect_key($user, array_flip(['id', 'name', 'username', 'email', 'loginMethod', 'role', 'createdAt', 'updatedAt', 'lastSignedIn']));
     return $user ?: null;
 }
 
@@ -654,38 +656,54 @@ function routeRequest(): void
         respond(currentUser(false));
     }
 
-    // Login with Username & Password
+    // Login with Email or Username & Password
     if ($route === '/auth/login' && $method === 'POST') {
         requireSameOrigin();
         $data = jsonBody();
-        $username = strtolower((string) inputString($data, 'identifier', 320, true) ?? inputString($data, 'username', 320, true));
+        $identifier = null;
+        foreach (['identifier', 'username', 'email'] as $field) {
+            $candidate = inputString($data, $field, 320);
+            if ($candidate !== null && $candidate !== '') {
+                $identifier = strtolower($candidate);
+                break;
+            }
+        }
         $password = (string) ($data['password'] ?? '');
-        if ($password === '') throw new ApiError(400, 'Password is required.');
+        if ($identifier === null) throw new ApiError(400, 'Please enter your email address or username.');
+        if ($password === '') throw new ApiError(400, 'Please enter your password.');
 
         $usernameColumn = database()->query("SHOW COLUMNS FROM users LIKE 'username'")->fetch();
-        $stmt = database()->prepare($usernameColumn
-            ? 'SELECT * FROM users WHERE LOWER(email) = ? OR LOWER(username) = ? OR LOWER(name) = ? LIMIT 1'
-            : 'SELECT * FROM users WHERE LOWER(email) = ? OR LOWER(name) = ? LIMIT 1');
-        $parameters = $usernameColumn
-            ? [$username, $username, $username]
-            : [$username, $username];
-        $stmt->execute($parameters);
+        if ($usernameColumn) {
+            $stmt = database()->prepare('SELECT * FROM users WHERE LOWER(email) = ? OR LOWER(username) = ? ORDER BY (LOWER(email) = ?) DESC LIMIT 1');
+            $stmt->execute([$identifier, $identifier, $identifier]);
+        } else {
+            $stmt = database()->prepare('SELECT * FROM users WHERE LOWER(email) = ? LIMIT 1');
+            $stmt->execute([$identifier]);
+        }
         $user = $stmt->fetch();
 
         if (!$user || empty($user['passwordHash']) || !password_verify($password, $user['passwordHash'])) {
-            throw new ApiError(401, 'Invalid username or password.');
+            usleep(random_int(250000, 500000));
+            throw new ApiError(401, 'Incorrect email/username or password. Please check your details and try again.');
+        }
+        if (($user['account_status'] ?? 'active') !== 'active') {
+            throw new ApiError(403, 'This account is inactive. Please contact a network administrator.');
         }
 
-        // Update lastSignedIn
+        if (password_needs_rehash($user['passwordHash'], PASSWORD_BCRYPT, ['cost' => 12])) {
+            database()->prepare('UPDATE users SET passwordHash = ? WHERE id = ?')
+                ->execute([password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]), $user['id']]);
+        }
         database()->prepare('UPDATE users SET lastSignedIn = NOW() WHERE id = ?')->execute([$user['id']]);
 
-        // Issue secure session cookie
         $sessionToken = signSession($user);
         setcookie('ptrp_session', $sessionToken, cookieOptions(time() + (86400 * 30)));
+        setcookie('webdev_app_session', '', cookieOptions(time() - 3600));
 
         respond([
             'id' => (int) $user['id'],
             'name' => $user['name'],
+            'username' => $user['username'] ?? null,
             'email' => $user['email'],
             'role' => $user['role'],
             'lastSignedIn' => date('c'),

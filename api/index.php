@@ -106,6 +106,7 @@ function ensureDatabaseSchema(PDO $pdo): void
         }
 
         // Ensure websiteSettings table exists
+        $settingsTableExisted = (bool) $pdo->query("SHOW TABLES LIKE 'websiteSettings'")->fetch();
         $pdo->exec("CREATE TABLE IF NOT EXISTS `websiteSettings` (
           `settingKey` varchar(100) NOT NULL,
           `settingValue` longtext NOT NULL,
@@ -114,9 +115,8 @@ function ensureDatabaseSchema(PDO $pdo): void
           PRIMARY KEY (`settingKey`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
-        // Seed default branding if empty
-        $settingsCount = (int) $pdo->query("SELECT COUNT(*) FROM `websiteSettings`")->fetchColumn();
-        if ($settingsCount === 0) {
+        // Seed default branding only when the table is first created
+        if (!$settingsTableExisted) {
             $pdo->exec("INSERT IGNORE INTO `websiteSettings` (`settingKey`, `settingValue`) VALUES
               ('siteName', 'PTR Alumni Network'),
               ('tagline', 'Inspire, Educate and Empower.'),

@@ -1,0 +1,29 @@
+<?php
+// cPanel / shared hosting configuration for the PTRP PHP API.
+// Copy to config.php in the same folder as the api/ directory (e.g. public_html/config.php)
+// and fill in the values from your hosting control panel. Never commit config.php.
+return [
+    'db_host' => 'localhost',
+    'db_port' => 3306,
+    'db_name' => 'CPANELUSER_ptrp',
+    'db_user' => 'CPANELUSER_ptrp',
+    'db_password' => 'CHANGE_ME',
+    // The API must be served from the domain root (https://api.example.com/api/...).
+    'base_path' => '',
+    // Random string of at least 32 characters. Changing it signs everyone out.
+    'manus_jwt_secret' => 'CHANGE_ME_TO_A_LONG_RANDOM_SECRET_AT_LEAST_32_CHARS',
+    // The Vercel frontend that forwards /api requests here.
+    'allowed_origins' => ['https://ptrprogram.vercel.app'],
+    'cookie_samesite' => 'Lax',
+    // Same random value (32+ characters) as PTRP_PROXY_SECRET on Vercel, so per-visitor
+    // rate limits use the visitor's IP instead of Vercel's.
+    'proxy_secret' => '',
+    // Optional contact-form email delivery.
+    'smtp_host' => 'smtp.gmail.com',
+    'smtp_port' => 587,
+    'smtp_encryption' => 'tls',
+    'smtp_username' => '',
+    'smtp_password' => '',
+    'smtp_from_email' => '',
+    'smtp_from_name' => 'PTR Alumni Network',
+];

@@ -166,6 +166,16 @@ function normalizeOrigin(string $origin): ?string
     return $normalized;
 }
 
+function clientIp(): string
+{
+    $remoteAddress = (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+    $proxySecret = (string) (config()['proxy_secret'] ?? '');
+    $providedSecret = (string) ($_SERVER['HTTP_X_PTRP_PROXY_SECRET'] ?? '');
+    if (strlen($proxySecret) < 32 || $providedSecret === '' || !hash_equals($proxySecret, $providedSecret)) return $remoteAddress;
+    $forwardedIp = trim((string) ($_SERVER['HTTP_X_PTRP_CLIENT_IP'] ?? ''));
+    return filter_var($forwardedIp, FILTER_VALIDATE_IP) ? $forwardedIp : $remoteAddress;
+}
+
 function uploadDirectory(): string
 {
     return rtrim((string) (config()['upload_dir'] ?? dirname(__DIR__) . '/uploads'), '/\\');
@@ -604,7 +614,7 @@ function routeRequest(): void
             ], 200);
         }
 
-        $clientIp = (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+        $clientIp = clientIp();
         $ipHash = hash_hmac('sha256', $clientIp, getSessionSecret());
         $rateLimit = database()->prepare('SELECT COUNT(*) FROM contactMessages WHERE ipHash = ? AND createdAt >= DATE_SUB(NOW(), INTERVAL 1 HOUR)');
         $rateLimit->execute([$ipHash]);

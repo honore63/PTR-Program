@@ -53,6 +53,7 @@ function database(): PDO
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES => false,
+            PDO::ATTR_TIMEOUT => 5,
         ];
         if (!empty($settings['db_ssl_ca'])) {
             if (!is_file($settings['db_ssl_ca'])) {
@@ -83,6 +84,9 @@ function ensureDatabaseSchema(PDO $pdo): void
         if (!in_array('passwordHash', $columns, true)) {
             $pdo->exec("ALTER TABLE users ADD COLUMN passwordHash VARCHAR(255) NULL AFTER email");
         }
+        if (!in_array('username', $columns, true)) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN username VARCHAR(100) NULL AFTER name");
+        }
         if (!in_array('resetToken', $columns, true)) {
             $pdo->exec("ALTER TABLE users ADD COLUMN resetToken VARCHAR(128) NULL AFTER role");
         }
@@ -95,6 +99,30 @@ function ensureDatabaseSchema(PDO $pdo): void
         }
         if (!in_array('account_type', $columns, true)) {
             $pdo->exec("ALTER TABLE users ADD COLUMN account_type ENUM('public','resident_teacher','admin') NOT NULL DEFAULT 'public' AFTER account_status");
+        }
+        $usernameIndex = $pdo->query("SHOW INDEX FROM users WHERE Key_name = 'users_username_unique'")->fetch();
+        if (!$usernameIndex) {
+            $pdo->exec("ALTER TABLE users ADD UNIQUE KEY users_username_unique (username)");
+        }
+
+        // Ensure websiteSettings table exists
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `websiteSettings` (
+          `settingKey` varchar(100) NOT NULL,
+          `settingValue` longtext NOT NULL,
+          `updatedBy` int DEFAULT NULL,
+          `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          PRIMARY KEY (`settingKey`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        // Seed default branding if empty
+        $settingsCount = (int) $pdo->query("SELECT COUNT(*) FROM `websiteSettings`")->fetchColumn();
+        if ($settingsCount === 0) {
+            $pdo->exec("INSERT IGNORE INTO `websiteSettings` (`settingKey`, `settingValue`) VALUES
+              ('siteName', 'PTR Alumni Network'),
+              ('tagline', 'Inspire, Educate and Empower.'),
+              ('contactEmail', 'info@ptr.rw'),
+              ('primaryColor', '#0b2347'),
+              ('accentColor', '#0098d9')");
         }
 
     } catch (Throwable $e) {
@@ -111,10 +139,11 @@ function basePath(): string
 function isSecureRequest(): bool
 {
     if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') return true;
-    if (getenv('RENDER') === 'true') {
-        $forwardedProto = strtolower(trim(explode(',', (string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''))[0]));
-        return $forwardedProto === 'https';
-    }
+    $forwardedProto = strtolower(trim(explode(',', (string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''))[0]));
+    if ($forwardedProto === 'https') return true;
+    if (strtolower((string) ($_SERVER['HTTP_X_FORWARDED_SSL'] ?? '')) === 'on') return true;
+    if (strtolower((string) ($_SERVER['HTTP_FRONT_END_HTTPS'] ?? '')) === 'on') return true;
+    if (getenv('RENDER') === 'true') return true;
     return false;
 }
 
@@ -530,11 +559,11 @@ function routeRequest(): void
     if ($route === '/health' && $method === 'GET') {
         try {
             database()->query('SELECT 1')->fetchColumn();
-        } catch (PDOException $error) {
+            respond(['status' => 'ok', 'database' => 'connected']);
+        } catch (Throwable $error) {
             error_log('PTRP API health check database failure: ' . $error->getMessage());
-            throw new ApiError(503, 'Database service unavailable.');
+            respond(['status' => 'degraded', 'database' => 'disconnected', 'message' => 'Database service unavailable.'], 503);
         }
-        respond(['status' => 'ok', 'database' => 'ok']);
     }
 
     if ($route === '/contact-messages') {
@@ -629,15 +658,25 @@ function routeRequest(): void
     if ($route === '/auth/login' && $method === 'POST') {
         requireSameOrigin();
         $data = jsonBody();
-        $username = strtolower((string) inputString($data, 'username', 320, true));
+        $identifierKey = array_key_exists('identifier', $data) ? 'identifier' : 'username';
+        $username = strtolower((string) inputString($data, $identifierKey, 320, true));
         $password = (string) ($data['password'] ?? '');
         if ($password === '') throw new ApiError(400, 'Password is required.');
 
-        // The username is matched against the email column (existing accounts store
-        // their username/identifier in the email column). No email format is required.
+        $usernameColumn = database()->query("SHOW COLUMNS FROM users LIKE 'username'")->fetch();
         $stmt = database()->prepare('SELECT * FROM users WHERE LOWER(email) = ? LIMIT 1');
         $stmt->execute([$username]);
         $user = $stmt->fetch();
+        if (!$user && $usernameColumn) {
+            $stmt = database()->prepare('SELECT * FROM users WHERE LOWER(username) = ? LIMIT 1');
+            $stmt->execute([$username]);
+            $user = $stmt->fetch();
+        }
+        if (!$user) {
+            $stmt = database()->prepare('SELECT * FROM users WHERE LOWER(name) = ? LIMIT 1');
+            $stmt->execute([$username]);
+            $user = $stmt->fetch();
+        }
 
         if (!$user || empty($user['passwordHash']) || !password_verify($password, $user['passwordHash'])) {
             throw new ApiError(401, 'Invalid username or password.');
@@ -739,12 +778,22 @@ function routeRequest(): void
     // =========================================================================
 
     if (preg_match('#^/content/([a-zA-Z0-9_-]{1,120})$#', $route, $matches) && $method === 'GET') {
-        $statement = database()->prepare("SELECT id, slug, title, summary, body, status, updatedBy, createdAt, updatedAt FROM siteContent WHERE slug = ? AND status = 'published' LIMIT 1");
-        $statement->execute([$matches[1]]);
-        respond($statement->fetch() ?: null);
+        try {
+            $statement = database()->prepare("SELECT id, slug, title, summary, body, status, updatedBy, createdAt, updatedAt FROM siteContent WHERE slug = ? AND status = 'published' LIMIT 1");
+            $statement->execute([$matches[1]]);
+            respond($statement->fetch() ?: null);
+        } catch (Throwable $error) {
+            error_log('PTRP content slug endpoint failure: ' . $error->getMessage());
+            respond(null);
+        }
     }
     if ($route === '/content' && $method === 'GET') {
-        respond(database()->query("SELECT id, slug, title, summary, body, status, createdAt, updatedAt FROM siteContent WHERE status = 'published' ORDER BY updatedAt DESC")->fetchAll());
+        try {
+            respond(database()->query("SELECT id, slug, title, summary, body, status, createdAt, updatedAt FROM siteContent WHERE status = 'published' ORDER BY updatedAt DESC")->fetchAll());
+        } catch (Throwable $error) {
+            error_log('PTRP content endpoint failure: ' . $error->getMessage());
+            respond([]);
+        }
     }
     if ($route === '/settings' && $method === 'GET') {
         $settings = [
@@ -768,52 +817,123 @@ function routeRequest(): void
         respond($settings);
     }
     if ($route === '/navigation' && $method === 'GET') {
-        respond(database()->query("SELECT id, label, href, parentId, sortOrder FROM navigationItems WHERE status = 'published' AND isVisible = 1 ORDER BY sortOrder ASC, id ASC")->fetchAll());
+        try {
+            $tableExists = database()->query("SHOW TABLES LIKE 'navigationItems'")->fetchColumn();
+            if ($tableExists) {
+                respond(database()->query("SELECT id, label, href, parentId, sortOrder FROM navigationItems WHERE status = 'published' AND isVisible = 1 ORDER BY sortOrder ASC, id ASC")->fetchAll());
+            }
+        } catch (Throwable $error) {
+            error_log('PTRP navigation endpoint failure: ' . $error->getMessage());
+        }
+        respond([
+            ['id' => 1, 'label' => 'Home', 'href' => '/', 'parentId' => null, 'sortOrder' => 1],
+            ['id' => 2, 'label' => 'About', 'href' => '/about', 'parentId' => null, 'sortOrder' => 2],
+            ['id' => 3, 'label' => 'Model Schools', 'href' => '/network', 'parentId' => null, 'sortOrder' => 3],
+            ['id' => 4, 'label' => 'Impact', 'href' => '/impact', 'parentId' => null, 'sortOrder' => 4],
+            ['id' => 5, 'label' => 'News & Activities', 'href' => '/news', 'parentId' => null, 'sortOrder' => 5],
+            ['id' => 6, 'label' => 'Gallery', 'href' => '/gallery', 'parentId' => null, 'sortOrder' => 6],
+            ['id' => 7, 'label' => 'Alumni', 'href' => '/alumni', 'parentId' => null, 'sortOrder' => 7],
+            ['id' => 8, 'label' => 'Resident Teachers', 'href' => '/residents', 'parentId' => null, 'sortOrder' => 8],
+            ['id' => 9, 'label' => 'Program Team', 'href' => '/team', 'parentId' => null, 'sortOrder' => 9],
+            ['id' => 10, 'label' => 'Resources', 'href' => '/resources', 'parentId' => null, 'sortOrder' => 10],
+            ['id' => 11, 'label' => 'Partners', 'href' => '/partners', 'parentId' => null, 'sortOrder' => 11],
+            ['id' => 12, 'label' => 'Join & Contact', 'href' => '/contact', 'parentId' => null, 'sortOrder' => 12],
+        ]);
     }
     if (preg_match('#^/banners/([a-zA-Z0-9_-]{1,80})$#', $route, $matches) && $method === 'GET') {
-        $statement = database()->prepare('SELECT slug, eyebrow, title, description, imageUrl, imageAlt, imagePosition, isVisible FROM pageBanners WHERE slug = ? LIMIT 1');
-        $statement->execute([$matches[1]]);
-        respond($statement->fetch() ?: null);
+        try {
+            $statement = database()->prepare('SELECT slug, eyebrow, title, description, imageUrl, imageAlt, imagePosition, isVisible FROM pageBanners WHERE slug = ? LIMIT 1');
+            $statement->execute([$matches[1]]);
+            respond($statement->fetch() ?: null);
+        } catch (Throwable $error) {
+            error_log('PTRP banners endpoint failure: ' . $error->getMessage());
+            respond(null);
+        }
     }
     if ($route === '/schools' && $method === 'GET') {
-        respond(database()->query("SELECT * FROM schools WHERE status = 'published' ORDER BY name ASC")->fetchAll());
+        try {
+            respond(database()->query("SELECT * FROM schools WHERE status = 'published' ORDER BY name ASC")->fetchAll());
+        } catch (Throwable $error) {
+            error_log('PTRP schools endpoint failure: ' . $error->getMessage());
+            respond([]);
+        }
     }
     if ($route === '/teachers' && $method === 'GET') {
-        respond(database()->query("SELECT t.*, s.name AS schoolName FROM teachers t LEFT JOIN schools s ON s.id = t.schoolId WHERE t.status = 'approved' ORDER BY t.fullName ASC")->fetchAll());
+        try {
+            respond(database()->query("SELECT t.*, s.name AS schoolName FROM teachers t LEFT JOIN schools s ON s.id = t.schoolId WHERE t.status = 'approved' ORDER BY t.fullName ASC")->fetchAll());
+        } catch (Throwable $error) {
+            error_log('PTRP teachers endpoint failure: ' . $error->getMessage());
+            respond([]);
+        }
     }
     if ($route === '/alumni' && $method === 'GET') {
-        $rows = database()->query("SELECT a.id, a.fullName, a.email, a.phone, a.graduationYear, a.schoolId, a.bio, a.status, a.createdAt, a.updatedAt, s.name AS schoolName, NULL AS position, NULL AS photoUrl
-            FROM alumni a LEFT JOIN schools s ON s.id = a.schoolId
-            WHERE a.status = 'approved'
-            UNION ALL
-            SELECT rt.id, rt.fullName, rt.email, rt.phone, NULL AS graduationYear, s.id AS schoolId, rt.bio, 'approved' AS status, rt.createdAt, rt.updatedAt, s.name AS schoolName, rt.position, rt.photoUrl
-            FROM resident_teachers rt
-            LEFT JOIN schools s ON LOWER(s.name) = LOWER(rt.modelSchool)
-            WHERE rt.status = 'published' AND rt.isAlumni = 1
-            ORDER BY fullName ASC")->fetchAll();
-        respond($rows);
+        try {
+            $rows = database()->query("SELECT a.id, a.fullName, a.email, a.phone, a.graduationYear, a.schoolId, a.bio, a.status, a.createdAt, a.updatedAt, s.name AS schoolName, NULL AS position, NULL AS photoUrl
+                FROM alumni a LEFT JOIN schools s ON s.id = a.schoolId
+                WHERE a.status = 'approved'
+                UNION ALL
+                SELECT rt.id, rt.fullName, rt.email, rt.phone, NULL AS graduationYear, s.id AS schoolId, rt.bio, 'approved' AS status, rt.createdAt, rt.updatedAt, s.name AS schoolName, rt.position, rt.photoUrl
+                FROM resident_teachers rt
+                LEFT JOIN schools s ON LOWER(s.name) = LOWER(rt.modelSchool)
+                WHERE rt.status = 'published' AND rt.isAlumni = 1
+                ORDER BY fullName ASC")->fetchAll();
+            respond($rows);
+        } catch (Throwable $error) {
+            error_log('PTRP alumni endpoint failure: ' . $error->getMessage());
+            respond([]);
+        }
     }
     if ($route === '/news' && $method === 'GET') {
-        respond(database()->query("SELECT * FROM newsArticles WHERE status = 'published' ORDER BY COALESCE(publishedAt, createdAt) DESC")->fetchAll());
+        try {
+            respond(database()->query("SELECT * FROM newsArticles WHERE status = 'published' ORDER BY COALESCE(publishedAt, createdAt) DESC")->fetchAll());
+        } catch (Throwable $error) {
+            error_log('PTRP news endpoint failure: ' . $error->getMessage());
+            respond([]);
+        }
     }
     if (preg_match('#^/news/([a-zA-Z0-9_-]{1,120})$#', $route, $matches) && $method === 'GET') {
-        $statement = database()->prepare("SELECT * FROM newsArticles WHERE slug = ? AND status = 'published' LIMIT 1");
-        $statement->execute([$matches[1]]);
-        respond($statement->fetch() ?: null);
+        try {
+            $statement = database()->prepare("SELECT * FROM newsArticles WHERE slug = ? AND status = 'published' LIMIT 1");
+            $statement->execute([$matches[1]]);
+            respond($statement->fetch() ?: null);
+        } catch (Throwable $error) {
+            error_log('PTRP news slug endpoint failure: ' . $error->getMessage());
+            respond(null);
+        }
     }
     if ($route === '/gallery' && $method === 'GET') {
-        respond(database()->query("SELECT * FROM galleryItems WHERE status = 'approved' ORDER BY createdAt DESC")->fetchAll());
+        try {
+            respond(database()->query("SELECT * FROM galleryItems WHERE status = 'approved' ORDER BY createdAt DESC")->fetchAll());
+        } catch (Throwable $error) {
+            error_log('PTRP gallery endpoint failure: ' . $error->getMessage());
+            respond([]);
+        }
     }
     if ($route === '/best-practices' && $method === 'GET') {
-        respond(database()->query("SELECT * FROM bestPractices WHERE status = 'published' ORDER BY updatedAt DESC")->fetchAll());
+        try {
+            respond(database()->query("SELECT * FROM bestPractices WHERE status = 'published' ORDER BY updatedAt DESC")->fetchAll());
+        } catch (Throwable $error) {
+            error_log('PTRP best-practices endpoint failure: ' . $error->getMessage());
+            respond([]);
+        }
     }
 
     // ---------- Program Coordinators & Mentors (public) ----------
     if ($route === '/coordinators' && $method === 'GET') {
-        respond(database()->query("SELECT *, 'coordinator' AS role FROM coordinators WHERE status = 'published' AND isVisible = 1 ORDER BY displayOrder ASC, fullName ASC")->fetchAll());
+        try {
+            respond(database()->query("SELECT *, 'coordinator' AS role FROM coordinators WHERE status = 'published' AND isVisible = 1 ORDER BY displayOrder ASC, fullName ASC")->fetchAll());
+        } catch (Throwable $error) {
+            error_log('PTRP coordinators endpoint failure: ' . $error->getMessage());
+            respond([]);
+        }
     }
     if ($route === '/mentors' && $method === 'GET') {
-        respond(database()->query("SELECT *, 'mentor' AS role FROM mentors WHERE status = 'published' AND isVisible = 1 ORDER BY displayOrder ASC, fullName ASC")->fetchAll());
+        try {
+            respond(database()->query("SELECT *, 'mentor' AS role FROM mentors WHERE status = 'published' AND isVisible = 1 ORDER BY displayOrder ASC, fullName ASC")->fetchAll());
+        } catch (Throwable $error) {
+            error_log('PTRP mentors endpoint failure: ' . $error->getMessage());
+            respond([]);
+        }
     }
 
     // =========================================================================
@@ -1740,77 +1860,94 @@ function routeRequest(): void
     // Resident Teacher Profiles - Public endpoints
     // =========================================================================
     if ($route === '/resident-teachers' && $method === 'GET') {
-        $limit = queryLimit(20, 100);
-        $offset = (int) max(0, $_GET['offset'] ?? 0);
-        $search = $_GET['search'] ?? null;
-        $school = $_GET['school'] ?? null;
-        $practice = $_GET['practice'] ?? null;
-        $role = $_GET['role'] ?? null;
-        $sort = $_GET['sort'] ?? 'displayOrder';
+        try {
+            $limit = queryLimit(20, 100);
+            $offset = (int) max(0, $_GET['offset'] ?? 0);
+            $search = $_GET['search'] ?? null;
+            $school = $_GET['school'] ?? null;
+            $practice = $_GET['practice'] ?? null;
+            $role = $_GET['role'] ?? null;
+            $sort = $_GET['sort'] ?? 'displayOrder';
 
-        $sql = "SELECT * FROM resident_teachers WHERE status = 'published'";
-        $params = [];
-        if ($search) {
-            $sql .= " AND (fullName LIKE ? OR bio LIKE ? OR contributions LIKE ?)";
-            $like = "%$search%";
-            $params[] = $like; $params[] = $like; $params[] = $like;
-        }
-        if ($school) {
-            $sql .= " AND modelSchool = ?";
-            $params[] = $school;
-        }
-        if ($practice) {
-            $sql .= " AND bestPractice = ?";
-            $params[] = $practice;
-        }
-        if ($role) {
-            $sql .= " AND position = ?";
-            $params[] = $role;
-        }
-        $sql .= " ORDER BY isFeatured DESC, displayOrder ASC, fullName ASC LIMIT ? OFFSET ?";
-        $params[] = $limit;
-        $params[] = $offset;
+            $sql = "SELECT * FROM resident_teachers WHERE status = 'published'";
+            $params = [];
+            if ($search) {
+                $sql .= " AND (fullName LIKE ? OR bio LIKE ? OR contributions LIKE ?)";
+                $like = "%$search%";
+                $params[] = $like; $params[] = $like; $params[] = $like;
+            }
+            if ($school) {
+                $sql .= " AND modelSchool = ?";
+                $params[] = $school;
+            }
+            if ($practice) {
+                $sql .= " AND bestPractice = ?";
+                $params[] = $practice;
+            }
+            if ($role) {
+                $sql .= " AND position = ?";
+                $params[] = $role;
+            }
+            $sql .= " ORDER BY isFeatured DESC, displayOrder ASC, fullName ASC LIMIT ? OFFSET ?";
+            $params[] = $limit;
+            $params[] = $offset;
 
-        $statement = database()->prepare($sql);
-        $statement->execute($params);
-        respond($statement->fetchAll());
+            $statement = database()->prepare($sql);
+            $statement->execute($params);
+            respond($statement->fetchAll());
+        } catch (Throwable $error) {
+            error_log('PTRP resident-teachers endpoint failure: ' . $error->getMessage());
+            respond([]);
+        }
     }
 
     if (preg_match('#^/resident-teachers/(\d+)$#', $route, $matches) && $method === 'GET') {
-        $statement = database()->prepare("SELECT * FROM resident_teachers WHERE id = ? AND status = 'published' LIMIT 1");
-        $statement->execute([(int) $matches[1]]);
-        $teacher = $statement->fetch();
-        if (!$teacher) throw new ApiError(404, 'Resident teacher not found.');
+        try {
+            $statement = database()->prepare("SELECT * FROM resident_teachers WHERE id = ? AND status = 'published' LIMIT 1");
+            $statement->execute([(int) $matches[1]]);
+            $teacher = $statement->fetch();
+            if (!$teacher) throw new ApiError(404, 'Resident teacher not found.');
 
-        $bpStmt = database()->prepare("SELECT * FROM resident_best_practices WHERE teacherId = ? ORDER BY createdAt DESC");
-        $bpStmt->execute([(int) $matches[1]]);
-        $teacher['bestPractices'] = $bpStmt->fetchAll();
-        respond($teacher);
+            $bpStmt = database()->prepare("SELECT * FROM resident_best_practices WHERE teacherId = ? ORDER BY createdAt DESC");
+            $bpStmt->execute([(int) $matches[1]]);
+            $teacher['bestPractices'] = $bpStmt->fetchAll();
+            respond($teacher);
+        } catch (ApiError $error) {
+            throw $error;
+        } catch (Throwable $error) {
+            error_log('PTRP resident-teacher detail endpoint failure: ' . $error->getMessage());
+            throw new ApiError(404, 'Resident teacher not found.');
+        }
     }
 
     if ($route === '/resident-best-practices' && $method === 'GET') {
-        $limit = queryLimit(50, 200);
-        $category = $_GET['category'] ?? null;
-        $teacherId = $_GET['teacherId'] ?? null;
+        try {
+            $limit = queryLimit(50, 200);
+            $category = $_GET['category'] ?? null;
+            $teacherId = $_GET['teacherId'] ?? null;
 
-        $sql = "SELECT rbp.*, rt.fullName AS teacherName, rt.modelSchool FROM resident_best_practices rbp
-                JOIN resident_teachers rt ON rbp.teacherId = rt.id
-                WHERE rt.status = 'published'";
-        $params = [];
-        if ($category) {
-            $sql .= " AND rbp.category = ?";
-            $params[] = $category;
-        }
-        if ($teacherId) {
-            $sql .= " AND rbp.teacherId = ?";
-            $params[] = (int) $teacherId;
-        }
-        $sql .= " ORDER BY rbp.publishedAt DESC LIMIT ?";
-        $params[] = $limit;
+            $sql = "SELECT rbp.*, rt.fullName AS teacherName, rt.modelSchool FROM resident_best_practices rbp
+                    JOIN resident_teachers rt ON rbp.teacherId = rt.id
+                    WHERE rt.status = 'published'";
+            $params = [];
+            if ($category) {
+                $sql .= " AND rbp.category = ?";
+                $params[] = $category;
+            }
+            if ($teacherId) {
+                $sql .= " AND rbp.teacherId = ?";
+                $params[] = (int) $teacherId;
+            }
+            $sql .= " ORDER BY rbp.publishedAt DESC LIMIT ?";
+            $params[] = $limit;
 
-        $statement = database()->prepare($sql);
-        $statement->execute($params);
-        respond($statement->fetchAll());
+            $statement = database()->prepare($sql);
+            $statement->execute($params);
+            respond($statement->fetchAll());
+        } catch (Throwable $error) {
+            error_log('PTRP resident-best-practices endpoint failure: ' . $error->getMessage());
+            respond([]);
+        }
     }
 
     // Resident Teacher Registration (public)
@@ -2333,12 +2470,20 @@ try {
         : 'The request could not be completed.';
     if ($error instanceof PDOException) {
         $driverCode = (int) ($error->errorInfo[1] ?? 0);
-        if (in_array($driverCode, [2002, 2003], true)) {
+        $code = (int) $error->getCode();
+        $isConnError = in_array($driverCode, [2002, 2003, 1045, 1049], true)
+            || in_array($code, [2002, 2003], true)
+            || str_contains($error->getMessage(), '[2002]')
+            || str_contains($error->getMessage(), 'Connection refused');
+        if ($isConnError) {
             $status = 503;
             $message = 'The database service is temporarily unavailable. Please try again later.';
         } elseif (strtolower((string) getenv('APP_ENV')) !== 'development') {
             $message = 'A database operation could not be completed. Please try again later.';
         }
+    } elseif ($error instanceof RuntimeException && str_starts_with($error->getMessage(), 'Database configuration is incomplete')) {
+        $status = 503;
+        $message = 'The database service is temporarily unavailable. Please try again later.';
     }
     respond(['error' => $message], $status);
 }

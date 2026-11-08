@@ -28,7 +28,7 @@ export default function Portal({ language }: PortalProps) {
     setErrorMsg(null);
     setSuccessMsg(null);
     if (!username || !password) {
-      setErrorMsg("Please enter both username and password.");
+      setErrorMsg("Please enter your email or username and password.");
       return;
     }
     setSubmitting(true);
@@ -346,13 +346,13 @@ export default function Portal({ language }: PortalProps) {
                   {mode === "login" && (
                     <form onSubmit={handleLogin} className="space-y-5">
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold uppercase tracking-wide text-[#4b5563]">Username or Email</label>
+                        <label className="text-xs font-bold uppercase tracking-wide text-[#4b5563]">Email or Username</label>
                         <input
                           type="text"
                           required
                           value={username}
                           onChange={(e) => setUsername(e.target.value)}
-                          placeholder="Residents teachers"
+                          placeholder="Email address or username"
                           autoComplete="username"
                           className="px-4 py-2.5 border border-[#d1d5db] rounded-lg text-sm text-[#111] focus:ring-2 focus:ring-[#0098d9] focus:border-transparent outline-none transition-all"
                         />

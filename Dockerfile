@@ -39,6 +39,15 @@ RUN mkdir -p /var/www/html/uploads && chown -R www-data:www-data /var/www/html/u
 # Load configuration only from environment variables at startup.
 RUN mkdir -p /usr/local/share/ptrp
 COPY deploy/runtime-config.php /usr/local/share/ptrp/runtime-config.php
+COPY database/migrations /var/www/html/database/migrations
+COPY deploy/apply-migration.php /usr/local/bin/ptrp-migrate
+RUN chmod +x /usr/local/bin/ptrp-migrate
+
+ENV APP_ENV=production \
+    UPLOAD_DIR=/var/www/html/uploads \
+    MIGRATIONS_DIR=/var/www/html/database/migrations \
+    PTRP_CONFIG_PATH=/var/www/html/config.php
+
 COPY deploy/entrypoint.sh /usr/local/bin/ptrp-entrypoint.sh
 RUN chmod +x /usr/local/bin/ptrp-entrypoint.sh
 ENTRYPOINT ["/usr/local/bin/ptrp-entrypoint.sh"]

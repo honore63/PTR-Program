@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `email` varchar(320) DEFAULT NULL,
   `passwordHash` varchar(255) DEFAULT NULL,
   `name` text DEFAULT NULL,
+  `username` varchar(100) DEFAULT NULL,
   `role` enum('user','editor','admin') NOT NULL DEFAULT 'user',
   `resetToken` varchar(128) DEFAULT NULL,
   `resetTokenExpires` datetime DEFAULT NULL,
@@ -18,7 +19,8 @@ CREATE TABLE IF NOT EXISTS `users` (
   `lastSignedIn` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `users_email_unique` (`email`),
-  UNIQUE KEY `users_openId_unique` (`openId`)
+  UNIQUE KEY `users_openId_unique` (`openId`),
+  UNIQUE KEY `users_username_unique` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- The following columns are included in the table definition above. Keep this

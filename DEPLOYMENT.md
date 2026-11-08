@@ -266,6 +266,32 @@ location = /config.php { deny all; }
 
 ---
 
+## 6a. Vercel frontend + cPanel/shared-hosting PHP API
+
+Vercel only hosts the static React build. It cannot run `api/index.php` or MySQL, so
+without a backend every `/api/*` request returns **405** (POST) or the homepage HTML (GET).
+`middleware.ts` forwards `/api/*` and `/uploads/*` from Vercel to the PHP host, so the
+session cookie stays on the Vercel domain.
+
+1. **Create the database (cPanel → MySQL Databases).** Add a database and a user with all privileges.
+2. **Import your data (phpMyAdmin).** Import your XAMPP export (phpMyAdmin → Export → SQL), or
+   `database/ptrp.sql` for an empty site, then run `database/migrations/20261108_admin_username.sql`.
+3. **Upload the API to the domain or subdomain root** (e.g. `https://api.example.com`):
+   - `api/` → `public_html/api/`
+   - `deploy/api.htaccess` → `public_html/.htaccess`
+   - `uploads/.htaccess` → `public_html/uploads/.htaccess`
+4. **Configure it.** Copy `deploy/shared-hosting/config.php.example` to `public_html/config.php`.
+   Fill in the database details and a long random `manus_jwt_secret`, and keep
+   `'base_path' => ''` and `'allowed_origins' => ['https://ptrprogram.vercel.app']`.
+5. **Check the API.** `https://api.example.com/api/health` must return
+   `{"status":"ok","database":"connected"}`.
+6. **Point Vercel at it.** Vercel → Project → Settings → Environment Variables → add
+   `PTRP_BACKEND_URL` = `https://api.example.com` (no trailing `/api`), then redeploy.
+   `https://ptrprogram.vercel.app/api/health` should now return the same JSON.
+
+Use HTTPS on the PHP host. Free hosts that put a JavaScript "browser check" in front of every
+request (e.g. InfinityFree) block Vercel's server-side requests and will not work.
+
 ## 7. Docker deployment (single container / local testing)
 
 The included `Dockerfile` builds the frontend and runs Apache + PHP in one container. MySQL is provided by the `db` service in `docker-compose.yml`.

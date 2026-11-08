@@ -29,8 +29,8 @@ function jsonError(status: number, error: string): Response {
 
 export default async function middleware(request: Request): Promise<Response> {
   const backend = (process.env.PTRP_BACKEND_URL ?? "").trim().replace(/\/+$/, "");
-  if (!/^https?:\/\//i.test(backend)) {
-    return jsonError(503, "The PTRP API is not configured. Set PTRP_BACKEND_URL in the Vercel project settings.");
+  if (!/^https:\/\//i.test(backend) && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(backend)) {
+    return jsonError(503, "The PTRP API is not configured. Set PTRP_BACKEND_URL to the https:// address of the PHP backend.");
   }
 
   const incoming = new URL(request.url);

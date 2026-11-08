@@ -286,7 +286,8 @@ session cookie stays on the Vercel domain.
 5. **Check the API.** `https://api.example.com/api/health` must return
    `{"status":"ok","database":"connected"}`.
 6. **Point Vercel at it.** Vercel → Project → Settings → Environment Variables → add
-   `PTRP_BACKEND_URL` = `https://api.example.com` (no trailing `/api`), then redeploy.
+   `PTRP_BACKEND_URL` = `https://api.example.com` (no trailing `/api`) and
+   `PTRP_PROXY_SECRET` = the same 32+ character value as `proxy_secret` in `config.php`, then redeploy.
    `https://ptrprogram.vercel.app/api/health` should now return the same JSON.
 
 Use HTTPS on the PHP host. Free hosts that put a JavaScript "browser check" in front of every

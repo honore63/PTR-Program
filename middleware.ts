@@ -38,6 +38,14 @@ export default async function middleware(request: Request): Promise<Response> {
 
   const headers = new Headers(request.headers);
   for (const name of HOP_BY_HOP_HEADERS) headers.delete(name);
+  headers.delete("X-PTRP-Proxy-Secret");
+  headers.delete("X-PTRP-Client-IP");
+  const proxySecret = process.env.PTRP_PROXY_SECRET ?? "";
+  const clientIp = (request.headers.get("x-real-ip") ?? request.headers.get("x-forwarded-for")?.split(",")[0] ?? "").trim();
+  if (proxySecret && clientIp) {
+    headers.set("X-PTRP-Proxy-Secret", proxySecret);
+    headers.set("X-PTRP-Client-IP", clientIp);
+  }
   headers.set("X-Forwarded-Host", incoming.host);
   headers.set("X-Forwarded-Proto", incoming.protocol.replace(":", ""));
 

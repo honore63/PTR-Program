@@ -15,6 +15,9 @@ return [
     // The Vercel frontend that forwards /api requests here.
     'allowed_origins' => ['https://ptrprogram.vercel.app'],
     'cookie_samesite' => 'Lax',
+    // Same random value (32+ characters) as PTRP_PROXY_SECRET on Vercel, so per-visitor
+    // rate limits use the visitor's IP instead of Vercel's.
+    'proxy_secret' => '',
     // Optional contact-form email delivery.
     'smtp_host' => 'smtp.gmail.com',
     'smtp_port' => 587,

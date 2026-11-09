@@ -19,7 +19,7 @@ $allowedOrigins = array_values(array_filter(array_map(
 
 $dbUrl = $env('DATABASE_URL', $env('MYSQL_URL'));
 $urlHost = null; $urlPort = null; $urlUser = null; $urlPass = null; $urlPath = null;
-if ($dbUrl !== '' && (str_starts_with($dbUrl, 'mysql://') || str_starts_with($dbUrl, 'mysql:'))) {
+if ($dbUrl !== '' && str_starts_with($dbUrl, 'mysql://')) {
     $parsed = parse_url($dbUrl);
     if ($parsed) {
         $urlHost = $parsed['host'] ?? null;

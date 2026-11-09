@@ -106,6 +106,7 @@ function ensureDatabaseSchema(PDO $pdo): void
         }
 
         // Ensure websiteSettings table exists
+        $settingsTableExisted = (bool) $pdo->query("SHOW TABLES LIKE 'websiteSettings'")->fetch();
         $pdo->exec("CREATE TABLE IF NOT EXISTS `websiteSettings` (
           `settingKey` varchar(100) NOT NULL,
           `settingValue` longtext NOT NULL,
@@ -114,9 +115,8 @@ function ensureDatabaseSchema(PDO $pdo): void
           PRIMARY KEY (`settingKey`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
-        // Seed default branding if empty
-        $settingsCount = (int) $pdo->query("SELECT COUNT(*) FROM `websiteSettings`")->fetchColumn();
-        if ($settingsCount === 0) {
+        // Seed default branding only when the table is first created
+        if (!$settingsTableExisted) {
             $pdo->exec("INSERT IGNORE INTO `websiteSettings` (`settingKey`, `settingValue`) VALUES
               ('siteName', 'PTR Alumni Network'),
               ('tagline', 'Inspire, Educate and Empower.'),
@@ -164,6 +164,16 @@ function normalizeOrigin(string $origin): ?string
     $normalized = strtolower((string) $parts['scheme']) . '://' . strtolower((string) $parts['host']);
     if (isset($parts['port'])) $normalized .= ':' . (int) $parts['port'];
     return $normalized;
+}
+
+function clientIp(): string
+{
+    $remoteAddress = (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+    $proxySecret = (string) (config()['proxy_secret'] ?? '');
+    $providedSecret = (string) ($_SERVER['HTTP_X_PTRP_PROXY_SECRET'] ?? '');
+    if (strlen($proxySecret) < 32 || $providedSecret === '' || !hash_equals($proxySecret, $providedSecret)) return $remoteAddress;
+    $forwardedIp = trim((string) ($_SERVER['HTTP_X_PTRP_CLIENT_IP'] ?? ''));
+    return filter_var($forwardedIp, FILTER_VALIDATE_IP) ? $forwardedIp : $remoteAddress;
 }
 
 function uploadDirectory(): string
@@ -353,15 +363,17 @@ function currentUser(bool $required = true): ?array
     }
     $uid = $identity['uid'] ?? 0;
     if ($uid > 0) {
-        $statement = database()->prepare('SELECT id, name, email, loginMethod, role, createdAt, updatedAt, lastSignedIn FROM users WHERE id = ? LIMIT 1');
+        $statement = database()->prepare('SELECT * FROM users WHERE id = ? LIMIT 1');
         $statement->execute([$uid]);
     } else {
         // Fallback for legacy session containing openId
-        $statement = database()->prepare('SELECT id, name, email, loginMethod, role, createdAt, updatedAt, lastSignedIn FROM users WHERE openId = ? OR email = ? LIMIT 1');
+        $statement = database()->prepare('SELECT * FROM users WHERE openId = ? OR email = ? LIMIT 1');
         $statement->execute([$identity['openId'] ?? '', $identity['email'] ?? '']);
     }
     $user = $statement->fetch();
-    if (!$user && $required) throw new ApiError(401, 'Account not found. Please log in again.');
+    if ($user && ($user['account_status'] ?? 'active') !== 'active') $user = false;
+    if (!$user && $required) throw new ApiError(401, 'Account not found or inactive. Please log in again.');
+    if ($user) $user = array_intersect_key($user, array_flip(['id', 'name', 'username', 'email', 'loginMethod', 'role', 'createdAt', 'updatedAt', 'lastSignedIn']));
     return $user ?: null;
 }
 
@@ -602,7 +614,7 @@ function routeRequest(): void
             ], 200);
         }
 
-        $clientIp = (string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+        $clientIp = clientIp();
         $ipHash = hash_hmac('sha256', $clientIp, getSessionSecret());
         $rateLimit = database()->prepare('SELECT COUNT(*) FROM contactMessages WHERE ipHash = ? AND createdAt >= DATE_SUB(NOW(), INTERVAL 1 HOUR)');
         $rateLimit->execute([$ipHash]);
@@ -654,44 +666,64 @@ function routeRequest(): void
         respond(currentUser(false));
     }
 
-    // Login with Username & Password
+    // Login with Email or Username & Password
     if ($route === '/auth/login' && $method === 'POST') {
         requireSameOrigin();
         $data = jsonBody();
-        $identifierKey = array_key_exists('identifier', $data) ? 'identifier' : 'username';
-        $username = strtolower((string) inputString($data, $identifierKey, 320, true));
+        $identifier = null;
+        foreach (['identifier', 'username', 'email'] as $field) {
+            $candidate = inputString($data, $field, 320);
+            if ($candidate !== null && $candidate !== '') {
+                $identifier = strtolower($candidate);
+                break;
+            }
+        }
         $password = (string) ($data['password'] ?? '');
-        if ($password === '') throw new ApiError(400, 'Password is required.');
+        if ($identifier === null) throw new ApiError(400, 'Please enter your email address or username.');
+        if ($password === '') throw new ApiError(400, 'Please enter your password.');
 
         $usernameColumn = database()->query("SHOW COLUMNS FROM users LIKE 'username'")->fetch();
-        $stmt = database()->prepare('SELECT * FROM users WHERE LOWER(email) = ? LIMIT 1');
-        $stmt->execute([$username]);
+        if ($usernameColumn) {
+            $stmt = database()->prepare('SELECT * FROM users WHERE LOWER(email) = ? OR LOWER(username) = ? ORDER BY (LOWER(email) = ?) DESC LIMIT 1');
+            $stmt->execute([$identifier, $identifier, $identifier]);
+        } else {
+            $stmt = database()->prepare('SELECT * FROM users WHERE LOWER(email) = ? LIMIT 1');
+            $stmt->execute([$identifier]);
+        }
         $user = $stmt->fetch();
         if (!$user && $usernameColumn) {
             $stmt = database()->prepare('SELECT * FROM users WHERE LOWER(username) = ? LIMIT 1');
-            $stmt->execute([$username]);
+            $stmt->execute([$identifier]);
             $user = $stmt->fetch();
         }
         if (!$user) {
             $stmt = database()->prepare('SELECT * FROM users WHERE LOWER(name) = ? LIMIT 1');
-            $stmt->execute([$username]);
+            $stmt->execute([$identifier]);
             $user = $stmt->fetch();
         }
 
         if (!$user || empty($user['passwordHash']) || !password_verify($password, $user['passwordHash'])) {
-            throw new ApiError(401, 'Invalid username or password.');
+            usleep(random_int(250000, 500000));
+            throw new ApiError(401, 'Incorrect email/username or password. Please check your details and try again.');
+        }
+        if (($user['account_status'] ?? 'active') !== 'active') {
+            throw new ApiError(403, 'This account is inactive. Please contact a network administrator.');
         }
 
-        // Update lastSignedIn
+        if (password_needs_rehash($user['passwordHash'], PASSWORD_BCRYPT, ['cost' => 12])) {
+            database()->prepare('UPDATE users SET passwordHash = ? WHERE id = ? AND passwordHash = ?')
+                ->execute([password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]), $user['id'], $user['passwordHash']]);
+        }
         database()->prepare('UPDATE users SET lastSignedIn = NOW() WHERE id = ?')->execute([$user['id']]);
 
-        // Issue secure session cookie
         $sessionToken = signSession($user);
         setcookie('ptrp_session', $sessionToken, cookieOptions(time() + (86400 * 30)));
+        setcookie('webdev_app_session', '', cookieOptions(time() - 3600));
 
         respond([
             'id' => (int) $user['id'],
             'name' => $user['name'],
+            'username' => $user['username'] ?? null,
             'email' => $user['email'],
             'role' => $user['role'],
             'lastSignedIn' => date('c'),

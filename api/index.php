@@ -2089,8 +2089,16 @@ function routeRequest(): void
         $values = [$status];
         if ($isFeatured !== null) { $updates[] = 'isFeatured = ?'; $values[] = $isFeatured ? 1 : 0; }
         if ($displayOrder !== null) { $updates[] = 'displayOrder = ?'; $values[] = $displayOrder; }
-        if ($status === 'published') { $updates[] = 'publishedAt = NOW()'; $values[] = null; } // placeholder
-        if ($status === 'unpublished') { $updates[] = 'publishedAt = NULL'; $values[] = null; }
+        if ($status === 'published') $updates[] = 'publishedAt = NOW()';
+        if ($status === 'unpublished') $updates[] = 'publishedAt = NULL';
+        if ($status === 'pending') {
+            $updates[] = 'reviewedAt = NULL';
+            $updates[] = 'reviewedBy = NULL';
+        } else {
+            $updates[] = 'reviewedAt = NOW()';
+            $updates[] = 'reviewedBy = ?';
+            $values[] = $user['id'];
+        }
 
         $values[] = $teacherId;
         $statement = database()->prepare('UPDATE resident_teachers SET ' . implode(', ', $updates) . ' WHERE id = ?');

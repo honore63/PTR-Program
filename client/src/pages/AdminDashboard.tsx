@@ -1,6 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { apiRequest, queryKeys, resolveMediaUrl, useApiQuery } from "@/lib/api";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Archive, ArrowDown, ArrowUp, BarChart3, Bell, BookOpen, Building2, CheckCircle2, Copy, FileText, GraduationCap, Mail, MailOpen,
@@ -220,7 +220,12 @@ export default function AdminDashboard() {
   const socialSyncLogs = useApiQuery<any[]>(queryKeys.adminSocialSyncLogs, "admin/social/sync-logs", isAdmin);
   const coordinators = useApiQuery<any[]>(queryKeys.adminCoordinators, "admin/coordinators", isAdmin);
   const mentors = useApiQuery<any[]>(queryKeys.adminMentors, "admin/mentors", isAdmin);
-  const residentTeachers = useApiQuery<any[]>(queryKeys.adminResidentTeachers, "admin/resident-teachers", isAdmin);
+  const residentTeachers = useQuery({
+    queryKey: queryKeys.adminResidentTeachers,
+    queryFn: () => apiRequest<any[]>("admin/resident-teachers"),
+    enabled: isAdmin,
+    refetchInterval: 30_000,
+  });
   const residentBestPractices = useApiQuery<any[]>(queryKeys.adminResidentBestPractices, "admin/resident-best-practices", isAdmin);
   const navigation = useApiQuery<any[]>(queryKeys.adminNavigation, "admin/navigation", canManageContent);
   const settings = useApiQuery<any[]>(queryKeys.adminSettings, "admin/settings", isAdmin);
@@ -351,6 +356,7 @@ export default function AdminDashboard() {
   const coordinatorRows = useMemo(() => coordinators.data ?? [], [coordinators.data]);
   const mentorRows = useMemo(() => mentors.data ?? [], [mentors.data]);
   const residentTeacherRows = useMemo(() => residentTeachers.data ?? [], [residentTeachers.data]);
+  const pendingResidentTeacherCount = residentTeacherRows.filter((row: any) => row.status === "pending").length;
   const residentBestPracticeRows = useMemo(() => residentBestPractices.data ?? [], [residentBestPractices.data]);
   const navigationRows = useMemo(() => navigation.data ?? [], [navigation.data]);
   const settingRows = useMemo(() => settings.data ?? [], [settings.data]);
@@ -387,13 +393,13 @@ export default function AdminDashboard() {
   const setResidentTeacherStatus = useMutation({
     mutationFn: (input: { id: number; status: string; isFeatured?: boolean; displayOrder?: number }) =>
       apiRequest(`admin/resident-teachers/${input.id}/status`, { method: "PATCH", body: { status: input.status, isFeatured: input.isFeatured, displayOrder: input.displayOrder } }),
-    onSuccess: async () => { toast.success("Teacher status updated"); await invalidate(queryKeys.adminResidentTeachers); await invalidate(queryKeys.adminResidentBestPractices); },
+    onSuccess: async () => { toast.success("Teacher status updated"); await invalidate(queryKeys.adminResidentTeachers); await invalidate(queryKeys.adminResidentBestPractices); await invalidate(queryKeys.adminOverview); },
     onError: (error: Error) => toast.error(error.message),
   });
 
   const saveResidentTeacher = useMutation({
     mutationFn: (input: any) => apiRequest("admin/resident-teachers", { method: "POST", body: input }),
-    onSuccess: async () => { toast.success("Resident teacher saved"); await invalidate(queryKeys.adminResidentTeachers); },
+    onSuccess: async () => { toast.success("Resident teacher saved"); await invalidate(queryKeys.adminResidentTeachers); await invalidate(queryKeys.adminOverview); },
     onError: (error: Error) => toast.error(error.message),
   });
 
@@ -495,7 +501,7 @@ export default function AdminDashboard() {
         <div className="admin-brand"><div className="admin-brand-mark">P</div><div><strong>PTR Alumni Network Control</strong><span>Alumni Network</span></div></div>
         <div className="admin-role"><ShieldCheck className="size-4" /><span>{isAdmin ? "Administrator workspace" : "Content editor workspace"}</span></div>
         <nav className="admin-nav" aria-label="Admin sections">
-          {visibleNavItems.map((item) => <button key={item.id} className={tab === item.id ? "admin-nav-active" : ""} onClick={() => setTab(item.id)}><item.icon className="size-4" />{item.label}</button>)}
+          {visibleNavItems.map((item) => <button key={item.id} className={tab === item.id ? "admin-nav-active" : ""} onClick={() => setTab(item.id)}><item.icon className="size-4" />{item.label}{item.id === "resident-teachers" && pendingResidentTeacherCount > 0 && <span aria-label={`${pendingResidentTeacherCount} pending registrations`} style={{ marginLeft: "auto", borderRadius: 999, background: "#f59e0b", color: "#0b2347", padding: "2px 7px", fontSize: ".65rem", fontWeight: 800 }}>{pendingResidentTeacherCount}</span>}</button>)}
         </nav>
         <div className="admin-sidebar-bottom"><a href="/" className="admin-back-link">View public site ↗</a><button className="admin-signout" onClick={() => logout()}><LogOut className="size-4" /> Sign out</button></div>
       </aside>
@@ -523,7 +529,7 @@ export default function AdminDashboard() {
         {tab === "social" && <SocialManager accounts={socialAccountRows} posts={socialPostRows} syncLogs={socialSyncLogRows} onConnect={connectAccount.mutate} onDisconnect={disconnectAccount.mutate} onModerate={moderatePost.mutate} onPublish={publishPost.mutate} onSync={syncAccounts.mutate} connecting={connectAccount.isPending} syncing={syncAccounts.isPending} moderating={moderatePost.isPending} publishing={publishPost.isPending} onRefresh={() => { invalidate(queryKeys.adminSocialAccounts); invalidate(queryKeys.adminSocialPosts); invalidate(queryKeys.adminSocialSyncLogs); }} />}
         {tab === "coordinators" && <TeamManager rows={coordinatorRows} role="coordinator" onDelete={(id: number) => deleteCoordinator.mutate(id)} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminCoordinators })} />}
         {tab === "mentors" && <TeamManager rows={mentorRows} role="mentor" onDelete={(id: number) => deleteMentor.mutate(id)} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminMentors })} />}
-        {tab === "resident-teachers" && <ResidentTeachersManager rows={residentTeacherRows} onSave={saveResidentTeacher.mutate} onSetStatus={setResidentTeacherStatus.mutate} onDelete={deleteResidentTeacher.mutate} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminResidentTeachers })} saving={saveResidentTeacher.isPending || setResidentTeacherStatus.isPending} />}
+        {tab === "resident-teachers" && <ResidentTeachersManager rows={residentTeacherRows} loading={residentTeachers.isLoading} error={residentTeachers.error} onSave={saveResidentTeacher.mutate} onSetStatus={setResidentTeacherStatus.mutate} onDelete={deleteResidentTeacher.mutate} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminResidentTeachers })} saving={saveResidentTeacher.isPending || setResidentTeacherStatus.isPending} />}
         {tab === "resident-best-practices" && <ResidentBestPracticesManager rows={residentBestPracticeRows} teachers={residentTeacherRows} onSave={saveResidentBestPractice.mutate} onDelete={deleteResidentBestPractice.mutate} onRefresh={() => queryClient.invalidateQueries({ queryKey: queryKeys.adminResidentBestPractices })} saving={saveResidentBestPractice.isPending} />}
         {tab === "navigation" && <NavigationManager rows={navigationRows} onSave={saveNavigation.mutate} onDelete={(id: number) => { if (window.confirm("Delete this navigation item and its dropdown items?")) deleteNavigation.mutate(id); }} saving={saveNavigation.isPending} />}
         {tab === "settings" && <WebsiteSettingsManager rows={settingRows} onSave={saveSetting.mutate} onDelete={(key: string) => { if (window.confirm(`Delete the ${key} setting?`)) deleteSetting.mutate(key); }} saving={saveSetting.isPending} />}
@@ -1751,7 +1757,7 @@ function TeamManager({ rows, role, onDelete, onRefresh }: { rows: any[]; role: "
   );
 }
 
-function ResidentTeachersManager({ rows, onSave, onSetStatus, onDelete, onRefresh, saving }: any) {
+function ResidentTeachersManager({ rows, loading, error, onSave, onSetStatus, onDelete, onRefresh, saving }: any) {
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({
     id: 0, fullName: "", email: "", phone: "", gender: "", modelSchool: "",
@@ -1769,6 +1775,31 @@ function ResidentTeachersManager({ rows, onSave, onSetStatus, onDelete, onRefres
     { value: "rejected", label: "Rejected" },
     { value: "unpublished", label: "Unpublished" },
   ];
+  const pendingRows = rows.filter((row: any) => row.status === "pending");
+
+  const editTeacher = (row: any) => {
+    setEditingId(row.id);
+    setForm({
+      id: row.id,
+      fullName: row.fullName,
+      email: row.email,
+      phone: row.phone,
+      gender: row.gender,
+      modelSchool: row.modelSchool,
+      position: row.position,
+      bestPractice: row.bestPractice,
+      bestPracticeDescription: row.bestPracticeDescription,
+      subjects: row.subjects,
+      skills: row.skills,
+      contributions: row.contributions,
+      bio: row.bio,
+      photoUrl: row.photoUrl,
+      status: row.status,
+      isFeatured: row.isFeatured,
+      isAlumni: row.isAlumni,
+      displayOrder: row.displayOrder,
+    });
+  };
 
   const submit = async () => {
     setSavingLocal(true);
@@ -1833,6 +1864,7 @@ function ResidentTeachersManager({ rows, onSave, onSetStatus, onDelete, onRefres
 
   return (
     <div className="admin-content">
+      {error && <div role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><span>Resident registrations could not be loaded: {error.message}</span><button className="admin-table-action" onClick={onRefresh}>Retry</button></div>}
       {editingId !== null && (
         <section className="admin-panel admin-editor">
           <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Resident Teachers</p><h3>Edit Teacher</h3></div><button className="admin-icon-button" onClick={() => setEditingId(null)} aria-label="Close"><X className="size-4" /></button></div>
@@ -1861,19 +1893,28 @@ function ResidentTeachersManager({ rows, onSave, onSetStatus, onDelete, onRefres
         <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Resident Teachers</p><h3>{rows.length} registered teachers</h3><button className="button-primary" onClick={() => { setEditingId(null); setForm({ id: 0, fullName: "", email: "", phone: "", gender: "", modelSchool: "", position: "", bestPractice: "", bestPracticeDescription: "", subjects: "", skills: "", contributions: "", bio: "", photoUrl: "", status: "pending", isFeatured: false, isAlumni: false, displayOrder: 0 }); }}><Plus className="size-4" /> Add Teacher</button></div></div>
         <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Name</th><th>Email</th><th>School</th><th>Status</th><th>Featured</th><th /></tr></thead><tbody>
           {rows.length ? rows.map((row: any) => (
-            <tr key={row.id}><td><strong>{row.fullName}</strong><span>{row.position || "—"}</span></td><td>{row.email}</td><td>{row.modelSchool || "—"}</td><td><span className={`admin-status ${row.status === "published" ? "admin-status-published" : row.status === "approved" ? "admin-status-published" : "admin-status-draft"}`}>{row.status}</span></td><td><button className="admin-table-action" onClick={() => handleFeature(row.id, !row.isFeatured)}>{row.isFeatured ? "Unfeature" : "Feature"}</button></td><td className="admin-row-actions"><button className="admin-table-action" onClick={() => { setEditingId(row.id); setForm({ id: row.id, fullName: row.fullName, email: row.email, phone: row.phone, gender: row.gender, modelSchool: row.modelSchool, position: row.position, bestPractice: row.bestPractice, bestPracticeDescription: row.bestPracticeDescription, subjects: row.subjects, skills: row.skills, contributions: row.contributions, bio: row.bio, photoUrl: row.photoUrl, status: row.status, isFeatured: row.isFeatured, isAlumni: row.isAlumni, displayOrder: row.displayOrder }); }}><Pencil className="size-3.5" /></button><button className="admin-table-action admin-danger" onClick={() => { if (confirm(`Delete ${row.fullName}?`)) onDelete(row.id); }}><Trash2 className="size-3.5" /></button></td></tr>
-          )) : <tr><td colSpan={6} className="admin-empty">No resident teachers registered yet.</td></tr>}
+            <tr key={row.id}><td><strong>{row.fullName}</strong><span>{row.position || "—"}</span></td><td>{row.email}</td><td>{row.modelSchool || "—"}</td><td><span className={`admin-status ${row.status === "published" ? "admin-status-published" : row.status === "approved" ? "admin-status-published" : "admin-status-draft"}`}>{row.status}</span></td><td><button className="admin-table-action" onClick={() => handleFeature(row.id, !row.isFeatured)}>{row.isFeatured ? "Unfeature" : "Feature"}</button></td><td className="admin-row-actions"><button className="admin-table-action" onClick={() => editTeacher(row)} aria-label={`Review ${row.fullName}`}><Pencil className="size-3.5" /></button><button className="admin-table-action admin-danger" onClick={() => { if (confirm(`Delete ${row.fullName}?`)) onDelete(row.id); }}><Trash2 className="size-3.5" /></button></td></tr>
+          )) : <tr><td colSpan={6} className="admin-empty">{loading ? "Loading resident registrations…" : error ? "Unable to load resident registrations." : "No resident teachers registered yet."}</td></tr>}
         </tbody></table></div>
       </section>
 
       <section className="admin-panel">
-        <div className="admin-panel-heading"><div><p className="eyebrow text-[#168d6d]">Bulk Status Actions</p><h3>Approve / Publish teachers</h3></div></div>
-        <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Name</th><th>Current Status</th><th>New Status</th><th /></tr></thead><tbody>
-          {rows.filter((r: any) => r.status !== "published").length > 0 ? (
-            rows.filter((r: any) => r.status !== "published").map((row: any) => (
-              <tr key={row.id}><td><strong>{row.fullName}</strong></td><td><span className={`admin-status ${row.status}`}>{row.status}</span></td><td><select value={row.status} onChange={(e) => setForm({ ...form, id: row.id, status: e.target.value })} className="admin-mod-select"><option value="pending">Pending</option><option value="approved">Approved</option><option value="published">Publish</option><option value="rejected">Reject</option><option value="unpublished">Unpublish</option></select></td><td className="admin-row-actions"><button className="admin-table-action" onClick={() => handleSetStatus(row.id, form.status)}>Apply</button></td></tr>
-            ))
-          ) : <tr><td colSpan={4} className="admin-empty">All teachers are published.</td></tr>}
+        <div className="admin-panel-heading"><div><p className="eyebrow text-[#b45309]">Needs administrator review</p><h3>{pendingRows.length} pending resident registration{pendingRows.length === 1 ? "" : "s"}</h3></div></div>
+        <p className="admin-muted">New resident registrations appear here until reviewed. Approving and publishing makes a profile visible in the public directory.</p>
+        <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Applicant</th><th>Email</th><th>Model school</th><th>Submitted</th><th>Review actions</th></tr></thead><tbody>
+          {pendingRows.length ? pendingRows.map((row: any) => (
+            <tr key={row.id}>
+              <td><strong>{row.fullName}</strong><span>{row.position || "Resident teacher"}</span></td>
+              <td>{row.email}</td>
+              <td>{row.modelSchool || "—"}</td>
+              <td>{row.submittedAt || row.createdAt ? new Date(row.submittedAt || row.createdAt).toLocaleDateString() : "—"}</td>
+              <td className="admin-row-actions">
+                <button className="admin-table-action" onClick={() => editTeacher(row)}>Review</button>
+                <button className="admin-table-action" disabled={saving} onClick={() => handleSetStatus(row.id, "published")}>Approve &amp; publish</button>
+                <button className="admin-table-action admin-danger" disabled={saving} onClick={() => { if (confirm(`Reject ${row.fullName}'s registration?`)) handleSetStatus(row.id, "rejected"); }}>Reject</button>
+              </td>
+            </tr>
+          )) : <tr><td colSpan={5} className="admin-empty">{loading ? "Loading registrations awaiting review…" : error ? "Pending registrations could not be checked." : "No resident registrations are waiting for approval."}</td></tr>}
         </tbody></table></div>
       </section>
     </div>

@@ -1,8 +1,9 @@
 // Only public values may reach the browser. Never serialize secrets.
 export function publicPlatformConfig(env: NodeJS.ProcessEnv = process.env) {
+  const apiProxyTarget = (env.VITE_API_PROXY_TARGET ?? "").replace(/\/+$/, "");
   return {
     appName: "PTR Alumni Network",
-    apiBaseUrl: env.VITE_API_BASE_URL ?? "/PTRP/api/",
+    apiBaseUrl: env.VITE_API_BASE_URL || (apiProxyTarget ? `${apiProxyTarget}/PTRP/api/` : "/PTRP/api/"),
     version: "1.0.0",
   };
 }

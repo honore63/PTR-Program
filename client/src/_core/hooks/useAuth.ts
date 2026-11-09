@@ -12,6 +12,31 @@ export type AuthUser = {
   createdAt?: string;
 };
 
+function isAuthUser(user: unknown): user is AuthUser {
+  if (
+    typeof user !== "object" ||
+    user === null ||
+    !("id" in user) ||
+    typeof user.id !== "number" ||
+    !("name" in user) ||
+    (typeof user.name !== "string" && user.name !== null) ||
+    !("email" in user) ||
+    (typeof user.email !== "string" && user.email !== null) ||
+    !("role" in user) ||
+    (user.role !== "user" && user.role !== "editor" && user.role !== "admin")
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function requireAuthUser(user: unknown): AuthUser {
+  if (!isAuthUser(user)) {
+    throw new ApiError("Sign-in could not be completed because the server returned an invalid account. Please try again or contact an administrator.", 502);
+  }
+  return user;
+}
+
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
   redirectPath?: string;
@@ -29,16 +54,16 @@ export function useAuth(options?: UseAuthOptions) {
   });
 
   const loginMutation = useMutation({
-    mutationFn: (credentials: { username: string; password: string }) =>
-      apiRequest<AuthUser>("auth/login", { method: "POST", body: credentials }),
+    mutationFn: async (credentials: { username: string; password: string }) =>
+      requireAuthUser(await apiRequest<unknown>("auth/login", { method: "POST", body: credentials })),
     onSuccess: (data) => {
       queryClient.setQueryData(queryKeys.authMe, data);
     },
   });
 
   const registerMutation = useMutation({
-    mutationFn: (payload: { name: string; email: string; password: string }) =>
-      apiRequest<AuthUser>("auth/register", { method: "POST", body: payload }),
+    mutationFn: async (payload: { name: string; email: string; password: string }) =>
+      requireAuthUser(await apiRequest<unknown>("auth/register", { method: "POST", body: payload })),
     onSuccess: (data) => {
       queryClient.setQueryData(queryKeys.authMe, data);
     },

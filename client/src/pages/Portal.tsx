@@ -34,10 +34,17 @@ export default function Portal({ language }: PortalProps) {
     setSubmitting(true);
     try {
       const loggedUser = await login({ username, password });
-      toast.success("Signed in successfully!");
-      if (loggedUser.role === "admin") {
+      if (loggedUser.role === "admin" || loggedUser.role === "editor") {
+        toast.success(
+          loggedUser.role === "admin"
+            ? "Administrator access confirmed. Opening the admin portal…"
+            : "Editor access confirmed. Opening the admin portal…",
+        );
         setLocation("/admin");
+        return;
       }
+
+      toast.success("Signed in successfully. You are now in the PTR Alumni Network.");
     } catch (err: any) {
       setErrorMsg(err.message || "Failed to sign in. Please verify your credentials.");
       toast.error(err.message || "Sign-in failed");

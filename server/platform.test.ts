@@ -7,6 +7,20 @@ import { COOKIE_NAME } from "../shared/const";
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 describe("current platform integration", () => {
+  it("uses the configured local PHP API when no explicit API URL is set", () => {
+    expect(publicPlatformConfig({
+      VITE_API_BASE_URL: "",
+      VITE_API_PROXY_TARGET: "http://localhost/",
+    }).apiBaseUrl).toBe("http://localhost/PTRP/api/");
+  });
+
+  it("prefers an explicit API URL over the local proxy target", () => {
+    expect(publicPlatformConfig({
+      VITE_API_BASE_URL: "https://api.example.test/v1/",
+      VITE_API_PROXY_TARGET: "http://localhost",
+    }).apiBaseUrl).toBe("https://api.example.test/v1/");
+  });
+
   it("exposes only named public runtime configuration", () => {
     const env = {
       APP_ID: "ptrp-test",
